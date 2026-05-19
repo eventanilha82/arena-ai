@@ -1,0 +1,110 @@
+{
+  "used_runtime_assets": {
+    "fonts": [
+      "assets/fonts/Oxanium.ttf",
+      "assets/fonts/Oxanium-OFL.txt"
+    ],
+    "generated_images": [
+      "assets/generated/title_stadium_ai.png",
+      "assets/generated/app_icon_worldcup.png",
+      "assets/generated/stadium_parallax_real.png",
+      "assets/generated/parallax/turf_mid_strip.png",
+      "assets/generated/parallax/turf_near_strip.png",
+      "assets/generated/fifa_external/fifa_maple.jpg",
+      "assets/generated/fifa_external/fifa_zayu.jpg",
+      "assets/generated/fifa_external/fifa_clutch.jpg",
+      "assets/generated/fifa_external/fifa_club_world_cup_final_2025.jpg",
+      "assets/generated/fifa_external/fifa_mexico_opening_ceremony.jpg",
+      "assets/generated/fifa_external/fifa_mexico_opening_ceremony_clean.png",
+      "assets/generated/fifa_external/fifa_detail_image_03.jpg",
+      "assets/generated/fifa_external/fwc26_ecomm_photo_update_b.jpg"
+    ],
+    "sounds": [
+      "assets/sounds/runtime_assets/stadium_base_loop.mp3",
+      "assets/sounds/runtime_assets/stadium_air_loop.wav",
+      "assets/sounds/runtime_assets/crowd_light_loop.mp3",
+      "assets/sounds/runtime_assets/crowd_tension_loop.mp3",
+      "assets/sounds/runtime_assets/crowd_attack_rise.wav",
+      "assets/sounds/runtime_assets/crowd_attack_short.wav",
+      "assets/sounds/runtime_assets/crowd_chant_loop.mp3",
+      "assets/sounds/runtime_assets/goal_roar_main.mp3",
+      "assets/sounds/runtime_assets/goal_roar_pixabay_01.wav",
+      "assets/sounds/runtime_assets/goal_roar_pixabay_02.wav",
+      "assets/sounds/runtime_assets/goal_crowd_cc0.wav",
+      "assets/sounds/runtime_assets/goal_explosion_01.wav",
+      "assets/sounds/runtime_assets/goal_explosion_02.wav",
+      "assets/sounds/runtime_assets/goal_explosion_03.wav",
+      "assets/sounds/runtime_assets/bass_hit_01.wav",
+      "assets/sounds/runtime_assets/stadium_reverb_tail.mp3",
+      "assets/sounds/runtime_assets/kick_grass_01.wav",
+      "assets/sounds/runtime_assets/kick_grass_02.wav",
+      "assets/sounds/runtime_assets/kick_grass_03.wav",
+      "assets/sounds/runtime_assets/kick_grass_04.wav",
+      "assets/sounds/runtime_assets/ball_whoosh_01.wav",
+      "assets/sounds/runtime_assets/ball_whoosh_02.wav",
+      "assets/sounds/runtime_assets/net_ripple_01.wav",
+      "assets/sounds/runtime_assets/net_ripple_02.wav",
+      "assets/sounds/runtime_assets/crowd_reaction_01.wav",
+      "assets/sounds/runtime_assets/crowd_reaction_02.wav",
+      "assets/sounds/runtime_assets/crowd_near_miss_01.wav",
+      "assets/sounds/runtime_assets/ui_chime_01.wav",
+      "assets/sounds/runtime_assets/cup_progress_tick_01.wav",
+      "assets/sounds/runtime_assets/cup_reveal_stinger.wav",
+      "assets/sounds/runtime_assets/opening_theme.mp3",
+      "assets/sounds/runtime_assets/whistle_start_01.wav",
+      "assets/sounds/runtime_assets/whistle_final_01.wav"
+    ]
+  },
+  "documentation_assets": [
+    "docs/ASSETS.md",
+    "docs/BUILD.md",
+    "docs/MODEL.md",
+    "docs/QUALITY.md",
+    "docs/STATISTICAL_AUDIT.md"
+  ],
+  "source_assets": [
+    "assets/generated/parallax_sources/imagen_turf_mid_source.png",
+    "assets/generated/parallax_sources/imagen_turf_near_source.png",
+    "assets/generated/ball_sources/plain_ball_sheet_8frames.png"
+  ],
+  "generated_runtime_globs": [
+    "assets/generated/balls3d/ball_*.png",
+    "assets/generated/cinematic/*_dribble.png",
+    "assets/generated/cinematic/*_idle.png",
+    "assets/generated/cinematic/*_kick.png",
+    "assets/generated/cinematic/*_run1.png",
+    "assets/generated/cinematic/goal_front_*.png",
+    "assets/generated/cinematic/goal_impact_*.png",
+    "assets/generated/cinematic/goal_net_*.png",
+    "assets/generated/cinematic/keeper_anim_*.png",
+    "assets/generated/cinematic/runner_*.png",
+    "assets/generated/flags/*.png"
+  ],
+  "generated_source_globs": [
+    "assets/generated/cinematic_sources/imagen_oracle_pose_sheet_8rows.png",
+    "assets/generated/cinematic_sources/imagen_oracle_runner_sheet_8rows.png",
+    "assets/generated/cinematic_sources/imagen_oracle_burgundy_pose_row.png",
+    "assets/generated/cinematic_sources/imagen_oracle_burgundy_runner_row.png",
+    "assets/generated/cinematic_sources/imagen_oracle_pose_left_sheet_8rows.png",
+    "assets/generated/cinematic_sources/imagen_oracle_runner_left_sheet_8rows.png",
+    "assets/generated/cinematic_sources/imagen_oracle_burgundy_pose_left_row.png",
+    "assets/generated/cinematic_sources/imagen_oracle_burgundy_runner_left_row.png",
+    "assets/generated/cinematic_sources/plain_keeper_sheet_green.png",
+    "assets/generated/cinematic_sources/plain_goal_net_sheet.png",
+    "assets/generated/ball_sources/plain_ball_sheet_8frames.png",
+    "assets/generated/flag_sheets/*.png",
+    "assets/generated/parallax_sources/imagen_turf_*.png"
+  ],
+  "curation_assets": [
+    "assets/sounds/audio_manifest.json",
+    "assets/sounds/downloaded_audio_manifest.csv"
+  ],
+  "curation_asset_globs": [
+    "assets/sounds/candidates/**/*"
+  ],
+  "rejected_asset_globs": [
+    "assets/sounds/rejected_assets/*",
+    "assets/sounds/rejected_assets/**/*"
+  ],
+  "allowed_orphans": []
+}

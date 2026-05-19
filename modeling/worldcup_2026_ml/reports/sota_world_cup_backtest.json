@@ -1,0 +1,872 @@
+{
+  "version": "worldcup_2026_sota_v2_backtest",
+  "folds": [
+    {
+      "cup_year": 1994,
+      "train_start": "1990-01-12",
+      "train_end": "1994-06-12",
+      "test_rows": 52,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.5192,
+          "top2_accuracy": 0.6346,
+          "log_loss": 1.1619,
+          "brier": 0.7018,
+          "rps": 0.2392,
+          "ece": 0.2408,
+          "draw_recall": 0.1818
+        },
+        "logistic_1x2": {
+          "accuracy": 0.6923,
+          "top2_accuracy": 0.9808,
+          "log_loss": 0.6147,
+          "brier": 0.4102,
+          "rps": 0.1087,
+          "ece": 0.0954,
+          "draw_recall": 0.5455
+        },
+        "xgb_1x2": {
+          "accuracy": 0.75,
+          "top2_accuracy": 0.9808,
+          "log_loss": 0.5032,
+          "brier": 0.3196,
+          "rps": 0.0843,
+          "ece": 0.1112,
+          "draw_recall": 0.2727
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.75,
+          "top2_accuracy": 0.9808,
+          "log_loss": 0.4832,
+          "brier": 0.3105,
+          "rps": 0.0815,
+          "ece": 0.0727,
+          "draw_recall": 0.2727,
+          "temperature": 0.7
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.7308,
+          "top2_accuracy": 0.9615,
+          "log_loss": 0.6373,
+          "brier": 0.3704,
+          "rps": 0.1068,
+          "ece": 0.1301,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0472,
+          "away_goal_mae": 0.6561
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.7692,
+          "top2_accuracy": 0.9808,
+          "log_loss": 0.6518,
+          "brier": 0.3706,
+          "rps": 0.1064,
+          "ece": 0.1626,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9637,
+          "away_goal_mae": 0.6355
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.6731,
+          "top2_accuracy": 0.9808,
+          "log_loss": 0.6525,
+          "brier": 0.4013,
+          "rps": 0.112,
+          "ece": 0.0922,
+          "draw_recall": 0.5455
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.8,
+          "poisson_weight": 0.2,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.46,
+          "objective": 0.674082,
+          "log_loss": 0.59309,
+          "rps": 0.096315,
+          "brier": 0.344386,
+          "ece": 0.129106,
+          "draw_recall": 0.090909,
+          "draw_expected_rate": 0.269991,
+          "draw_actual_rate": 0.211538,
+          "draw_gap": 0.058452,
+          "entropy": 0.733694,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 1177,
+          "inner_rows": 1505,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 1998,
+      "train_start": "1990-01-12",
+      "train_end": "1998-06-07",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.5156,
+          "top2_accuracy": 0.6406,
+          "log_loss": 1.1685,
+          "brier": 0.7064,
+          "rps": 0.2292,
+          "ece": 0.2444,
+          "draw_recall": 0.2105
+        },
+        "logistic_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.602,
+          "brier": 0.396,
+          "rps": 0.1042,
+          "ece": 0.1237,
+          "draw_recall": 0.4211
+        },
+        "xgb_1x2": {
+          "accuracy": 0.7031,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.5777,
+          "brier": 0.3895,
+          "rps": 0.0979,
+          "ece": 0.125,
+          "draw_recall": 0.0526
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.7031,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.6149,
+          "brier": 0.4171,
+          "rps": 0.1044,
+          "ece": 0.1475,
+          "draw_recall": 0.0526,
+          "temperature": 0.7
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.6875,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6925,
+          "brier": 0.4152,
+          "rps": 0.1079,
+          "ece": 0.0654,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0463,
+          "away_goal_mae": 0.6012
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.6875,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6776,
+          "brier": 0.4044,
+          "rps": 0.1033,
+          "ece": 0.1106,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9521,
+          "away_goal_mae": 0.6073
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.6406,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.645,
+          "brier": 0.4042,
+          "rps": 0.1067,
+          "ece": 0.1113,
+          "draw_recall": 0.4211
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.5,
+          "poisson_weight": 0.5,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.46,
+          "objective": 0.748283,
+          "log_loss": 0.661696,
+          "rps": 0.102564,
+          "brier": 0.399365,
+          "ece": 0.078812,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.226531,
+          "draw_actual_rate": 0.296875,
+          "draw_gap": 0.070344,
+          "entropy": 0.696858,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 4055,
+          "inner_rows": 1747,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2002,
+      "train_start": "1990-01-12",
+      "train_end": "2002-05-30",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.4531,
+          "top2_accuracy": 0.5469,
+          "log_loss": 1.2839,
+          "brier": 0.7864,
+          "rps": 0.2726,
+          "ece": 0.3069,
+          "draw_recall": 0.1875
+        },
+        "logistic_1x2": {
+          "accuracy": 0.5625,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.7678,
+          "brier": 0.5177,
+          "rps": 0.1455,
+          "ece": 0.0878,
+          "draw_recall": 0.125
+        },
+        "xgb_1x2": {
+          "accuracy": 0.6562,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.7109,
+          "brier": 0.4642,
+          "rps": 0.1297,
+          "ece": 0.0996,
+          "draw_recall": 0.0625
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.6562,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.7289,
+          "brier": 0.4732,
+          "rps": 0.1325,
+          "ece": 0.1582,
+          "draw_recall": 0.0625,
+          "temperature": 0.85
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.6562,
+          "top2_accuracy": 0.9219,
+          "log_loss": 0.7867,
+          "brier": 0.4747,
+          "rps": 0.1396,
+          "ece": 0.0648,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9961,
+          "away_goal_mae": 0.6737
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.7739,
+          "brier": 0.4621,
+          "rps": 0.1353,
+          "ece": 0.1367,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9021,
+          "away_goal_mae": 0.6782
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.5781,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.8175,
+          "brier": 0.5151,
+          "rps": 0.1491,
+          "ece": 0.0371,
+          "draw_recall": 0.125
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.82,
+          "poisson_weight": 0.18,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.3,
+          "objective": 0.820582,
+          "log_loss": 0.747024,
+          "rps": 0.130668,
+          "brier": 0.454001,
+          "ece": 0.100029,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.241296,
+          "draw_actual_rate": 0.25,
+          "draw_gap": 0.008704,
+          "entropy": 0.744102,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 7541,
+          "inner_rows": 1888,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2006,
+      "train_start": "1990-01-12",
+      "train_end": "2006-06-08",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.6406,
+          "top2_accuracy": 0.7031,
+          "log_loss": 0.9378,
+          "brier": 0.5464,
+          "rps": 0.1697,
+          "ece": 0.1194,
+          "draw_recall": 0.3333
+        },
+        "logistic_1x2": {
+          "accuracy": 0.7188,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.6049,
+          "brier": 0.3931,
+          "rps": 0.1061,
+          "ece": 0.144,
+          "draw_recall": 0.4
+        },
+        "xgb_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5383,
+          "brier": 0.3475,
+          "rps": 0.09,
+          "ece": 0.0812,
+          "draw_recall": 0.0
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5332,
+          "brier": 0.347,
+          "rps": 0.0894,
+          "ece": 0.0675,
+          "draw_recall": 0.0,
+          "temperature": 0.85
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.75,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6106,
+          "brier": 0.3576,
+          "rps": 0.0947,
+          "ece": 0.0921,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.1025,
+          "away_goal_mae": 0.5951
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.75,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6339,
+          "brier": 0.3652,
+          "rps": 0.0979,
+          "ece": 0.1002,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9632,
+          "away_goal_mae": 0.6119
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.632,
+          "brier": 0.3956,
+          "rps": 0.108,
+          "ece": 0.1122,
+          "draw_recall": 0.2
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.88,
+          "poisson_weight": 0.12,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.46,
+          "objective": 0.651302,
+          "log_loss": 0.594946,
+          "rps": 0.093542,
+          "brier": 0.353006,
+          "ece": 0.087914,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.242971,
+          "draw_actual_rate": 0.234375,
+          "draw_gap": 0.008596,
+          "entropy": 0.696817,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 11254,
+          "inner_rows": 1781,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2010,
+      "train_start": "1990-01-12",
+      "train_end": "2010-06-10",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.5312,
+          "top2_accuracy": 0.6719,
+          "log_loss": 1.1397,
+          "brier": 0.6864,
+          "rps": 0.2202,
+          "ece": 0.2287,
+          "draw_recall": 0.0625
+        },
+        "logistic_1x2": {
+          "accuracy": 0.7188,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6205,
+          "brier": 0.4072,
+          "rps": 0.1069,
+          "ece": 0.0851,
+          "draw_recall": 0.5
+        },
+        "xgb_1x2": {
+          "accuracy": 0.7344,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5554,
+          "brier": 0.3645,
+          "rps": 0.0946,
+          "ece": 0.0606,
+          "draw_recall": 0.0625
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.7344,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5634,
+          "brier": 0.3717,
+          "rps": 0.0967,
+          "ece": 0.0614,
+          "draw_recall": 0.0625,
+          "temperature": 0.8
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.7031,
+          "top2_accuracy": 0.9531,
+          "log_loss": 0.67,
+          "brier": 0.3872,
+          "rps": 0.1047,
+          "ece": 0.1149,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0659,
+          "away_goal_mae": 0.6212
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.7344,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6662,
+          "brier": 0.3845,
+          "rps": 0.1032,
+          "ece": 0.1692,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0017,
+          "away_goal_mae": 0.6202
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.7812,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6405,
+          "brier": 0.4007,
+          "rps": 0.1081,
+          "ece": 0.1521,
+          "draw_recall": 0.4375
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.88,
+          "poisson_weight": 0.12,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.3,
+          "objective": 0.696234,
+          "log_loss": 0.629902,
+          "rps": 0.098643,
+          "brier": 0.37482,
+          "ece": 0.132961,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.232475,
+          "draw_actual_rate": 0.25,
+          "draw_gap": 0.017525,
+          "entropy": 0.694553,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 14996,
+          "inner_rows": 1841,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2014,
+      "train_start": "1990-01-12",
+      "train_end": "2014-06-10",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.6094,
+          "top2_accuracy": 0.7031,
+          "log_loss": 0.9955,
+          "brier": 0.5864,
+          "rps": 0.1972,
+          "ece": 0.1506,
+          "draw_recall": 0.3846
+        },
+        "logistic_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.6062,
+          "brier": 0.3969,
+          "rps": 0.1033,
+          "ece": 0.1697,
+          "draw_recall": 0.3846
+        },
+        "xgb_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.5387,
+          "brier": 0.3374,
+          "rps": 0.0914,
+          "ece": 0.0735,
+          "draw_recall": 0.0
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.5373,
+          "brier": 0.3367,
+          "rps": 0.0919,
+          "ece": 0.064,
+          "draw_recall": 0.0,
+          "temperature": 0.85
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.6228,
+          "brier": 0.3565,
+          "rps": 0.1006,
+          "ece": 0.101,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9615,
+          "away_goal_mae": 0.7078
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.7656,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.6413,
+          "brier": 0.3661,
+          "rps": 0.1036,
+          "ece": 0.1217,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9308,
+          "away_goal_mae": 0.7107
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.75,
+          "top2_accuracy": 0.9688,
+          "log_loss": 0.6454,
+          "brier": 0.4093,
+          "rps": 0.1107,
+          "ece": 0.1809,
+          "draw_recall": 0.3846
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.88,
+          "poisson_weight": 0.12,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.46,
+          "objective": 0.675236,
+          "log_loss": 0.600805,
+          "rps": 0.096776,
+          "brier": 0.350044,
+          "ece": 0.124619,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.245806,
+          "draw_actual_rate": 0.203125,
+          "draw_gap": 0.042681,
+          "entropy": 0.70266,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 18904,
+          "inner_rows": 1898,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2018,
+      "train_start": "1990-01-12",
+      "train_end": "2018-06-12",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.5469,
+          "top2_accuracy": 0.6719,
+          "log_loss": 1.1108,
+          "brier": 0.6664,
+          "rps": 0.2236,
+          "ece": 0.2131,
+          "draw_recall": 0.0769
+        },
+        "logistic_1x2": {
+          "accuracy": 0.6875,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.62,
+          "brier": 0.411,
+          "rps": 0.1061,
+          "ece": 0.07,
+          "draw_recall": 0.5385
+        },
+        "xgb_1x2": {
+          "accuracy": 0.7969,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.4946,
+          "brier": 0.3051,
+          "rps": 0.0773,
+          "ece": 0.0947,
+          "draw_recall": 0.0769
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.7969,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.4845,
+          "brier": 0.2995,
+          "rps": 0.0756,
+          "ece": 0.1137,
+          "draw_recall": 0.0769,
+          "temperature": 0.9
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.7812,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.6072,
+          "brier": 0.3418,
+          "rps": 0.0958,
+          "ece": 0.1508,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.9105,
+          "away_goal_mae": 0.673
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.7969,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.6136,
+          "brier": 0.3441,
+          "rps": 0.0948,
+          "ece": 0.1599,
+          "draw_recall": 0.0,
+          "home_goal_mae": 0.8559,
+          "away_goal_mae": 0.6813
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.6971,
+          "brier": 0.4362,
+          "rps": 0.12,
+          "ece": 0.0912,
+          "draw_recall": 0.5385
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.88,
+          "poisson_weight": 0.12,
+          "draw_floor": 0.06,
+          "draw_ceiling": 0.46,
+          "objective": 0.658804,
+          "log_loss": 0.579157,
+          "rps": 0.089602,
+          "brier": 0.332548,
+          "ece": 0.143149,
+          "draw_recall": 0.076923,
+          "draw_expected_rate": 0.261903,
+          "draw_actual_rate": 0.203125,
+          "draw_gap": 0.058778,
+          "entropy": 0.726989,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 22824,
+          "inner_rows": 1693,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    },
+    {
+      "cup_year": 2022,
+      "train_start": "1990-01-12",
+      "train_end": "2022-11-19",
+      "test_rows": 64,
+      "metrics": {
+        "baseline_elo_1x2": {
+          "accuracy": 0.5156,
+          "top2_accuracy": 0.5938,
+          "log_loss": 1.1685,
+          "brier": 0.7064,
+          "rps": 0.2405,
+          "ece": 0.2444,
+          "draw_recall": 0.0667
+        },
+        "logistic_1x2": {
+          "accuracy": 0.6406,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.6458,
+          "brier": 0.4327,
+          "rps": 0.113,
+          "ece": 0.072,
+          "draw_recall": 0.3333
+        },
+        "xgb_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5855,
+          "brier": 0.389,
+          "rps": 0.1025,
+          "ece": 0.109,
+          "draw_recall": 0.0667
+        },
+        "xgb_temperature_calibrated_1x2": {
+          "accuracy": 0.6719,
+          "top2_accuracy": 0.9844,
+          "log_loss": 0.5855,
+          "brier": 0.392,
+          "rps": 0.103,
+          "ece": 0.1005,
+          "draw_recall": 0.0667,
+          "temperature": 0.9
+        },
+        "poisson_goal_model_1x2": {
+          "accuracy": 0.7031,
+          "top2_accuracy": 0.9375,
+          "log_loss": 0.7241,
+          "brier": 0.428,
+          "rps": 0.1279,
+          "ece": 0.0755,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0439,
+          "away_goal_mae": 0.6904
+        },
+        "xgb_count_poisson_1x2": {
+          "accuracy": 0.7188,
+          "top2_accuracy": 0.9531,
+          "log_loss": 0.6981,
+          "brier": 0.4091,
+          "rps": 0.1171,
+          "ece": 0.1031,
+          "draw_recall": 0.0,
+          "home_goal_mae": 1.0115,
+          "away_goal_mae": 0.6779
+        },
+        "stacking_meta_1x2": {
+          "accuracy": 0.625,
+          "top2_accuracy": 1.0,
+          "log_loss": 0.754,
+          "brier": 0.4897,
+          "rps": 0.1297,
+          "ece": 0.102,
+          "draw_recall": 0.5333
+        },
+        "hybrid_nested_policy_1x2": {
+          "classifier_weight": 0.88,
+          "poisson_weight": 0.12,
+          "draw_floor": 0.04,
+          "draw_ceiling": 0.42,
+          "objective": 0.728658,
+          "log_loss": 0.658879,
+          "rps": 0.111297,
+          "brier": 0.397131,
+          "ece": 0.059281,
+          "draw_recall": 0.0,
+          "draw_expected_rate": 0.262449,
+          "draw_actual_rate": 0.234375,
+          "draw_gap": 0.028074,
+          "entropy": 0.72607,
+          "randomness_penalty": 0.0,
+          "inner_train_rows": 26636,
+          "inner_rows": 2013,
+          "inner_rho": -0.18,
+          "outer_rho": -0.18
+        }
+      }
+    }
+  ],
+  "aggregate_weighted_by_matches": {
+    "baseline_elo_1x2": {
+      "accuracy": 0.542,
+      "top2_accuracy": 0.646,
+      "log_loss": 1.1198,
+      "brier": 0.6726,
+      "rps": 0.2237,
+      "ece": 0.218,
+      "draw_recall": 0.1881
+    },
+    "hybrid_nested_policy_1x2": {
+      "log_loss": 0.6341,
+      "brier": 0.3764,
+      "rps": 0.1026,
+      "ece": 0.1065,
+      "draw_recall": 0.0193,
+      "classifier_weight": 0.8154,
+      "poisson_weight": 0.1846,
+      "draw_floor": 0.0426,
+      "draw_ceiling": 0.4139,
+      "objective": 0.7074,
+      "draw_expected_rate": 0.2474,
+      "draw_actual_rate": 0.236,
+      "draw_gap": 0.0361,
+      "entropy": 0.7148,
+      "randomness_penalty": 0.0,
+      "inner_train_rows": 13717.288,
+      "inner_rows": 1802.728,
+      "inner_rho": -0.18,
+      "outer_rho": -0.18
+    },
+    "logistic_1x2": {
+      "accuracy": 0.682,
+      "top2_accuracy": 0.982,
+      "log_loss": 0.6357,
+      "brier": 0.4208,
+      "rps": 0.1118,
+      "ece": 0.1062,
+      "draw_recall": 0.4027
+    },
+    "poisson_goal_model_1x2": {
+      "accuracy": 0.722,
+      "top2_accuracy": 0.962,
+      "log_loss": 0.6697,
+      "brier": 0.3919,
+      "rps": 0.1098,
+      "ece": 0.0986,
+      "draw_recall": 0.0,
+      "home_goal_mae": 1.0211,
+      "away_goal_mae": 0.6522
+    },
+    "stacking_meta_1x2": {
+      "accuracy": 0.674,
+      "top2_accuracy": 0.978,
+      "log_loss": 0.6863,
+      "brier": 0.4322,
+      "rps": 0.1182,
+      "ece": 0.1103,
+      "draw_recall": 0.3947
+    },
+    "xgb_1x2": {
+      "accuracy": 0.73,
+      "top2_accuracy": 0.98,
+      "log_loss": 0.5645,
+      "brier": 0.3657,
+      "rps": 0.0962,
+      "ece": 0.0939,
+      "draw_recall": 0.0695
+    },
+    "xgb_count_poisson_1x2": {
+      "accuracy": 0.736,
+      "top2_accuracy": 0.974,
+      "log_loss": 0.67,
+      "brier": 0.3887,
+      "rps": 0.1077,
+      "ece": 0.1323,
+      "draw_recall": 0.0,
+      "home_goal_mae": 0.9472,
+      "away_goal_mae": 0.6533
+    },
+    "xgb_temperature_calibrated_1x2": {
+      "accuracy": 0.73,
+      "top2_accuracy": 0.98,
+      "log_loss": 0.5684,
+      "brier": 0.3699,
+      "rps": 0.0972,
+      "ece": 0.0988,
+      "draw_recall": 0.0695,
+      "temperature": 0.8216
+    }
+  }
+}

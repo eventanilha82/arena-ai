@@ -1,0 +1,105 @@
+id,match_number,home_team_id,away_team_id,city_id,stage_id,kickoff_at,match_label,home_id,home_team,home_fifa_code,group,home_is_placeholder,away_id,away_team,away_fifa_code,away_group_letter,away_is_placeholder,stage,stage_stage_order,city_city_name,host_country,city_venue_name,city_region_cluster,airport_code
+1,1,1.0,2.0,15,1,2026-06-11 21:00:00+00:00,Group A,1.0,Mexico,MEX,A,False,2.0,South Africa,RSA,A,False,Group Stage,1,Mexico City,Mexico,Estadio Azteca,Central,MEX
+2,2,3.0,4.0,14,1,2026-06-12 04:00:00+00:00,Group A,3.0,Korea Republic,KOR,A,False,4.0,Czechia,CZE,A,False,Group Stage,1,Guadalajara,Mexico,Estadio Akron,Central,GDL
+3,3,5.0,6.0,12,1,2026-06-12 19:00:00+00:00,Group B,5.0,Canada,CAN,B,False,6.0,Bosnia and Herzegovina,BIH,B,False,Group Stage,1,Toronto,Canada,BMO Field,East,YYZ
+4,4,13.0,14.0,6,1,2026-06-13 04:00:00+00:00,Group D,13.0,USA,USA,D,False,14.0,Paraguay,PAR,D,False,Group Stage,1,Los Angeles,USA,SoFi Stadium,West,LAX
+5,5,7.0,8.0,10,1,2026-06-13 22:00:00+00:00,Group B,7.0,Qatar,QAT,B,False,8.0,Switzerland,SUI,B,False,Group Stage,1,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+6,6,9.0,10.0,8,1,2026-06-13 22:00:00+00:00,Group C,9.0,Brazil,BRA,C,False,10.0,Morocco,MAR,C,False,Group Stage,1,New York/New Jersey,USA,MetLife Stadium,East,EWR
+7,7,11.0,12.0,2,1,2026-06-14 01:00:00+00:00,Group C,11.0,Haiti,HAI,C,False,12.0,Scotland,SCO,C,False,Group Stage,1,Boston,USA,Gillette Stadium,East,BOS
+8,8,15.0,16.0,13,1,2026-06-14 07:00:00+00:00,Group D,15.0,Australia,AUS,D,False,16.0,Türkiye,TUR,D,False,Group Stage,1,Vancouver,Canada,BC Place,West,YVR
+9,9,17.0,18.0,4,1,2026-06-14 18:00:00+00:00,Group E,17.0,Germany,GER,E,False,18.0,Curaçao,CUR,E,False,Group Stage,1,Houston,USA,NRG Stadium,Central,IAH
+10,10,21.0,22.0,3,1,2026-06-14 21:00:00+00:00,Group F,21.0,Netherlands,NED,F,False,22.0,Japan,JPN,F,False,Group Stage,1,Dallas,USA,AT&T Stadium,Central,DAL
+11,11,19.0,20.0,9,1,2026-06-14 23:00:00+00:00,Group E,19.0,Côte d'Ivoire,CIV,E,False,20.0,Ecuador,ECU,E,False,Group Stage,1,Philadelphia,USA,Lincoln Financial Field,East,PHL
+12,12,23.0,24.0,16,1,2026-06-15 04:00:00+00:00,Group F,23.0,Sweden,SWE,F,False,24.0,Tunisia,TUN,F,False,Group Stage,1,Monterrey,Mexico,Estadio BBVA,Central,MTY
+13,13,29.0,30.0,1,1,2026-06-15 16:00:00+00:00,Group H,29.0,Spain,ESP,H,False,30.0,Cabo Verde,CPV,H,False,Group Stage,1,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+14,14,25.0,26.0,11,1,2026-06-15 22:00:00+00:00,Group G,25.0,Belgium,BEL,G,False,26.0,Egypt,EGY,G,False,Group Stage,1,Seattle,USA,Lumen Field,West,SEA
+15,15,31.0,32.0,7,1,2026-06-15 22:00:00+00:00,Group H,31.0,Saudi Arabia,KSA,H,False,32.0,Uruguay,URU,H,False,Group Stage,1,Miami,USA,Hard Rock Stadium,East,MIA
+16,16,27.0,28.0,6,1,2026-06-16 04:00:00+00:00,Group G,27.0,IR Iran,IRN,G,False,28.0,New Zealand,NZL,G,False,Group Stage,1,Los Angeles,USA,SoFi Stadium,West,LAX
+17,17,33.0,34.0,8,1,2026-06-16 19:00:00+00:00,Group I,33.0,France,FRA,I,False,34.0,Senegal,SEN,I,False,Group Stage,1,New York/New Jersey,USA,MetLife Stadium,East,EWR
+18,18,35.0,36.0,2,1,2026-06-16 22:00:00+00:00,Group I,35.0,Iraq,IRQ,I,False,36.0,Norway,NOR,I,False,Group Stage,1,Boston,USA,Gillette Stadium,East,BOS
+19,19,37.0,38.0,5,1,2026-06-17 02:00:00+00:00,Group J,37.0,Argentina,ARG,J,False,38.0,Algeria,ALG,J,False,Group Stage,1,Kansas City,USA,Arrowhead Stadium,Central,MCI
+20,20,39.0,40.0,10,1,2026-06-17 07:00:00+00:00,Group J,39.0,Austria,AUT,J,False,40.0,Jordan,JOR,J,False,Group Stage,1,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+21,21,41.0,42.0,4,1,2026-06-17 18:00:00+00:00,Group K,41.0,Portugal,POR,K,False,42.0,Congo DR,COD,K,False,Group Stage,1,Houston,USA,NRG Stadium,Central,IAH
+22,22,45.0,46.0,3,1,2026-06-17 21:00:00+00:00,Group L,45.0,England,ENG,L,False,46.0,Croatia,CRO,L,False,Group Stage,1,Dallas,USA,AT&T Stadium,Central,DAL
+23,23,47.0,48.0,12,1,2026-06-17 23:00:00+00:00,Group L,47.0,Ghana,GHA,L,False,48.0,Panama,PAN,L,False,Group Stage,1,Toronto,Canada,BMO Field,East,YYZ
+24,24,43.0,44.0,15,1,2026-06-18 04:00:00+00:00,Group K,43.0,Uzbekistan,UZB,K,False,44.0,Colombia,COL,K,False,Group Stage,1,Mexico City,Mexico,Estadio Azteca,Central,MEX
+25,25,4.0,2.0,1,1,2026-06-18 16:00:00+00:00,Group A,4.0,Czechia,CZE,A,False,2.0,South Africa,RSA,A,False,Group Stage,1,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+26,26,8.0,6.0,6,1,2026-06-18 22:00:00+00:00,Group B,8.0,Switzerland,SUI,B,False,6.0,Bosnia and Herzegovina,BIH,B,False,Group Stage,1,Los Angeles,USA,SoFi Stadium,West,LAX
+27,27,5.0,7.0,13,1,2026-06-19 01:00:00+00:00,Group B,5.0,Canada,CAN,B,False,7.0,Qatar,QAT,B,False,Group Stage,1,Vancouver,Canada,BC Place,West,YVR
+28,28,1.0,3.0,14,1,2026-06-19 03:00:00+00:00,Group A,1.0,Mexico,MEX,A,False,3.0,Korea Republic,KOR,A,False,Group Stage,1,Guadalajara,Mexico,Estadio Akron,Central,GDL
+29,29,13.0,15.0,11,1,2026-06-19 22:00:00+00:00,Group D,13.0,USA,USA,D,False,15.0,Australia,AUS,D,False,Group Stage,1,Seattle,USA,Lumen Field,West,SEA
+30,30,12.0,10.0,2,1,2026-06-19 22:00:00+00:00,Group C,12.0,Scotland,SCO,C,False,10.0,Morocco,MAR,C,False,Group Stage,1,Boston,USA,Gillette Stadium,East,BOS
+31,31,9.0,11.0,9,1,2026-06-20 01:00:00+00:00,Group C,9.0,Brazil,BRA,C,False,11.0,Haiti,HAI,C,False,Group Stage,1,Philadelphia,USA,Lincoln Financial Field,East,PHL
+32,32,16.0,14.0,10,1,2026-06-20 07:00:00+00:00,Group D,16.0,Türkiye,TUR,D,False,14.0,Paraguay,PAR,D,False,Group Stage,1,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+33,33,21.0,23.0,4,1,2026-06-20 18:00:00+00:00,Group F,21.0,Netherlands,NED,F,False,23.0,Sweden,SWE,F,False,Group Stage,1,Houston,USA,NRG Stadium,Central,IAH
+34,34,17.0,19.0,12,1,2026-06-20 20:00:00+00:00,Group E,17.0,Germany,GER,E,False,19.0,Côte d'Ivoire,CIV,E,False,Group Stage,1,Toronto,Canada,BMO Field,East,YYZ
+35,35,20.0,18.0,5,1,2026-06-21 01:00:00+00:00,Group E,20.0,Ecuador,ECU,E,False,18.0,Curaçao,CUR,E,False,Group Stage,1,Kansas City,USA,Arrowhead Stadium,Central,MCI
+36,36,24.0,22.0,16,1,2026-06-21 06:00:00+00:00,Group F,24.0,Tunisia,TUN,F,False,22.0,Japan,JPN,F,False,Group Stage,1,Monterrey,Mexico,Estadio BBVA,Central,MTY
+37,37,29.0,31.0,1,1,2026-06-21 16:00:00+00:00,Group H,29.0,Spain,ESP,H,False,31.0,Saudi Arabia,KSA,H,False,Group Stage,1,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+38,38,25.0,27.0,6,1,2026-06-21 22:00:00+00:00,Group G,25.0,Belgium,BEL,G,False,27.0,IR Iran,IRN,G,False,Group Stage,1,Los Angeles,USA,SoFi Stadium,West,LAX
+39,39,32.0,30.0,7,1,2026-06-21 22:00:00+00:00,Group H,32.0,Uruguay,URU,H,False,30.0,Cabo Verde,CPV,H,False,Group Stage,1,Miami,USA,Hard Rock Stadium,East,MIA
+40,40,28.0,26.0,13,1,2026-06-22 04:00:00+00:00,Group G,28.0,New Zealand,NZL,G,False,26.0,Egypt,EGY,G,False,Group Stage,1,Vancouver,Canada,BC Place,West,YVR
+41,41,37.0,39.0,3,1,2026-06-22 18:00:00+00:00,Group J,37.0,Argentina,ARG,J,False,39.0,Austria,AUT,J,False,Group Stage,1,Dallas,USA,AT&T Stadium,Central,DAL
+42,42,33.0,35.0,9,1,2026-06-22 21:00:00+00:00,Group I,33.0,France,FRA,I,False,35.0,Iraq,IRQ,I,False,Group Stage,1,Philadelphia,USA,Lincoln Financial Field,East,PHL
+43,43,36.0,34.0,8,1,2026-06-23 00:00:00+00:00,Group I,36.0,Norway,NOR,I,False,34.0,Senegal,SEN,I,False,Group Stage,1,New York/New Jersey,USA,MetLife Stadium,East,EWR
+44,44,40.0,38.0,10,1,2026-06-23 06:00:00+00:00,Group J,40.0,Jordan,JOR,J,False,38.0,Algeria,ALG,J,False,Group Stage,1,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+45,45,41.0,43.0,4,1,2026-06-23 18:00:00+00:00,Group K,41.0,Portugal,POR,K,False,43.0,Uzbekistan,UZB,K,False,Group Stage,1,Houston,USA,NRG Stadium,Central,IAH
+46,46,45.0,47.0,2,1,2026-06-23 20:00:00+00:00,Group L,45.0,England,ENG,L,False,47.0,Ghana,GHA,L,False,Group Stage,1,Boston,USA,Gillette Stadium,East,BOS
+47,47,48.0,46.0,12,1,2026-06-23 23:00:00+00:00,Group L,48.0,Panama,PAN,L,False,46.0,Croatia,CRO,L,False,Group Stage,1,Toronto,Canada,BMO Field,East,YYZ
+48,48,44.0,42.0,14,1,2026-06-24 04:00:00+00:00,Group K,44.0,Colombia,COL,K,False,42.0,Congo DR,COD,K,False,Group Stage,1,Guadalajara,Mexico,Estadio Akron,Central,GDL
+49,49,8.0,5.0,13,1,2026-06-24 22:00:00+00:00,Group B,8.0,Switzerland,SUI,B,False,5.0,Canada,CAN,B,False,Group Stage,1,Vancouver,Canada,BC Place,West,YVR
+50,50,6.0,7.0,11,1,2026-06-24 22:00:00+00:00,Group B,6.0,Bosnia and Herzegovina,BIH,B,False,7.0,Qatar,QAT,B,False,Group Stage,1,Seattle,USA,Lumen Field,West,SEA
+51,51,12.0,9.0,7,1,2026-06-24 22:00:00+00:00,Group C,12.0,Scotland,SCO,C,False,9.0,Brazil,BRA,C,False,Group Stage,1,Miami,USA,Hard Rock Stadium,East,MIA
+52,52,10.0,11.0,1,1,2026-06-24 22:00:00+00:00,Group C,10.0,Morocco,MAR,C,False,11.0,Haiti,HAI,C,False,Group Stage,1,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+53,53,4.0,1.0,15,1,2026-06-25 03:00:00+00:00,Group A,4.0,Czechia,CZE,A,False,1.0,Mexico,MEX,A,False,Group Stage,1,Mexico City,Mexico,Estadio Azteca,Central,MEX
+54,54,2.0,3.0,16,1,2026-06-25 03:00:00+00:00,Group A,2.0,South Africa,RSA,A,False,3.0,Korea Republic,KOR,A,False,Group Stage,1,Monterrey,Mexico,Estadio BBVA,Central,MTY
+55,55,18.0,19.0,9,1,2026-06-25 20:00:00+00:00,Group E,18.0,Curaçao,CUR,E,False,19.0,Côte d'Ivoire,CIV,E,False,Group Stage,1,Philadelphia,USA,Lincoln Financial Field,East,PHL
+56,56,20.0,17.0,8,1,2026-06-25 20:00:00+00:00,Group E,20.0,Ecuador,ECU,E,False,17.0,Germany,GER,E,False,Group Stage,1,New York/New Jersey,USA,MetLife Stadium,East,EWR
+57,57,22.0,23.0,3,1,2026-06-26 00:00:00+00:00,Group F,22.0,Japan,JPN,F,False,23.0,Sweden,SWE,F,False,Group Stage,1,Dallas,USA,AT&T Stadium,Central,DAL
+58,58,24.0,21.0,5,1,2026-06-26 00:00:00+00:00,Group F,24.0,Tunisia,TUN,F,False,21.0,Netherlands,NED,F,False,Group Stage,1,Kansas City,USA,Arrowhead Stadium,Central,MCI
+59,59,16.0,13.0,6,1,2026-06-26 05:00:00+00:00,Group D,16.0,Türkiye,TUR,D,False,13.0,USA,USA,D,False,Group Stage,1,Los Angeles,USA,SoFi Stadium,West,LAX
+60,60,14.0,15.0,10,1,2026-06-26 05:00:00+00:00,Group D,14.0,Paraguay,PAR,D,False,15.0,Australia,AUS,D,False,Group Stage,1,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+61,61,36.0,33.0,2,1,2026-06-26 19:00:00+00:00,Group I,36.0,Norway,NOR,I,False,33.0,France,FRA,I,False,Group Stage,1,Boston,USA,Gillette Stadium,East,BOS
+62,62,34.0,35.0,12,1,2026-06-26 19:00:00+00:00,Group I,34.0,Senegal,SEN,I,False,35.0,Iraq,IRQ,I,False,Group Stage,1,Toronto,Canada,BMO Field,East,YYZ
+63,63,30.0,31.0,4,1,2026-06-27 01:00:00+00:00,Group H,30.0,Cabo Verde,CPV,H,False,31.0,Saudi Arabia,KSA,H,False,Group Stage,1,Houston,USA,NRG Stadium,Central,IAH
+64,64,32.0,29.0,14,1,2026-06-27 02:00:00+00:00,Group H,32.0,Uruguay,URU,H,False,29.0,Spain,ESP,H,False,Group Stage,1,Guadalajara,Mexico,Estadio Akron,Central,GDL
+65,65,26.0,27.0,11,1,2026-06-27 06:00:00+00:00,Group G,26.0,Egypt,EGY,G,False,27.0,IR Iran,IRN,G,False,Group Stage,1,Seattle,USA,Lumen Field,West,SEA
+66,66,28.0,25.0,13,1,2026-06-27 06:00:00+00:00,Group G,28.0,New Zealand,NZL,G,False,25.0,Belgium,BEL,G,False,Group Stage,1,Vancouver,Canada,BC Place,West,YVR
+67,67,48.0,45.0,8,1,2026-06-27 21:00:00+00:00,Group L,48.0,Panama,PAN,L,False,45.0,England,ENG,L,False,Group Stage,1,New York/New Jersey,USA,MetLife Stadium,East,EWR
+68,68,46.0,47.0,9,1,2026-06-27 21:00:00+00:00,Group L,46.0,Croatia,CRO,L,False,47.0,Ghana,GHA,L,False,Group Stage,1,Philadelphia,USA,Lincoln Financial Field,East,PHL
+69,69,44.0,41.0,7,1,2026-06-27 23:30:00+00:00,Group K,44.0,Colombia,COL,K,False,41.0,Portugal,POR,K,False,Group Stage,1,Miami,USA,Hard Rock Stadium,East,MIA
+70,70,42.0,43.0,1,1,2026-06-27 23:30:00+00:00,Group K,42.0,Congo DR,COD,K,False,43.0,Uzbekistan,UZB,K,False,Group Stage,1,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+71,71,38.0,39.0,5,1,2026-06-28 03:00:00+00:00,Group J,38.0,Algeria,ALG,J,False,39.0,Austria,AUT,J,False,Group Stage,1,Kansas City,USA,Arrowhead Stadium,Central,MCI
+72,72,40.0,37.0,3,1,2026-06-28 03:00:00+00:00,Group J,40.0,Jordan,JOR,J,False,37.0,Argentina,ARG,J,False,Group Stage,1,Dallas,USA,AT&T Stadium,Central,DAL
+73,73,,,6,2,2026-06-28 22:00:00+00:00,2A vs 2B,,,,,,,,,,,Round of 32,2,Los Angeles,USA,SoFi Stadium,West,LAX
+74,74,,,4,2,2026-06-29 18:00:00+00:00,1C vs 2F,,,,,,,,,,,Round of 32,2,Houston,USA,NRG Stadium,Central,IAH
+75,75,,,2,2,2026-06-29 20:30:00+00:00,1E vs 3ABCDF,,,,,,,,,,,Round of 32,2,Boston,USA,Gillette Stadium,East,BOS
+76,76,,,16,2,2026-06-30 03:00:00+00:00,1F vs 2C,,,,,,,,,,,Round of 32,2,Monterrey,Mexico,Estadio BBVA,Central,MTY
+77,77,,,3,2,2026-06-30 18:00:00+00:00,2E vs 2I,,,,,,,,,,,Round of 32,2,Dallas,USA,AT&T Stadium,Central,DAL
+78,78,,,8,2,2026-06-30 21:00:00+00:00,1I vs 3CDFGH,,,,,,,,,,,Round of 32,2,New York/New Jersey,USA,MetLife Stadium,East,EWR
+79,79,,,15,2,2026-07-01 03:00:00+00:00,1A vs 3CEFHI,,,,,,,,,,,Round of 32,2,Mexico City,Mexico,Estadio Azteca,Central,MEX
+80,80,,,1,2,2026-07-01 16:00:00+00:00,1L vs 3EHIJK,,,,,,,,,,,Round of 32,2,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+81,81,,,11,2,2026-07-01 23:00:00+00:00,1G vs 3AEHIJ,,,,,,,,,,,Round of 32,2,Seattle,USA,Lumen Field,West,SEA
+82,82,,,10,2,2026-07-02 03:00:00+00:00,1D vs 3BEFIJ,,,,,,,,,,,Round of 32,2,San Francisco Bay Area,USA,Levi's Stadium,West,SFO
+83,83,,,6,2,2026-07-02 22:00:00+00:00,1H vs 2J,,,,,,,,,,,Round of 32,2,Los Angeles,USA,SoFi Stadium,West,LAX
+84,84,,,12,2,2026-07-02 23:00:00+00:00,2K vs 2L,,,,,,,,,,,Round of 32,2,Toronto,Canada,BMO Field,East,YYZ
+85,85,,,13,2,2026-07-03 06:00:00+00:00,1B vs 3EFGIJ,,,,,,,,,,,Round of 32,2,Vancouver,Canada,BC Place,West,YVR
+86,86,,,3,2,2026-07-03 19:00:00+00:00,2D vs 2G,,,,,,,,,,,Round of 32,2,Dallas,USA,AT&T Stadium,Central,DAL
+87,87,,,7,2,2026-07-03 22:00:00+00:00,1J vs 2H,,,,,,,,,,,Round of 32,2,Miami,USA,Hard Rock Stadium,East,MIA
+88,88,,,5,2,2026-07-04 02:30:00+00:00,1K vs 3DEIJL,,,,,,,,,,,Round of 32,2,Kansas City,USA,Arrowhead Stadium,Central,MCI
+89,89,,,4,3,2026-07-04 18:00:00+00:00,W73 vs W75,,,,,,,,,,,Round of 16,3,Houston,USA,NRG Stadium,Central,IAH
+90,90,,,9,3,2026-07-04 21:00:00+00:00,W74 vs W77,,,,,,,,,,,Round of 16,3,Philadelphia,USA,Lincoln Financial Field,East,PHL
+91,91,,,8,3,2026-07-05 20:00:00+00:00,W76 vs W78,,,,,,,,,,,Round of 16,3,New York/New Jersey,USA,MetLife Stadium,East,EWR
+92,92,,,15,3,2026-07-06 02:00:00+00:00,W79 vs W80,,,,,,,,,,,Round of 16,3,Mexico City,Mexico,Estadio Azteca,Central,MEX
+93,93,,,3,3,2026-07-06 20:00:00+00:00,W83 vs W84,,,,,,,,,,,Round of 16,3,Dallas,USA,AT&T Stadium,Central,DAL
+94,94,,,11,3,2026-07-07 03:00:00+00:00,W81 vs W82,,,,,,,,,,,Round of 16,3,Seattle,USA,Lumen Field,West,SEA
+95,95,,,1,3,2026-07-07 16:00:00+00:00,W86 vs W88,,,,,,,,,,,Round of 16,3,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+96,96,,,13,3,2026-07-07 23:00:00+00:00,W85 vs W87,,,,,,,,,,,Round of 16,3,Vancouver,Canada,BC Place,West,YVR
+97,97,,,2,4,2026-07-09 20:00:00+00:00,W89 vs W90,,,,,,,,,,,Quarterfinals,4,Boston,USA,Gillette Stadium,East,BOS
+98,98,,,6,4,2026-07-10 22:00:00+00:00,W93 vs W94,,,,,,,,,,,Quarterfinals,4,Los Angeles,USA,SoFi Stadium,West,LAX
+99,99,,,7,4,2026-07-11 21:00:00+00:00,W91 vs W92,,,,,,,,,,,Quarterfinals,4,Miami,USA,Hard Rock Stadium,East,MIA
+100,100,,,5,4,2026-07-12 02:00:00+00:00,W95 vs W100,,,,,,,,,,,Quarterfinals,4,Kansas City,USA,Arrowhead Stadium,Central,MCI
+101,101,,,3,5,2026-07-14 20:00:00+00:00,W97 vs W98,,,,,,,,,,,Semifinals,5,Dallas,USA,AT&T Stadium,Central,DAL
+102,102,,,1,5,2026-07-15 19:00:00+00:00,W99 vs W100,,,,,,,,,,,Semifinals,5,Atlanta,USA,Mercedes-Benz Stadium,East,ATL
+103,103,,,7,6,2026-07-18 21:00:00+00:00,RU101 vs RU102,,,,,,,,,,,Third Place Playoff,6,Miami,USA,Hard Rock Stadium,East,MIA
+104,104,,,8,7,2026-07-19 19:00:00+00:00,W101 vs W102,,,,,,,,,,,Final,7,New York/New Jersey,USA,MetLife Stadium,East,EWR

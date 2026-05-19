@@ -1,0 +1,9 @@
+.env
+known_hosts
+artifacts/
+logs/
+*.log
+*.tmp
+*.zip
+id_*
+authorized_keys.pub

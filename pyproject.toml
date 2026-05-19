@@ -1,0 +1,29 @@
+[project]
+name = "arena-ai"
+version = "0.1.0"
+description = "Pygame simulation of a World Cup data/AI pipeline."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "kaggle>=2.1.2",
+    "pandas>=3.0.2",
+    "pygame>=2.6.1",
+    "rich>=15.0.0",
+    "scikit-learn>=1.8.0",
+    "xgboost>=3.2.0",
+]
+
+[project.scripts]
+arena-ai = "arena_ai.main:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.20.0",
+]

@@ -1,0 +1,740 @@
+{
+  "schema_version": 1,
+  "description": "Single audio governance manifest for Arena AI runtime sounds, replacing scattered runtime SOURCES.md and per-file receipt Markdown files.",
+  "runtime_directory": "assets/sounds/runtime_assets",
+  "candidate_directory": "assets/sounds/candidates",
+  "downloaded_candidates_manifest": "assets/sounds/downloaded_audio_manifest.csv",
+  "operational_contract": "src/arena_ai/audio_manifest.py",
+  "rules": [
+    "Game code loads only assets/sounds/runtime_assets.",
+    "assets/sounds/candidates is a curation library and must not be imported directly by runtime code.",
+    "Project archive assets keep author, origin, license/status, source hash, runtime hash and transform in project_archive_receipt.",
+    "Monte Carlo uses UI/broadcast cues, not goal sounds."
+  ],
+  "required_buses": [
+    "ambience",
+    "ball",
+    "crowd",
+    "goal",
+    "music",
+    "ui"
+  ],
+  "goal_audio_sequence": [
+    "kick",
+    "whoosh",
+    "net",
+    "bass",
+    "cheer",
+    "reverb"
+  ],
+  "cup_progress_markers": [
+    25,
+    50,
+    75,
+    100
+  ],
+  "sound_bags": {
+    "kick": [
+      "kick_grass_01.wav",
+      "kick_grass_02.wav",
+      "kick_grass_03.wav",
+      "kick_grass_04.wav"
+    ],
+    "whoosh": [
+      "ball_whoosh_01.wav",
+      "ball_whoosh_02.wav"
+    ],
+    "net": [
+      "net_ripple_01.wav",
+      "net_ripple_02.wav"
+    ],
+    "goal_roar": [
+      "goal_roar_main.mp3",
+      "goal_roar_pixabay_01.wav",
+      "goal_roar_pixabay_02.wav"
+    ],
+    "goal_explosion": [
+      "goal_explosion_01.wav",
+      "goal_explosion_02.wav",
+      "goal_explosion_03.wav"
+    ],
+    "crowd_reaction": [
+      "crowd_attack_short.wav",
+      "crowd_reaction_01.wav",
+      "crowd_reaction_02.wav"
+    ],
+    "near_miss_reaction": [
+      "crowd_near_miss_01.wav",
+      "crowd_attack_short.wav",
+      "crowd_reaction_01.wav"
+    ],
+    "cup_reveal_crowd": [
+      "crowd_attack_short.wav",
+      "crowd_reaction_01.wav",
+      "crowd_reaction_02.wav"
+    ]
+  },
+  "runtime_assets": [
+    {
+      "filename": "stadium_base_loop.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/stadium_base_loop.mp3",
+      "bus": "ambience",
+      "role": "stadium_base",
+      "duration_seconds": {
+        "min": 20.0,
+        "max": 60.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/stadium_crowd_loop.mp3`",
+      "license": "Acervo do projeto",
+      "usage": "Cama principal de estádio, menu e jogo",
+      "runtime_sha256": "1eea7277ed831fd38059f5b118c15b77a54ebd305dd3a8e797f9c67289a61ae9",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/stadium_crowd_loop.mp3",
+          "exists": true,
+          "sha256": "1eea7277ed831fd38059f5b118c15b77a54ebd305dd3a8e797f9c67289a61ae9"
+        }
+      ],
+      "project_archive_receipt": {
+        "runtime_asset": "stadium_base_loop.mp3",
+        "source_asset": "assets/sounds/candidates/promoted_sources/stadium_crowd_loop.mp3",
+        "author": "Arena AI project audio curation",
+        "origin": "Local project collection promoted from the user's curated game-audio library",
+        "captured_on": "2026-05-18",
+        "license": "Acervo do projeto - internal Arena AI project use; do not redistribute outside the project without a fresh rights review",
+        "source_sha256": "1eea7277ed831fd38059f5b118c15b77a54ebd305dd3a8e797f9c67289a61ae9",
+        "runtime_sha256": "1eea7277ed831fd38059f5b118c15b77a54ebd305dd3a8e797f9c67289a61ae9",
+        "transform": "Copied as the approved runtime loop after curation"
+      }
+    },
+    {
+      "filename": "stadium_air_loop.wav",
+      "runtime_path": "assets/sounds/runtime_assets/stadium_air_loop.wav",
+      "bus": "ambience",
+      "role": "stadium_air",
+      "duration_seconds": {
+        "min": 45.0,
+        "max": 80.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "Freesound Sandermotions pack 27815, `494350`",
+      "license": "Creative Commons 0",
+      "usage": "Ar longo de arquibancada",
+      "runtime_sha256": "65c628a37ab315e143fdc4c62900f6ccdfef217b9b345ee32101f3e511d635f7",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_light_loop.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_light_loop.mp3",
+      "bus": "crowd",
+      "role": "light_crowd",
+      "duration_seconds": {
+        "min": 5.0,
+        "max": 20.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/light_crowd_mixkit.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Torcida leve complementar",
+      "runtime_sha256": "68a73ce7d1109386bbfe56be251897855890af7aeee308db0c6906e935864f3d",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/light_crowd_mixkit.mp3",
+          "exists": true,
+          "sha256": "68a73ce7d1109386bbfe56be251897855890af7aeee308db0c6906e935864f3d"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_tension_loop.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_tension_loop.mp3",
+      "bus": "crowd",
+      "role": "crowd_tension",
+      "duration_seconds": {
+        "min": 20.0,
+        "max": 100.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/crowd_tension_mixkit.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Tensão progressiva de ataque",
+      "runtime_sha256": "65f0d3d2bdf77cc3c9eb253fdd45ea9e34890cec7d285f7bd25a69d3e4ce6196",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/crowd_tension_mixkit.mp3",
+          "exists": true,
+          "sha256": "65f0d3d2bdf77cc3c9eb253fdd45ea9e34890cec7d285f7bd25a69d3e4ce6196"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_attack_rise.wav",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_attack_rise.wav",
+      "bus": "crowd",
+      "role": "crowd_attack",
+      "duration_seconds": {
+        "min": 8.0,
+        "max": 12.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "Freesound Sandermotions pack 27815, `494362`",
+      "license": "Creative Commons 0",
+      "usage": "Arco longo de ataque/gol, não usado como reação randômica",
+      "runtime_sha256": "12bc2e8a7504481bd5950e2ec064921fda3dd683a89889cba19fd069e0c85f04",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_attack_short.wav",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_attack_short.wav",
+      "bus": "crowd",
+      "role": "crowd_attack_short",
+      "duration_seconds": {
+        "min": 3.0,
+        "max": 5.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "Freesound Sandermotions pack 27815, `494361`",
+      "license": "Creative Commons 0",
+      "usage": "Reação curta randomizada",
+      "runtime_sha256": "459a02087f6cde29b3395ade41c98c9757ec39bacb66462cf14287edf4b55960",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_chant_loop.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_chant_loop.mp3",
+      "bus": "crowd",
+      "role": "chant",
+      "duration_seconds": {
+        "min": 8.0,
+        "max": 24.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/stadium_chant_mixkit.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Chant de torcida com fade",
+      "runtime_sha256": "37aad5208cf9e837c8703315e27f09f31059d776aa6a0445cfa84a61cf8c9f69",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/stadium_chant_mixkit.mp3",
+          "exists": true,
+          "sha256": "37aad5208cf9e837c8703315e27f09f31059d776aa6a0445cfa84a61cf8c9f69"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_roar_main.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/goal_roar_main.mp3",
+      "bus": "goal",
+      "role": "goal_roar",
+      "duration_seconds": {
+        "min": 8.0,
+        "max": 24.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/crowd_goal_roar.mp3`",
+      "license": "Acervo do projeto",
+      "usage": "Roar principal no gol",
+      "runtime_sha256": "10878a490dd3f1af7877a23c33baca143a3f86f91112c5dfb59dcf83cc94e975",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/crowd_goal_roar.mp3",
+          "exists": true,
+          "sha256": "10878a490dd3f1af7877a23c33baca143a3f86f91112c5dfb59dcf83cc94e975"
+        }
+      ],
+      "project_archive_receipt": {
+        "runtime_asset": "goal_roar_main.mp3",
+        "source_asset": "assets/sounds/candidates/promoted_sources/crowd_goal_roar.mp3",
+        "author": "Arena AI project audio curation",
+        "origin": "Local project collection promoted from the user's curated game-audio library",
+        "captured_on": "2026-05-18",
+        "license": "Acervo do projeto - internal Arena AI project use; do not redistribute outside the project without a fresh rights review",
+        "source_sha256": "10878a490dd3f1af7877a23c33baca143a3f86f91112c5dfb59dcf83cc94e975",
+        "runtime_sha256": "10878a490dd3f1af7877a23c33baca143a3f86f91112c5dfb59dcf83cc94e975",
+        "transform": "Copied as the approved runtime goal roar after curation"
+      }
+    },
+    {
+      "filename": "goal_roar_pixabay_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_roar_pixabay_01.wav",
+      "bus": "goal",
+      "role": "goal_roar",
+      "duration_seconds": {
+        "min": 6.0,
+        "max": 8.8
+      },
+      "transient_start_limit_seconds": 0.09,
+      "origin": "Pixabay `mrmark81-stadium-roar-concert-471943.mp3`, https://pixabay.com/sound-effects/people-stadium-roar-concert-471943/",
+      "license": "Pixabay Content License confirmado em 2026-05-18",
+      "usage": "Roar forte randomizado no gol, cortado no transiente",
+      "runtime_sha256": "2753b1fc241f8e91c649807555a5d374501a4768b90f55c67bc5fd6a28f3c0e3",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_roar_pixabay_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_roar_pixabay_02.wav",
+      "bus": "goal",
+      "role": "goal_roar",
+      "duration_seconds": {
+        "min": 6.0,
+        "max": 8.8
+      },
+      "transient_start_limit_seconds": 0.09,
+      "origin": "Pixabay `vishiv-crowd-cheering-in-stadium-435357.mp3`, https://pixabay.com/sound-effects/people-crowd-cheering-in-stadium-435357/",
+      "license": "Pixabay Content License confirmado em 2026-05-18",
+      "usage": "Cheer forte randomizado no gol, cortado no transiente",
+      "runtime_sha256": "0b16d17fb96eb865bb16034066201c5fea91368cd42521d254b305290f233040",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_crowd_cc0.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_crowd_cc0.wav",
+      "bus": "goal",
+      "role": "goal_crowd_tail",
+      "duration_seconds": {
+        "min": 10.0,
+        "max": 18.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "Freesound Sandermotions pack 27815, `494352`",
+      "license": "Creative Commons 0",
+      "usage": "Cauda alternativa de crowd no gol",
+      "runtime_sha256": "2bb6f6e14c09c7b8a82011fd4f14982409c9ba3c9301997295a2ddc612af18d6",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_explosion_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_explosion_01.wav",
+      "bus": "goal",
+      "role": "goal_explosion",
+      "duration_seconds": {
+        "min": 2.5,
+        "max": 4.5
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "`assets/sounds/candidates/promoted_sources/goal_explosion_mixkit_a.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Explosão de gol, variação A cortada no transiente",
+      "runtime_sha256": "c45406aaf0387021dd377740aca2dafbbf4db02c9c2861cd26849ea198e4abee",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/goal_explosion_mixkit_a.mp3",
+          "exists": true,
+          "sha256": "8620209339ea51a159de2c75ad0918aec7063b187f5b7398bbaf2b9b09fc0633"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_explosion_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_explosion_02.wav",
+      "bus": "goal",
+      "role": "goal_explosion",
+      "duration_seconds": {
+        "min": 2.5,
+        "max": 4.5
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Mixkit `crowd_at_stadium_2111.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Explosão/reação de gol, variação B cortada no transiente",
+      "runtime_sha256": "9ed65ab8a2c8246c8e78392285e9fd56db80fd3fcae27c795845791bd57ed1ee",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "goal_explosion_03.wav",
+      "runtime_path": "assets/sounds/runtime_assets/goal_explosion_03.wav",
+      "bus": "goal",
+      "role": "goal_explosion_alt",
+      "duration_seconds": {
+        "min": 2.5,
+        "max": 4.5
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Mixkit `stadium_joy_shouting_crowd_3022.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Explosão/reação de gol, variação C cortada no transiente",
+      "runtime_sha256": "7184ac5abe3d2a7b8723476655a25dae4d321c621554afa99f43f22381eec98a",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "bass_hit_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/bass_hit_01.wav",
+      "bus": "goal",
+      "role": "bass_hit",
+      "duration_seconds": {
+        "min": 0.4,
+        "max": 2.5
+      },
+      "transient_start_limit_seconds": 0.09,
+      "origin": "`assets/sounds/candidates/promoted_sources/bass_hit_mixkit.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Impacto emocional no gol, cortado para ataque imediato em WAV cross-platform",
+      "runtime_sha256": "c7b0e8abcf2fc7acc42f36446fdde27249befb81543f65531f43efde60cd9920",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/bass_hit_mixkit.mp3",
+          "exists": true,
+          "sha256": "8bd0c7fd63fbb8a4442ffe1176aa41b260d1fafbcf728e3c63648eb5bcd4e16b"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "stadium_reverb_tail.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/stadium_reverb_tail.mp3",
+      "bus": "goal",
+      "role": "reverb_tail",
+      "duration_seconds": {
+        "min": 3.0,
+        "max": 12.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/stadium_reverb_tail_mixkit.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Cauda/reverb de arena",
+      "runtime_sha256": "ec46a072f65a3384d05b00689cbd59b90498521cd65914823a6df21a510930f8",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/stadium_reverb_tail_mixkit.mp3",
+          "exists": true,
+          "sha256": "ec46a072f65a3384d05b00689cbd59b90498521cd65914823a6df21a510930f8"
+        }
+      ],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "kick_grass_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/kick_grass_01.wav",
+      "bus": "ball",
+      "role": "kick",
+      "duration_seconds": {
+        "min": 0.35,
+        "max": 0.7
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Freesound `555042__bittermelonheart__soccer-ball-kick.wav`, https://freesound.org/s/555042/",
+      "license": "Creative Commons 0 confirmado em 2026-05-17",
+      "usage": "Chute real principal, cortado no transiente",
+      "runtime_sha256": "7fcf999642180930ac36fb4db499295217b45f738fc694d8931bb6b77247c911",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "kick_grass_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/kick_grass_02.wav",
+      "bus": "ball",
+      "role": "kick_alt",
+      "duration_seconds": {
+        "min": 0.35,
+        "max": 0.7
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Mixkit `soccer_ball_kick_2108.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Variação real de chute, cortada no transiente",
+      "runtime_sha256": "516afa544b118430356325d0cd8bbf2a034e4df5235ca4085eb478e3ed746be5",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "kick_grass_03.wav",
+      "runtime_path": "assets/sounds/runtime_assets/kick_grass_03.wav",
+      "bus": "ball",
+      "role": "kick_alt",
+      "duration_seconds": {
+        "min": 0.35,
+        "max": 0.7
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Mixkit `hitting_soccer_ball_2112.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Variação seca de chute, cortada no transiente",
+      "runtime_sha256": "cd2d81f347d50851fef076ccae566e46f95460687b861c78468e9c2f9c5d95fb",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "kick_grass_04.wav",
+      "runtime_path": "assets/sounds/runtime_assets/kick_grass_04.wav",
+      "bus": "ball",
+      "role": "kick_alt",
+      "duration_seconds": {
+        "min": 0.35,
+        "max": 0.7
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Mixkit `sports_ball_hit_2082.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Variação curta de impacto de bola, cortada no transiente",
+      "runtime_sha256": "4d8a00dd3eaa45fbdfb031d9d86f484cd67250896186c260b40ee573f70107a8",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "ball_whoosh_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/ball_whoosh_01.wav",
+      "bus": "ball",
+      "role": "whoosh",
+      "duration_seconds": {
+        "min": 0.45,
+        "max": 0.9
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Mixkit `fast_sweep_transition_174.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Whoosh leve da bola",
+      "runtime_sha256": "6475ca5de8a48694459a4820e5c7086fc0d430b20749e32577fdc67609819ae7",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "ball_whoosh_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/ball_whoosh_02.wav",
+      "bus": "ball",
+      "role": "whoosh_alt",
+      "duration_seconds": {
+        "min": 0.45,
+        "max": 0.9
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Mixkit `cinematic_trailer_riser_790.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Whoosh alternativo da bola, cortado e reduzido",
+      "runtime_sha256": "dc7a70a99e1921b4f390697cb3c52ed6fc63d2218f6fae668e6fe17e4de1a491",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "net_ripple_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/net_ripple_01.wav",
+      "bus": "ball",
+      "role": "net",
+      "duration_seconds": {
+        "min": 0.7,
+        "max": 1.35
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Pixabay `forza1903-a-football-hits-the-net-goal-313216.mp3`, https://pixabay.com/de/sound-effects/film-spezialeffekte-a-football-hits-the-net-goal-313216/",
+      "license": "Pixabay Content License confirmado em 2026-05-18",
+      "usage": "Bola batendo na rede, cortada no transiente",
+      "runtime_sha256": "b96dd2147d3c1bef8ea46b133b32e99ff64042e2daad5815eb13589709040635",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "net_ripple_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/net_ripple_02.wav",
+      "bus": "ball",
+      "role": "net_alt",
+      "duration_seconds": {
+        "min": 0.45,
+        "max": 0.85
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Mixkit `basketball_ball_hitting_net_2084.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Variação curta de rede, usada com volume menor",
+      "runtime_sha256": "c675d41e441acc0891027757d8a19f6296b9616ab069807008f37d402805324a",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_reaction_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_reaction_01.wav",
+      "bus": "crowd",
+      "role": "crowd_reaction",
+      "duration_seconds": {
+        "min": 2.8,
+        "max": 4.0
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Mixkit `crowd_yelling_at_stadium_2097.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Reação curta de torcida para defesa/pressão",
+      "runtime_sha256": "9722c8079d908b8b3c1390fc7bd81a22e33e492bd45b62a51be6e816a02162ca",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_reaction_02.wav",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_reaction_02.wav",
+      "bus": "crowd",
+      "role": "crowd_reaction",
+      "duration_seconds": {
+        "min": 2.8,
+        "max": 4.0
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Freesound Sandermotions pack 27815, `494357`",
+      "license": "Creative Commons 0 conforme `_readme_and_license.txt`",
+      "usage": "Reação curta adicional de ambiente Sandermotions",
+      "runtime_sha256": "b9d6d7a6e43799b8a3ab2984bb99be471a59fc5bb6c9610d1d002eabbf526e63",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "crowd_near_miss_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/crowd_near_miss_01.wav",
+      "bus": "crowd",
+      "role": "near_miss_reaction",
+      "duration_seconds": {
+        "min": 2.8,
+        "max": 3.8
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Freesound Sandermotions pack 27815, `494359`",
+      "license": "Creative Commons 0 conforme `_readme_and_license.txt`",
+      "usage": "Reação “uhhh”/frustração em chance perdida",
+      "runtime_sha256": "e666102e6e30b9287a601101cf27b58a67fe8fa49d908a22d075f1c2a13408f0",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "ui_chime_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/ui_chime_01.wav",
+      "bus": "ui",
+      "role": "ui_chime",
+      "duration_seconds": {
+        "min": 1.0,
+        "max": 4.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "`assets/sounds/candidates/promoted_sources/analysis_chime.wav`",
+      "license": "Acervo do projeto",
+      "usage": "UI/chime curto com ducking",
+      "runtime_sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/analysis_chime.wav",
+          "exists": true,
+          "sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80"
+        }
+      ],
+      "project_archive_receipt": {
+        "runtime_asset": "ui_chime_01.wav",
+        "source_asset": "assets/sounds/candidates/promoted_sources/analysis_chime.wav",
+        "author": "Arena AI project audio curation",
+        "origin": "Local project collection promoted from the user's curated game-audio library",
+        "captured_on": "2026-05-18",
+        "license": "Acervo do projeto - internal Arena AI project use; do not redistribute outside the project without a fresh rights review",
+        "source_sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80",
+        "runtime_sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80",
+        "transform": "Copied as the approved runtime UI chime after curation"
+      }
+    },
+    {
+      "filename": "cup_progress_tick_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/cup_progress_tick_01.wav",
+      "bus": "ui",
+      "role": "cup_tick",
+      "duration_seconds": {
+        "min": 0.2,
+        "max": 0.5
+      },
+      "transient_start_limit_seconds": 0.05,
+      "origin": "`assets/sounds/candidates/promoted_sources/analysis_chime.wav`, trecho curto",
+      "license": "Acervo do projeto",
+      "usage": "Tick discreto em 25/50/75/100% no Monte Carlo",
+      "runtime_sha256": "2d9d6fce9934b63eb5ed9b6c8368be7c766ba71fd46c50753c0db1d520b579ed",
+      "source_paths": [
+        {
+          "path": "assets/sounds/candidates/promoted_sources/analysis_chime.wav",
+          "exists": true,
+          "sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80"
+        }
+      ],
+      "project_archive_receipt": {
+        "runtime_asset": "cup_progress_tick_01.wav",
+        "source_asset": "assets/sounds/candidates/promoted_sources/analysis_chime.wav",
+        "author": "Arena AI project audio curation",
+        "origin": "Local project collection promoted from the user's curated game-audio library",
+        "captured_on": "2026-05-18",
+        "license": "Acervo do projeto - internal Arena AI project use; do not redistribute outside the project without a fresh rights review",
+        "source_sha256": "b4abb5339556924e0ea0b5c26668b385d23dbf7b7e8bf04dd0776575b8be0e80",
+        "runtime_sha256": "2d9d6fce9934b63eb5ed9b6c8368be7c766ba71fd46c50753c0db1d520b579ed",
+        "transform": "Short tick excerpt derived from the approved analysis chime for Monte Carlo progress markers"
+      }
+    },
+    {
+      "filename": "cup_reveal_stinger.wav",
+      "runtime_path": "assets/sounds/runtime_assets/cup_reveal_stinger.wav",
+      "bus": "ui",
+      "role": "cup_reveal",
+      "duration_seconds": {
+        "min": 2.5,
+        "max": 6.0
+      },
+      "transient_start_limit_seconds": 0.09,
+      "origin": "Mixkit `movie_trailer_epic_impact_2908.mp3`",
+      "license": "Mixkit Free License",
+      "usage": "Reveal final da simulação da Copa, cortado em WAV para ataque consistente no Windows e macOS",
+      "runtime_sha256": "bc5666c297731ace2066423faa85489420dfcfa494d2605c95c5d3ed6a3ede8f",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "opening_theme.mp3",
+      "runtime_path": "assets/sounds/runtime_assets/opening_theme.mp3",
+      "bus": "music",
+      "role": "opening_theme",
+      "duration_seconds": {
+        "min": 10.0,
+        "max": 20.0
+      },
+      "transient_start_limit_seconds": null,
+      "origin": "Pixabay `bombinsound-football-football-soccer-game-music-15-second-490555.mp3`, https://pixabay.com/sound-effects/musical-football-football-soccer-game-music-15-second-490555/",
+      "license": "Pixabay Content License confirmado em 2026-05-18",
+      "usage": "Música curta de abertura/menu",
+      "runtime_sha256": "b166b1c6aa2d58aae9ee3559900b623e56d907a7df99f384a285a5d48a3b1512",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "whistle_start_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/whistle_start_01.wav",
+      "bus": "ui",
+      "role": "whistle_start",
+      "duration_seconds": {
+        "min": 0.2,
+        "max": 0.75
+      },
+      "transient_start_limit_seconds": 0.06,
+      "origin": "Freesound `538422__rosa-orenes256__referee-whistle-sound.wav`, https://freesound.org/s/538422/",
+      "license": "Creative Commons 0 confirmado em 2026-05-17",
+      "usage": "Apito inicial",
+      "runtime_sha256": "33124587500068d69f85168e74adb6e256963a2096d0db173f600a681a8076a3",
+      "source_paths": [],
+      "project_archive_receipt": null
+    },
+    {
+      "filename": "whistle_final_01.wav",
+      "runtime_path": "assets/sounds/runtime_assets/whistle_final_01.wav",
+      "bus": "ui",
+      "role": "whistle_final",
+      "duration_seconds": {
+        "min": 0.9,
+        "max": 1.8
+      },
+      "transient_start_limit_seconds": 0.08,
+      "origin": "Freesound `218318__splicesound__referee-whistle-blow-gymnasium.wav`, https://freesound.org/s/218318/",
+      "license": "Creative Commons 0 confirmado em 2026-05-17",
+      "usage": "Apito final",
+      "runtime_sha256": "7c71fce6865d1e73c00b13e63dc5bb1550a459530b8bd35171488da285b16c77",
+      "source_paths": [],
+      "project_archive_receipt": null
+    }
+  ]
+}
