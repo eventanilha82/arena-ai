@@ -248,9 +248,8 @@ Se os builds já existem e você quer só montar a pasta `release/`:
 make release-artifacts
 ```
 
-Esse alvo também roda `make windows-artifact-check`. Ou seja: ele só monta a
-pasta de release se o ZIP Windows tiver `ArenaAI.exe` e todos os assets/cache
-obrigatórios do runtime atual.
+O bolão é um utilitário Rich executado dentro do projeto por `make bolao`; ele
+não gera binário nem ZIP próprio de release.
 
 Para publicar como GitHub Release, depois de configurar o repositório remoto e
 ter o GitHub CLI autenticado:

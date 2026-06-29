@@ -1139,7 +1139,7 @@ def load_monte_carlo_stability() -> dict[str, Any]:
             "fresh": False,
             "passed": False,
             "path": str(MC_STABILITY_JSON),
-            "reason": "Rode `make mc-stability` para gerar estabilidade offline 5k/10k e fase/chave 1k/2k sem travar o jogo.",
+            "reason": "Rode `make mc-stability` para gerar estabilidade offline 5k/10k e fase/chave 1k/2k/5k sem travar o jogo.",
         }
     data = json.loads(MC_STABILITY_JSON.read_text(encoding="utf-8"))
     runs = sorted(int(item.get("runs", 0)) for item in data.get("runs", []))
@@ -1176,10 +1176,20 @@ def load_monte_carlo_stability() -> dict[str, Any]:
             stage_bracket_passed
             and float(stage_bracket_comparison.get("max_stage_top16_abs_delta", 1.0)) <= float(stability_gate.get("max_stage_top16_abs_delta", 0.035))
             and int(stage_bracket_comparison.get("max_stage_top16_churn", 99)) <= int(stability_gate.get("max_stage_top16_churn", 4))
-            and float(stage_bracket_comparison.get("max_pair_top8_abs_delta", 1.0)) <= float(stability_gate.get("max_pair_top8_abs_delta", 0.02))
+            and float(stage_bracket_comparison.get("max_pair_top8_nested_z", float("inf")))
+            <= float(stability_gate.get("max_pair_top8_nested_z", 4.0))
             and int(stage_bracket_comparison.get("max_pair_top8_churn", 99)) <= int(stability_gate.get("max_pair_top8_churn", 8))
         )
-    passed = bool(final_passed and fresh and stage_bracket_passed and 5_000 in runs and 10_000 in runs and 1_000 in stage_bracket_runs and 2_000 in stage_bracket_runs)
+    passed = bool(
+        final_passed
+        and fresh
+        and stage_bracket_passed
+        and 5_000 in runs
+        and 10_000 in runs
+        and 1_000 in stage_bracket_runs
+        and 2_000 in stage_bracket_runs
+        and 5_000 in stage_bracket_runs
+    )
     return {
         "available": True,
         "fresh": bool(fresh),

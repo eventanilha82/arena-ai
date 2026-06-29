@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import pickle
 import random
 import sys
@@ -223,6 +224,8 @@ def compare_probability_rows(
     *,
     name_key: str = "name",
     top_limit: int | None = None,
+    previous_runs: int | None = None,
+    current_runs: int | None = None,
 ) -> dict[str, Any]:
     previous_probs = {str(row[name_key]): float(row["probability"]) for row in previous}
     current_probs = {str(row[name_key]): float(row["probability"]) for row in current}
@@ -232,12 +235,26 @@ def compare_probability_rows(
     current_top = {str(row[name_key]) for row in current_top_rows}
     union = sorted(previous_top | current_top)
     deltas = [abs(current_probs.get(name, 0.0) - previous_probs.get(name, 0.0)) for name in union]
+    z_scores: list[tuple[float, str]] = []
+    if previous_runs and current_runs and previous_runs != current_runs:
+        smaller_runs = min(int(previous_runs), int(current_runs))
+        larger_runs = max(int(previous_runs), int(current_runs))
+        for name in union:
+            if name not in previous_probs or name not in current_probs:
+                continue
+            delta = abs(current_probs[name] - previous_probs[name])
+            probability = current_probs[name] if current_runs > previous_runs else previous_probs[name]
+            variance = probability * (1.0 - probability) * (1.0 / smaller_runs - 1.0 / larger_runs)
+            if variance > 1e-12:
+                z_scores.append((delta / math.sqrt(variance), name))
     return {
         "entered": sorted(current_top - previous_top),
         "exited": sorted(previous_top - current_top),
         "churn_count": int(len(current_top - previous_top) + len(previous_top - current_top)),
         "max_abs_delta": round(max(deltas) if deltas else 0.0, 6),
         "mean_abs_delta": round(sum(deltas) / len(deltas) if deltas else 0.0, 6),
+        "max_nested_z": round(max(z_scores)[0] if z_scores else 0.0, 6),
+        "max_nested_z_name": max(z_scores)[1] if z_scores else "",
     }
 
 
@@ -346,16 +363,36 @@ def compare_stage_bracket(previous: dict[str, Any] | None, current: dict[str, An
     max_stage_churn = 0
     max_pair_delta = 0.0
     max_pair_churn = 0
+    max_pair_z = 0.0
     for stage in BRACKET_STAGES:
-        stage_cmp = compare_probability_rows(previous["stages"].get(stage, []), current["stages"].get(stage, []), top_limit=16)
-        pair_cmp = compare_probability_rows(previous["pairs"].get(stage, []), current["pairs"].get(stage, []), top_limit=8)
+        stage_cmp = compare_probability_rows(
+            previous["stages"].get(stage, []),
+            current["stages"].get(stage, []),
+            top_limit=16,
+            previous_runs=int(previous["runs"]),
+            current_runs=int(current["runs"]),
+        )
+        pair_cmp = compare_probability_rows(
+            previous["pairs"].get(stage, []),
+            current["pairs"].get(stage, []),
+            top_limit=8,
+            previous_runs=int(previous["runs"]),
+            current_runs=int(current["runs"]),
+        )
         stage_comparisons[stage] = stage_cmp
         pair_comparisons[stage] = pair_cmp
         max_stage_delta = max(max_stage_delta, float(stage_cmp["max_abs_delta"]))
         max_stage_churn = max(max_stage_churn, int(stage_cmp["churn_count"]))
         max_pair_delta = max(max_pair_delta, float(pair_cmp["max_abs_delta"]))
         max_pair_churn = max(max_pair_churn, int(pair_cmp["churn_count"]))
-    finalist_cmp = compare_probability_rows(previous["finalists"], current["finalists"], top_limit=16)
+        max_pair_z = max(max_pair_z, float(pair_cmp["max_nested_z"]))
+    finalist_cmp = compare_probability_rows(
+        previous["finalists"],
+        current["finalists"],
+        top_limit=16,
+        previous_runs=int(previous["runs"]),
+        current_runs=int(current["runs"]),
+    )
     return {
         "baseline": False,
         "previous_runs": int(previous["runs"]),
@@ -366,6 +403,7 @@ def compare_stage_bracket(previous: dict[str, Any] | None, current: dict[str, An
         "max_stage_top16_churn": int(max_stage_churn),
         "max_pair_top8_abs_delta": round(max_pair_delta, 6),
         "max_pair_top8_churn": int(max_pair_churn),
+        "max_pair_top8_nested_z": round(max_pair_z, 6),
         "max_finalist_top16_abs_delta": finalist_cmp["max_abs_delta"],
         "max_finalist_top16_churn": finalist_cmp["churn_count"],
     }
@@ -434,7 +472,7 @@ def run_stage_bracket_size(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Monte Carlo offline para estabilidade do ranking de campeoes.")
     parser.add_argument("--runs", type=parse_runs, default=parse_runs("5000,10000"), help="Volumes separados por virgula.")
-    parser.add_argument("--stage-runs", type=parse_runs, default=parse_runs("1000,2000"), help="Volumes full-bracket separados por virgula para estabilidade de fases/chaves.")
+    parser.add_argument("--stage-runs", type=parse_runs, default=parse_runs("1000,2000,5000"), help="Volumes full-bracket separados por virgula para estabilidade de fases/chaves.")
     parser.add_argument("--seed", type=int, default=2026, help="Seed base da auditoria de convergencia; volumes maiores estendem a mesma amostra.")
     parser.add_argument("--workers", type=int, default=8, help="Threads paralelas. Evita subprocessos presos e segue o executor usado pelo runtime do jogo.")
     parser.add_argument("--chunk-size", type=int, default=0, help="Tamanho fixo de chunk; 0 calcula automaticamente.")
@@ -443,7 +481,7 @@ def main() -> None:
     parser.add_argument("--max-top16-churn", type=int, default=2, help="Falha se times entrarem/sairem do top 16 alem deste limite.")
     parser.add_argument("--max-stage-top16-delta", type=float, default=0.035, help="Falha se o delta maximo por fase entre volumes passar deste limite.")
     parser.add_argument("--max-stage-top16-churn", type=int, default=4, help="Falha se o churn por fase top 16 passar deste limite.")
-    parser.add_argument("--max-pair-top8-delta", type=float, default=0.02, help="Falha se o delta maximo de confrontos top 8 por fase passar deste limite.")
+    parser.add_argument("--max-pair-top8-z", type=float, default=4.0, help="Falha se o z-score maximo de confrontos top 8 em amostras aninhadas passar deste limite.")
     parser.add_argument("--max-pair-top8-churn", type=int, default=16, help="Falha se o churn de confrontos top 8 por fase passar deste limite.")
     parser.add_argument("--allow-leader-change", action="store_true", help="Nao falha se o lider mudar entre os volumes.")
     args = parser.parse_args()
@@ -515,7 +553,7 @@ def main() -> None:
             "leader_change_allowed": bool(args.allow_leader_change),
             "max_stage_top16_abs_delta": float(args.max_stage_top16_delta),
             "max_stage_top16_churn": int(args.max_stage_top16_churn),
-            "max_pair_top8_abs_delta": float(args.max_pair_top8_delta),
+            "max_pair_top8_nested_z": float(args.max_pair_top8_z),
             "max_pair_top8_churn": int(args.max_pair_top8_churn),
         },
         "runs": all_summaries,
@@ -552,9 +590,9 @@ def main() -> None:
         if int(final_stage_comparison.get("max_stage_top16_churn", 99)) > int(args.max_stage_top16_churn):
             stage_bracket_passed = False
             raise AssertionError(f"Monte Carlo stage stability failed: stage churn too high: {final_stage_comparison}")
-        if float(final_stage_comparison.get("max_pair_top8_abs_delta", 1.0)) > float(args.max_pair_top8_delta):
+        if float(final_stage_comparison.get("max_pair_top8_nested_z", float("inf"))) > float(args.max_pair_top8_z):
             stage_bracket_passed = False
-            raise AssertionError(f"Monte Carlo bracket stability failed: pair delta too high: {final_stage_comparison}")
+            raise AssertionError(f"Monte Carlo bracket stability failed: pair z-score too high: {final_stage_comparison}")
         if int(final_stage_comparison.get("max_pair_top8_churn", 99)) > int(args.max_pair_top8_churn):
             stage_bracket_passed = False
             raise AssertionError(f"Monte Carlo bracket stability failed: pair churn too high: {final_stage_comparison}")

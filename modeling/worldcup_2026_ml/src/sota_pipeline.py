@@ -10,6 +10,7 @@ import itertools
 from collections import defaultdict, deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 import threading
 
@@ -2433,6 +2434,7 @@ def predict_match(
         "p_poisson_away_win_90": float(prob_stack["poisson"][2]),
         "p_home_advances": p_home_advances,
         "p_away_advances": p_away_advances,
+        "p_home_advances_if_draw": float(p_home_advances_if_draw),
         "home_xg": float(home_xg),
         "away_xg": float(away_xg),
         "context_shift": float(context_shift),
@@ -2628,59 +2630,479 @@ def sample_hybrid_score(
     return hybrid_score_choice(matrix, classifier_probs_from_prediction(pred), rng, resolved_weight)
 
 
+@dataclass(frozen=True)
+class KnockoutResolutionPolicy:
+    extra_time_matrix: np.ndarray
+    extra_time_outcomes: np.ndarray
+    home_penalty_probability: float
+    home_advances_if_draw: float
+
+
+def home_advances_if_draw(prediction: dict[str, float]) -> float:
+    explicit = prediction.get("p_home_advances_if_draw")
+    if explicit is not None:
+        return float(np.clip(float(explicit), 0.0, 1.0))
+    draw_probability = max(1e-9, float(prediction["p_draw_90"]))
+    return float(
+        np.clip(
+            (float(prediction["p_home_advances"]) - float(prediction["p_home_win_90"])) / draw_probability,
+            0.0,
+            1.0,
+        )
+    )
+
+
+def reweight_score_matrix_outcomes(
+    matrix: np.ndarray,
+    source_outcomes: np.ndarray,
+    target_outcomes: np.ndarray,
+) -> np.ndarray:
+    """Keep each score's conditional shape while calibrating 1X2 outcome mass."""
+    adjusted = np.array(matrix, dtype=float, copy=True)
+    for home_goals in range(adjusted.shape[0]):
+        for away_goals in range(adjusted.shape[1]):
+            outcome = 0 if home_goals > away_goals else 2 if away_goals > home_goals else 1
+            source_probability = float(source_outcomes[outcome])
+            if source_probability > 1e-12:
+                adjusted[home_goals, away_goals] *= float(target_outcomes[outcome]) / source_probability
+            else:
+                adjusted[home_goals, away_goals] = 0.0
+    total = float(adjusted.sum())
+    if total <= 0.0:
+        raise ValueError("extra-time score matrix has no probability mass")
+    return adjusted / total
+
+
+def knockout_resolution_policy(
+    prediction: dict[str, float],
+    *,
+    rho: float = DEFAULT_DIXON_COLES_RHO,
+) -> KnockoutResolutionPolicy:
+    """Model 90-minute draws as calibrated extra time followed by penalties."""
+    raw_extra_time_matrix = score_matrix(
+        max(0.05, float(prediction["home_xg"]) * 0.28),
+        max(0.05, float(prediction["away_xg"]) * 0.28),
+        rho=rho,
+    )
+    raw_extra_time_outcomes = outcome_probs_from_matrix(raw_extra_time_matrix)
+    target_home_advances = home_advances_if_draw(prediction)
+    home_limit = (
+        target_home_advances / float(raw_extra_time_outcomes[0])
+        if float(raw_extra_time_outcomes[0]) > 1e-12
+        else 1.0
+    )
+    away_limit = (
+        (1.0 - target_home_advances) / float(raw_extra_time_outcomes[2])
+        if float(raw_extra_time_outcomes[2]) > 1e-12
+        else 1.0
+    )
+    decisive_scale = float(np.clip(min(1.0, home_limit, away_limit), 0.0, 1.0))
+    extra_time_outcomes = np.array(
+        [
+            float(raw_extra_time_outcomes[0]) * decisive_scale,
+            1.0 - (float(raw_extra_time_outcomes[0]) + float(raw_extra_time_outcomes[2])) * decisive_scale,
+            float(raw_extra_time_outcomes[2]) * decisive_scale,
+        ],
+        dtype=float,
+    )
+    extra_time_matrix = reweight_score_matrix_outcomes(
+        raw_extra_time_matrix,
+        raw_extra_time_outcomes,
+        extra_time_outcomes,
+    )
+    extra_time_draw = float(extra_time_outcomes[1])
+    if extra_time_draw <= 1e-9:
+        home_penalty_probability = 0.5
+    else:
+        home_penalty_probability = float(
+            np.clip((target_home_advances - float(extra_time_outcomes[0])) / extra_time_draw, 0.0, 1.0)
+        )
+    return KnockoutResolutionPolicy(
+        extra_time_matrix=extra_time_matrix,
+        extra_time_outcomes=extra_time_outcomes,
+        home_penalty_probability=home_penalty_probability,
+        home_advances_if_draw=float(
+            extra_time_outcomes[0] + extra_time_outcomes[1] * home_penalty_probability
+        ),
+    )
+
+
+def sample_score_from_matrix(matrix: np.ndarray, rng: random.Random) -> tuple[int, int]:
+    flat_index = rng.choices(range(matrix.size), weights=matrix.ravel())[0]
+    return int(flat_index // matrix.shape[1]), int(flat_index % matrix.shape[1])
+
+
+def _resolve_knockout_draw(
+    home: str,
+    away: str,
+    regulation_home_goals: int,
+    regulation_away_goals: int,
+    extra_time_home_goals: int,
+    extra_time_away_goals: int,
+    home_penalty_probability: float,
+    rng: random.Random,
+) -> tuple[str, int, int, str]:
+    home_goals = regulation_home_goals + extra_time_home_goals
+    away_goals = regulation_away_goals + extra_time_away_goals
+    if extra_time_home_goals > extra_time_away_goals:
+        return home, home_goals, away_goals, "extra_time"
+    if extra_time_away_goals > extra_time_home_goals:
+        return away, home_goals, away_goals, "extra_time"
+    winner = home if rng.random() < home_penalty_probability else away
+    return winner, home_goals, away_goals, "penalties"
+
+
 def group_rank(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_values(["pts", "gd", "gf", "model_rating"], ascending=[False, False, False, False])
 
 
-def rank_group(group_df: pd.DataFrame, match_results: list[dict[str, object]]) -> pd.DataFrame:
-    ranked = group_df.copy()
-    ranked["h2h_pts"] = 0
-    ranked["h2h_gd"] = 0
-    ranked["h2h_gf"] = 0
-    tied_cols = ["pts", "gd", "gf"]
-    for _key, tied in ranked.groupby(tied_cols, sort=False):
+def _finite_tiebreak_value(value: object) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
+@lru_cache(maxsize=1)
+def _latest_fifa_rankings_for_tiebreaks() -> dict[str, float]:
+    """Return the latest available FIFA ranking for the terminal FIFA criterion."""
+    rankings = load_rankings()
+    if rankings.empty:
+        return {}
+    latest = rankings.sort_values("rank_date").groupby("team").tail(1)
+    lookup: dict[str, float] = {}
+    for row in latest.itertuples(index=False):
+        rank = _finite_tiebreak_value(row.rank)
+        if rank is not None and rank > 0:
+            lookup[canonical_team(str(row.team))] = rank
+    return lookup
+
+
+def _row_metric(row: dict[str, object], field: str) -> float:
+    value = _finite_tiebreak_value(row.get(field))
+    return value if value is not None else 0.0
+
+
+def _partition_rows(rows: list[dict[str, object]], fields: tuple[str, ...]) -> list[list[dict[str, object]]]:
+    partitions: dict[tuple[float, ...], list[dict[str, object]]] = defaultdict(list)
+    for row in rows:
+        partitions[tuple(_row_metric(row, field) for field in fields)].append(row)
+    return list(partitions.values())
+
+
+def _fair_play_score(row: dict[str, object]) -> float | None:
+    # FIFA's team conduct score is higher for the better disciplinary record.
+    for column in ("fair_play_score", "fair_play"):
+        if column in row:
+            score = _finite_tiebreak_value(row.get(column))
+            if score is not None:
+                return score
+    return None
+
+
+def _fifa_rank(row: dict[str, object], fallback_rankings: dict[str, float]) -> float | None:
+    rank = _finite_tiebreak_value(row.get("fifa_rank"))
+    if rank is not None and rank > 0:
+        return rank
+    return fallback_rankings.get(canonical_team(str(row["team"])))
+
+
+def _package_fifa_rank(package: dict[str, object], team: str) -> float | None:
+    rankings = package.get("latest_rankings", {})
+    if not isinstance(rankings, dict):
+        return None
+    entry = rankings.get(canonical_team(team), {})
+    if not isinstance(entry, dict):
+        return None
+    rank = _finite_tiebreak_value(entry.get("rank"))
+    return rank if rank is not None and rank > 0 else None
+
+
+def _prepare_fifa_tiebreak_inputs(rows: list[dict[str, object]]) -> None:
+    needs_fallback_rank = any(_fifa_rank(row, {}) is None for row in rows)
+    fallback_rankings = _latest_fifa_rankings_for_tiebreaks() if needs_fallback_rank else {}
+    for row in rows:
+        fair_play = _fair_play_score(row)
+        fifa_rank = _fifa_rank(row, fallback_rankings)
+        row["fair_play_score"] = fair_play if fair_play is not None else float("nan")
+        row["fair_play_available"] = fair_play is not None
+        row["fifa_rank"] = fifa_rank if fifa_rank is not None else float("nan")
+        row["fifa_rank_available"] = fifa_rank is not None
+        row["fair_play_tiebreak"] = "not_required"
+        row["fifa_rank_tiebreak"] = "not_required"
+        row["tiebreak_fallback"] = "not_required"
+        row["_fair_play_sort"] = 0.0
+        row["_fifa_rank_sort"] = 0.0
+
+
+def _apply_terminal_fifa_tiebreaks(rows: list[dict[str, object]], prior_fields: tuple[str, ...]) -> None:
+    """Apply fair play then FIFA ranking only to teams still tied on prior criteria.
+
+    Callers that need a complete ordered group table must first reject a terminal
+    tie with unavailable fair-play data. The best-third selector separately
+    permits non-cutoff ties because they cannot affect qualification.
+    """
+    for tied in _partition_rows(rows, prior_fields):
         if len(tied) <= 1:
             continue
-        tied_teams = set(tied["team"])
-        h2h = {team: {"pts": 0, "gd": 0, "gf": 0} for team in tied_teams}
-        for result in match_results:
-            home = result["home"]
-            away = result["away"]
-            if home not in tied_teams or away not in tied_teams:
+        if all(bool(row["fair_play_available"]) for row in tied):
+            for row in tied:
+                row["_fair_play_sort"] = _row_metric(row, "fair_play_score")
+                row["fair_play_tiebreak"] = "applied"
+        else:
+            for row in tied:
+                row["fair_play_tiebreak"] = "unavailable"
+
+    fifa_prior_fields = (*prior_fields, "_fair_play_sort")
+    for tied in _partition_rows(rows, fifa_prior_fields):
+        if len(tied) <= 1:
+            continue
+        if all(bool(row["fifa_rank_available"]) for row in tied):
+            for row in tied:
+                row["_fifa_rank_sort"] = _row_metric(row, "fifa_rank")
+                row["fifa_rank_tiebreak"] = "applied"
+        else:
+            for row in tied:
+                row["fifa_rank_tiebreak"] = "unavailable"
+
+    fallback_prior_fields = (*fifa_prior_fields, "_fifa_rank_sort")
+    for tied in _partition_rows(rows, fallback_prior_fields):
+        if len(tied) > 1:
+            for row in tied:
+                row["tiebreak_fallback"] = "stable_team_name"
+
+
+GROUP_TERMINAL_TIE_FIELDS = (
+    "pts",
+    "h2h_pts",
+    "h2h_gd",
+    "h2h_gf",
+    "_h2h_step2_pts",
+    "_h2h_step2_gd",
+    "_h2h_step2_gf",
+    "gd",
+    "gf",
+)
+
+
+def _require_fair_play_for_group_terminal_ties(rows: list[dict[str, object]]) -> None:
+    """Refuse an observed group order that would need undisclosed fair play."""
+    for tied in _partition_rows(rows, GROUP_TERMINAL_TIE_FIELDS):
+        if len(tied) <= 1:
+            continue
+        missing = [str(row["team"]) for row in tied if not bool(row["fair_play_available"])]
+        if missing:
+            teams = ", ".join(sorted(missing, key=str.casefold))
+            raise ValueError(
+                "Cannot rank group: teams remain tied after the FIFA sporting criteria and fair-play data "
+                f"is missing for {teams}; do not use FIFA ranking as a substitute."
+            )
+
+
+def _head_to_head_metrics(
+    rows: list[dict[str, object]],
+    match_results: list[dict[str, object]],
+) -> dict[str, dict[str, int]]:
+    tied_teams = {canonical_team(str(row["team"])) for row in rows}
+    metrics = {team: {"pts": 0, "gd": 0, "gf": 0} for team in tied_teams}
+    for result in match_results:
+        home = canonical_team(str(result["home"]))
+        away = canonical_team(str(result["away"]))
+        if home not in tied_teams or away not in tied_teams:
+            continue
+        home_goals = int(result["home_goals"])
+        away_goals = int(result["away_goals"])
+        metrics[home]["gf"] += home_goals
+        metrics[home]["gd"] += home_goals - away_goals
+        metrics[away]["gf"] += away_goals
+        metrics[away]["gd"] += away_goals - home_goals
+        if home_goals > away_goals:
+            metrics[home]["pts"] += 3
+        elif away_goals > home_goals:
+            metrics[away]["pts"] += 3
+        else:
+            metrics[home]["pts"] += 1
+            metrics[away]["pts"] += 1
+    return metrics
+
+
+def _apply_head_to_head_tiebreak(rows: list[dict[str, object]], match_results: list[dict[str, object]]) -> None:
+    for row in rows:
+        row["h2h_pts"] = 0
+        row["h2h_gd"] = 0
+        row["h2h_gf"] = 0
+        row["_h2h_step2_pts"] = 0
+        row["_h2h_step2_gd"] = 0
+        row["_h2h_step2_gf"] = 0
+
+    # Article 13, step 1: apply the initial mini-table to each points tie.
+    for tied_on_points in _partition_rows(rows, ("pts",)):
+        if len(tied_on_points) <= 1:
+            continue
+        initial_metrics = _head_to_head_metrics(tied_on_points, match_results)
+        for row in tied_on_points:
+            metrics = initial_metrics[canonical_team(str(row["team"]))]
+            row["h2h_pts"] = metrics["pts"]
+            row["h2h_gd"] = metrics["gd"]
+            row["h2h_gf"] = metrics["gf"]
+
+        # Article 13, step 2: repeat a)-c) only for teams still equal after step 1.
+        # Any unresolved set then continues to global d)-f) without restarting.
+        for still_tied in _partition_rows(tied_on_points, ("h2h_pts", "h2h_gd", "h2h_gf")):
+            if len(still_tied) <= 1:
                 continue
-            hg = int(result["home_goals"])
-            ag = int(result["away_goals"])
-            h2h[home]["gf"] += hg
-            h2h[home]["gd"] += hg - ag
-            h2h[away]["gf"] += ag
-            h2h[away]["gd"] += ag - hg
-            if hg > ag:
-                h2h[home]["pts"] += 3
-            elif ag > hg:
-                h2h[away]["pts"] += 3
-            else:
-                h2h[home]["pts"] += 1
-                h2h[away]["pts"] += 1
-        for team, vals in h2h.items():
-            mask = ranked["team"] == team
-            ranked.loc[mask, "h2h_pts"] = vals["pts"]
-            ranked.loc[mask, "h2h_gd"] = vals["gd"]
-            ranked.loc[mask, "h2h_gf"] = vals["gf"]
-    return ranked.sort_values(
-        ["pts", "gd", "gf", "wins", "h2h_pts", "h2h_gd", "h2h_gf", "model_rating", "team"],
-        ascending=[False, False, False, False, False, False, False, False, True],
+            step2_metrics = _head_to_head_metrics(still_tied, match_results)
+            for row in still_tied:
+                metrics = step2_metrics[canonical_team(str(row["team"]))]
+                row["_h2h_step2_pts"] = metrics["pts"]
+                row["_h2h_step2_gd"] = metrics["gd"]
+                row["_h2h_step2_gf"] = metrics["gf"]
+
+
+def _team_name_sort_key(row: dict[str, object]) -> str:
+    return canonical_team(str(row["team"])).casefold()
+
+
+def _strip_internal_tiebreak_fields(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    for row in rows:
+        row.pop("_fair_play_sort", None)
+        row.pop("_fifa_rank_sort", None)
+        row.pop("_h2h_step2_pts", None)
+        row.pop("_h2h_step2_gd", None)
+        row.pop("_h2h_step2_gf", None)
+    return rows
+
+
+def _rank_group_records(rows: list[dict[str, object]], match_results: list[dict[str, object]]) -> list[dict[str, object]]:
+    ranked = [dict(row) for row in rows]
+    if not ranked:
+        return ranked
+    _prepare_fifa_tiebreak_inputs(ranked)
+    _apply_head_to_head_tiebreak(ranked, match_results)
+    _require_fair_play_for_group_terminal_ties(ranked)
+    _apply_terminal_fifa_tiebreaks(
+        ranked,
+        GROUP_TERMINAL_TIE_FIELDS,
     )
+    ranked.sort(
+        key=lambda row: (
+            -_row_metric(row, "pts"),
+            -_row_metric(row, "h2h_pts"),
+            -_row_metric(row, "h2h_gd"),
+            -_row_metric(row, "h2h_gf"),
+            -_row_metric(row, "_h2h_step2_pts"),
+            -_row_metric(row, "_h2h_step2_gd"),
+            -_row_metric(row, "_h2h_step2_gf"),
+            -_row_metric(row, "gd"),
+            -_row_metric(row, "gf"),
+            -_row_metric(row, "_fair_play_sort"),
+            _row_metric(row, "_fifa_rank_sort"),
+            _team_name_sort_key(row),
+        )
+    )
+    return _strip_internal_tiebreak_fields(ranked)
+
+
+def _rank_best_third_records(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    ranked = [dict(row) for row in rows]
+    if not ranked:
+        return ranked
+    _prepare_fifa_tiebreak_inputs(ranked)
+    _apply_terminal_fifa_tiebreaks(ranked, ("pts", "gd", "gf"))
+    ranked.sort(
+        key=lambda row: (
+            -_row_metric(row, "pts"),
+            -_row_metric(row, "gd"),
+            -_row_metric(row, "gf"),
+            -_row_metric(row, "_fair_play_sort"),
+            _row_metric(row, "_fifa_rank_sort"),
+            _team_name_sort_key(row),
+        )
+    )
+    return _strip_internal_tiebreak_fields(ranked)
+
+
+def _require_fair_play_at_best_third_cutoff(rows: list[dict[str, object]], cutoff: int = 8) -> None:
+    """Refuse an unresolved best-third qualification cutoff without fair-play data."""
+    primary_ties: dict[tuple[float, float, float], list[dict[str, object]]] = defaultdict(list)
+    for row in rows:
+        primary_ties[
+            (
+                _row_metric(row, "pts"),
+                _row_metric(row, "gd"),
+                _row_metric(row, "gf"),
+            )
+        ].append(row)
+
+    placed = 0
+    for _metrics, tied in sorted(primary_ties.items(), reverse=True):
+        next_placed = placed + len(tied)
+        if placed < cutoff < next_placed:
+            missing_fair_play = [str(row["team"]) for row in tied if _fair_play_score(row) is None]
+            if missing_fair_play:
+                teams = ", ".join(sorted(missing_fair_play, key=str.casefold))
+                raise ValueError(
+                    "Cannot select the eight best third-placed teams: the qualification cutoff is tied "
+                    f"and fair-play data is missing for {teams}; do not use FIFA ranking as a substitute."
+                )
+        placed = next_placed
+
+
+def rank_group(group_df: pd.DataFrame, match_results: list[dict[str, object]]) -> pd.DataFrame:
+    """Rank a completed group using the FIFA World Cup 2026 tie-break sequence."""
+    if group_df.empty:
+        return group_df.copy()
+    records = group_df.to_dict("records")
+    for index, row in zip(group_df.index, records):
+        row["_ranking_input_index"] = index
+    ranked = pd.DataFrame(_rank_group_records(records, match_results))
+    ranked.index = ranked.pop("_ranking_input_index")
+    ranked.index.name = group_df.index.name
+    return ranked
 
 
 def select_best_thirds(thirds: pd.DataFrame) -> pd.DataFrame:
-    return thirds.sort_values(["pts", "gd", "gf", "wins", "model_rating", "team"], ascending=[False, False, False, False, False, True]).head(8)
+    """Return the eight best third-placed teams under the FIFA World Cup 2026 rules.
+
+    Any qualification cutoff tied on points, goal difference and goals scored
+    must carry fair-play data. Observed snapshots refuse an unknown tiebreak;
+    generated simulations supply a separate sampled conduct score per match.
+    """
+    if thirds.empty:
+        return thirds.copy()
+    records = thirds.to_dict("records")
+    _require_fair_play_at_best_third_cutoff(records)
+    return pd.DataFrame(_rank_best_third_records(records)).head(8)
+
+
+# Team-conduct deductions modeled only for FIFA's terminal tiebreak. This RNG
+# is kept separate from score sampling, so it cannot perturb match outcomes.
+SIMULATED_FAIR_PLAY_SCORES = (0, -1, -2, -3, -4, -5)
+SIMULATED_FAIR_PLAY_WEIGHTS = (0.18, 0.34, 0.26, 0.13, 0.06, 0.03)
+
+
+def sample_simulated_fair_play_score(rng: random.Random) -> int:
+    return int(rng.choices(SIMULATED_FAIR_PLAY_SCORES, weights=SIMULATED_FAIR_PLAY_WEIGHTS, k=1)[0])
 
 
 def simulate_group_stage(package: dict[str, object], fixtures: pd.DataFrame, seed: int) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, str], list[str], dict[str, dict[str, object]]]:
     rng = random.Random(seed)
+    fair_play_rng = random.Random(f"{seed}:fifa-fair-play")
     teams = package["squad_strength"]
     table = {
-        row.team_key: {"team": row.team_key, "group": row.group_letter, "pts": 0, "wins": 0, "gf": 0, "ga": 0, "gd": 0, "model_rating": 0.0}
+        row.team_key: {
+            "team": row.team_key,
+            "group": row.group_letter,
+            "pts": 0,
+            "wins": 0,
+            "gf": 0,
+            "ga": 0,
+            "gd": 0,
+            "model_rating": 0.0,
+            "fifa_rank": _package_fifa_rank(package, str(row.team_key)),
+            "fair_play_score": 0,
+        }
         for row in teams.itertuples(index=False)
     }
     group_games = fixtures[fixtures["stage_id"] == GROUP_STAGE_ID]
@@ -2699,6 +3121,8 @@ def simulate_group_stage(package: dict[str, object], fixtures: pd.DataFrame, see
         table[h]["ga"] += ag
         table[a]["gf"] += ag
         table[a]["ga"] += hg
+        table[h]["fair_play_score"] += sample_simulated_fair_play_score(fair_play_rng)
+        table[a]["fair_play_score"] += sample_simulated_fair_play_score(fair_play_rng)
         table[h]["model_rating"] = states[h].elo
         table[a]["model_rating"] = states[a].elo
         if hg > ag:
@@ -2747,52 +3171,559 @@ def knockout_winner(
         return home, hg, ag, "90min", sim_meta
     if ag > hg:
         return away, hg, ag, "90min", sim_meta
-    et_hg, et_ag = sample_score(
-        max(0.05, pred["home_xg"] * 0.28),
-        max(0.05, pred["away_xg"] * 0.28),
+    resolution_policy = knockout_resolution_policy(pred, rho=rho)
+    sim_meta = {
+        **sim_meta,
+        "sim_home_advances_if_draw": float(resolution_policy.home_advances_if_draw),
+        "sim_home_penalties_if_extra_time_draw": float(resolution_policy.home_penalty_probability),
+    }
+    et_hg, et_ag = sample_score_from_matrix(resolution_policy.extra_time_matrix, rng)
+    winner, final_hg, final_ag, resolution = _resolve_knockout_draw(
+        home,
+        away,
+        hg,
+        ag,
+        et_hg,
+        et_ag,
+        resolution_policy.home_penalty_probability,
         rng,
-        rho=rho,
     )
-    if et_hg > et_ag:
-        return home, hg + et_hg, ag + et_ag, "extra_time", sim_meta
-    if et_ag > et_hg:
-        return away, hg + et_hg, ag + et_ag, "extra_time", sim_meta
-    penalties_home = 0.50 + (pred["p_home_advances"] - 0.50) * 0.45
-    winner = home if rng.random() < penalties_home else away
-    return winner, hg, ag, "penalties", sim_meta
+    return winner, final_hg, final_ag, resolution, sim_meta
+
+
+# FIFA World Cup 2026 Regulations, Annex C. Each value follows the fixed
+# Round-of-32 slot order below; its key is the sorted set of eight qualifiers.
+FIFA_2026_ANNEX_C_THIRD_PLACE_SLOT_ORDER = (
+    "3CEFHI",  # M79, winner A
+    "3EFGIJ",  # M85, winner B
+    "3BEFIJ",  # M81, winner D
+    "3ABCDF",  # M74, winner E
+    "3AEHIJ",  # M82, winner G
+    "3CDFGH",  # M77, winner I
+    "3DEIJL",  # M87, winner K
+    "3EHIJK",  # M80, winner L
+)
+
+FIFA_2026_ANNEX_C_THIRD_PLACE_MATRIX: dict[str, str] = {
+    'EFGHIJKL': 'EJIFHGLK',  # Option 1
+    'DFGHIJKL': 'HGIDJFLK',  # Option 2
+    'DEGHIJKL': 'EJIDHGLK',  # Option 3
+    'DEFHIJKL': 'EJIDHFLK',  # Option 4
+    'DEFGIJKL': 'EGIDJFLK',  # Option 5
+    'DEFGHJKL': 'EGJDHFLK',  # Option 6
+    'DEFGHIKL': 'EGIDHFLK',  # Option 7
+    'DEFGHIJL': 'EGJDHFLI',  # Option 8
+    'DEFGHIJK': 'EGJDHFIK',  # Option 9
+    'CFGHIJKL': 'HGICJFLK',  # Option 10
+    'CEGHIJKL': 'EJICHGLK',  # Option 11
+    'CEFHIJKL': 'EJICHFLK',  # Option 12
+    'CEFGIJKL': 'EGICJFLK',  # Option 13
+    'CEFGHJKL': 'EGJCHFLK',  # Option 14
+    'CEFGHIKL': 'EGICHFLK',  # Option 15
+    'CEFGHIJL': 'EGJCHFLI',  # Option 16
+    'CEFGHIJK': 'EGJCHFIK',  # Option 17
+    'CDGHIJKL': 'HGICJDLK',  # Option 18
+    'CDFHIJKL': 'CJIDHFLK',  # Option 19
+    'CDFGIJKL': 'CGIDJFLK',  # Option 20
+    'CDFGHJKL': 'CGJDHFLK',  # Option 21
+    'CDFGHIKL': 'CGIDHFLK',  # Option 22
+    'CDFGHIJL': 'CGJDHFLI',  # Option 23
+    'CDFGHIJK': 'CGJDHFIK',  # Option 24
+    'CDEHIJKL': 'EJICHDLK',  # Option 25
+    'CDEGIJKL': 'EGICJDLK',  # Option 26
+    'CDEGHJKL': 'EGJCHDLK',  # Option 27
+    'CDEGHIKL': 'EGICHDLK',  # Option 28
+    'CDEGHIJL': 'EGJCHDLI',  # Option 29
+    'CDEGHIJK': 'EGJCHDIK',  # Option 30
+    'CDEFIJKL': 'CJEDIFLK',  # Option 31
+    'CDEFHJKL': 'CJEDHFLK',  # Option 32
+    'CDEFHIKL': 'CEIDHFLK',  # Option 33
+    'CDEFHIJL': 'CJEDHFLI',  # Option 34
+    'CDEFHIJK': 'CJEDHFIK',  # Option 35
+    'CDEFGJKL': 'CGEDJFLK',  # Option 36
+    'CDEFGIKL': 'CGEDIFLK',  # Option 37
+    'CDEFGIJL': 'CGEDJFLI',  # Option 38
+    'CDEFGIJK': 'CGEDJFIK',  # Option 39
+    'CDEFGHKL': 'CGEDHFLK',  # Option 40
+    'CDEFGHJL': 'CGJDHFLE',  # Option 41
+    'CDEFGHJK': 'CGJDHFEK',  # Option 42
+    'CDEFGHIL': 'CGEDHFLI',  # Option 43
+    'CDEFGHIK': 'CGEDHFIK',  # Option 44
+    'CDEFGHIJ': 'CGJDHFEI',  # Option 45
+    'BFGHIJKL': 'HJBFIGLK',  # Option 46
+    'BEGHIJKL': 'EJIBHGLK',  # Option 47
+    'BEFHIJKL': 'EJBFIHLK',  # Option 48
+    'BEFGIJKL': 'EJBFIGLK',  # Option 49
+    'BEFGHJKL': 'EJBFHGLK',  # Option 50
+    'BEFGHIKL': 'EGBFIHLK',  # Option 51
+    'BEFGHIJL': 'EJBFHGLI',  # Option 52
+    'BEFGHIJK': 'EJBFHGIK',  # Option 53
+    'BDGHIJKL': 'HJBDIGLK',  # Option 54
+    'BDFHIJKL': 'HJBDIFLK',  # Option 55
+    'BDFGIJKL': 'IGBDJFLK',  # Option 56
+    'BDFGHJKL': 'HGBDJFLK',  # Option 57
+    'BDFGHIKL': 'HGBDIFLK',  # Option 58
+    'BDFGHIJL': 'HGBDJFLI',  # Option 59
+    'BDFGHIJK': 'HGBDJFIK',  # Option 60
+    'BDEHIJKL': 'EJBDIHLK',  # Option 61
+    'BDEGIJKL': 'EJBDIGLK',  # Option 62
+    'BDEGHJKL': 'EJBDHGLK',  # Option 63
+    'BDEGHIKL': 'EGBDIHLK',  # Option 64
+    'BDEGHIJL': 'EJBDHGLI',  # Option 65
+    'BDEGHIJK': 'EJBDHGIK',  # Option 66
+    'BDEFIJKL': 'EJBDIFLK',  # Option 67
+    'BDEFHJKL': 'EJBDHFLK',  # Option 68
+    'BDEFHIKL': 'EIBDHFLK',  # Option 69
+    'BDEFHIJL': 'EJBDHFLI',  # Option 70
+    'BDEFHIJK': 'EJBDHFIK',  # Option 71
+    'BDEFGJKL': 'EGBDJFLK',  # Option 72
+    'BDEFGIKL': 'EGBDIFLK',  # Option 73
+    'BDEFGIJL': 'EGBDJFLI',  # Option 74
+    'BDEFGIJK': 'EGBDJFIK',  # Option 75
+    'BDEFGHKL': 'EGBDHFLK',  # Option 76
+    'BDEFGHJL': 'HGBDJFLE',  # Option 77
+    'BDEFGHJK': 'HGBDJFEK',  # Option 78
+    'BDEFGHIL': 'EGBDHFLI',  # Option 79
+    'BDEFGHIK': 'EGBDHFIK',  # Option 80
+    'BDEFGHIJ': 'HGBDJFEI',  # Option 81
+    'BCGHIJKL': 'HJBCIGLK',  # Option 82
+    'BCFHIJKL': 'HJBCIFLK',  # Option 83
+    'BCFGIJKL': 'IGBCJFLK',  # Option 84
+    'BCFGHJKL': 'HGBCJFLK',  # Option 85
+    'BCFGHIKL': 'HGBCIFLK',  # Option 86
+    'BCFGHIJL': 'HGBCJFLI',  # Option 87
+    'BCFGHIJK': 'HGBCJFIK',  # Option 88
+    'BCEHIJKL': 'EJBCIHLK',  # Option 89
+    'BCEGIJKL': 'EJBCIGLK',  # Option 90
+    'BCEGHJKL': 'EJBCHGLK',  # Option 91
+    'BCEGHIKL': 'EGBCIHLK',  # Option 92
+    'BCEGHIJL': 'EJBCHGLI',  # Option 93
+    'BCEGHIJK': 'EJBCHGIK',  # Option 94
+    'BCEFIJKL': 'EJBCIFLK',  # Option 95
+    'BCEFHJKL': 'EJBCHFLK',  # Option 96
+    'BCEFHIKL': 'EIBCHFLK',  # Option 97
+    'BCEFHIJL': 'EJBCHFLI',  # Option 98
+    'BCEFHIJK': 'EJBCHFIK',  # Option 99
+    'BCEFGJKL': 'EGBCJFLK',  # Option 100
+    'BCEFGIKL': 'EGBCIFLK',  # Option 101
+    'BCEFGIJL': 'EGBCJFLI',  # Option 102
+    'BCEFGIJK': 'EGBCJFIK',  # Option 103
+    'BCEFGHKL': 'EGBCHFLK',  # Option 104
+    'BCEFGHJL': 'HGBCJFLE',  # Option 105
+    'BCEFGHJK': 'HGBCJFEK',  # Option 106
+    'BCEFGHIL': 'EGBCHFLI',  # Option 107
+    'BCEFGHIK': 'EGBCHFIK',  # Option 108
+    'BCEFGHIJ': 'HGBCJFEI',  # Option 109
+    'BCDHIJKL': 'HJBCIDLK',  # Option 110
+    'BCDGIJKL': 'IGBCJDLK',  # Option 111
+    'BCDGHJKL': 'HGBCJDLK',  # Option 112
+    'BCDGHIKL': 'HGBCIDLK',  # Option 113
+    'BCDGHIJL': 'HGBCJDLI',  # Option 114
+    'BCDGHIJK': 'HGBCJDIK',  # Option 115
+    'BCDFIJKL': 'CJBDIFLK',  # Option 116
+    'BCDFHJKL': 'CJBDHFLK',  # Option 117
+    'BCDFHIKL': 'CIBDHFLK',  # Option 118
+    'BCDFHIJL': 'CJBDHFLI',  # Option 119
+    'BCDFHIJK': 'CJBDHFIK',  # Option 120
+    'BCDFGJKL': 'CGBDJFLK',  # Option 121
+    'BCDFGIKL': 'CGBDIFLK',  # Option 122
+    'BCDFGIJL': 'CGBDJFLI',  # Option 123
+    'BCDFGIJK': 'CGBDJFIK',  # Option 124
+    'BCDFGHKL': 'CGBDHFLK',  # Option 125
+    'BCDFGHJL': 'CGBDHFLJ',  # Option 126
+    'BCDFGHJK': 'HGBCJFDK',  # Option 127
+    'BCDFGHIL': 'CGBDHFLI',  # Option 128
+    'BCDFGHIK': 'CGBDHFIK',  # Option 129
+    'BCDFGHIJ': 'HGBCJFDI',  # Option 130
+    'BCDEIJKL': 'EJBCIDLK',  # Option 131
+    'BCDEHJKL': 'EJBCHDLK',  # Option 132
+    'BCDEHIKL': 'EIBCHDLK',  # Option 133
+    'BCDEHIJL': 'EJBCHDLI',  # Option 134
+    'BCDEHIJK': 'EJBCHDIK',  # Option 135
+    'BCDEGJKL': 'EGBCJDLK',  # Option 136
+    'BCDEGIKL': 'EGBCIDLK',  # Option 137
+    'BCDEGIJL': 'EGBCJDLI',  # Option 138
+    'BCDEGIJK': 'EGBCJDIK',  # Option 139
+    'BCDEGHKL': 'EGBCHDLK',  # Option 140
+    'BCDEGHJL': 'HGBCJDLE',  # Option 141
+    'BCDEGHJK': 'HGBCJDEK',  # Option 142
+    'BCDEGHIL': 'EGBCHDLI',  # Option 143
+    'BCDEGHIK': 'EGBCHDIK',  # Option 144
+    'BCDEGHIJ': 'HGBCJDEI',  # Option 145
+    'BCDEFJKL': 'CJBDEFLK',  # Option 146
+    'BCDEFIKL': 'CEBDIFLK',  # Option 147
+    'BCDEFIJL': 'CJBDEFLI',  # Option 148
+    'BCDEFIJK': 'CJBDEFIK',  # Option 149
+    'BCDEFHKL': 'CEBDHFLK',  # Option 150
+    'BCDEFHJL': 'CJBDHFLE',  # Option 151
+    'BCDEFHJK': 'CJBDHFEK',  # Option 152
+    'BCDEFHIL': 'CEBDHFLI',  # Option 153
+    'BCDEFHIK': 'CEBDHFIK',  # Option 154
+    'BCDEFHIJ': 'CJBDHFEI',  # Option 155
+    'BCDEFGKL': 'CGBDEFLK',  # Option 156
+    'BCDEFGJL': 'CGBDJFLE',  # Option 157
+    'BCDEFGJK': 'CGBDJFEK',  # Option 158
+    'BCDEFGIL': 'CGBDEFLI',  # Option 159
+    'BCDEFGIK': 'CGBDEFIK',  # Option 160
+    'BCDEFGIJ': 'CGBDJFEI',  # Option 161
+    'BCDEFGHL': 'CGBDHFLE',  # Option 162
+    'BCDEFGHK': 'CGBDHFEK',  # Option 163
+    'BCDEFGHJ': 'HGBCJFDE',  # Option 164
+    'BCDEFGHI': 'CGBDHFEI',  # Option 165
+    'AFGHIJKL': 'HJIFAGLK',  # Option 166
+    'AEGHIJKL': 'EJIAHGLK',  # Option 167
+    'AEFHIJKL': 'EJIFAHLK',  # Option 168
+    'AEFGIJKL': 'EJIFAGLK',  # Option 169
+    'AEFGHJKL': 'EGJFAHLK',  # Option 170
+    'AEFGHIKL': 'EGIFAHLK',  # Option 171
+    'AEFGHIJL': 'EGJFAHLI',  # Option 172
+    'AEFGHIJK': 'EGJFAHIK',  # Option 173
+    'ADGHIJKL': 'HJIDAGLK',  # Option 174
+    'ADFHIJKL': 'HJIDAFLK',  # Option 175
+    'ADFGIJKL': 'IGJDAFLK',  # Option 176
+    'ADFGHJKL': 'HGJDAFLK',  # Option 177
+    'ADFGHIKL': 'HGIDAFLK',  # Option 178
+    'ADFGHIJL': 'HGJDAFLI',  # Option 179
+    'ADFGHIJK': 'HGJDAFIK',  # Option 180
+    'ADEHIJKL': 'EJIDAHLK',  # Option 181
+    'ADEGIJKL': 'EJIDAGLK',  # Option 182
+    'ADEGHJKL': 'EGJDAHLK',  # Option 183
+    'ADEGHIKL': 'EGIDAHLK',  # Option 184
+    'ADEGHIJL': 'EGJDAHLI',  # Option 185
+    'ADEGHIJK': 'EGJDAHIK',  # Option 186
+    'ADEFIJKL': 'EJIDAFLK',  # Option 187
+    'ADEFHJKL': 'HJEDAFLK',  # Option 188
+    'ADEFHIKL': 'HEIDAFLK',  # Option 189
+    'ADEFHIJL': 'HJEDAFLI',  # Option 190
+    'ADEFHIJK': 'HJEDAFIK',  # Option 191
+    'ADEFGJKL': 'EGJDAFLK',  # Option 192
+    'ADEFGIKL': 'EGIDAFLK',  # Option 193
+    'ADEFGIJL': 'EGJDAFLI',  # Option 194
+    'ADEFGIJK': 'EGJDAFIK',  # Option 195
+    'ADEFGHKL': 'HGEDAFLK',  # Option 196
+    'ADEFGHJL': 'HGJDAFLE',  # Option 197
+    'ADEFGHJK': 'HGJDAFEK',  # Option 198
+    'ADEFGHIL': 'HGEDAFLI',  # Option 199
+    'ADEFGHIK': 'HGEDAFIK',  # Option 200
+    'ADEFGHIJ': 'HGJDAFEI',  # Option 201
+    'ACGHIJKL': 'HJICAGLK',  # Option 202
+    'ACFHIJKL': 'HJICAFLK',  # Option 203
+    'ACFGIJKL': 'IGJCAFLK',  # Option 204
+    'ACFGHJKL': 'HGJCAFLK',  # Option 205
+    'ACFGHIKL': 'HGICAFLK',  # Option 206
+    'ACFGHIJL': 'HGJCAFLI',  # Option 207
+    'ACFGHIJK': 'HGJCAFIK',  # Option 208
+    'ACEHIJKL': 'EJICAHLK',  # Option 209
+    'ACEGIJKL': 'EJICAGLK',  # Option 210
+    'ACEGHJKL': 'EGJCAHLK',  # Option 211
+    'ACEGHIKL': 'EGICAHLK',  # Option 212
+    'ACEGHIJL': 'EGJCAHLI',  # Option 213
+    'ACEGHIJK': 'EGJCAHIK',  # Option 214
+    'ACEFIJKL': 'EJICAFLK',  # Option 215
+    'ACEFHJKL': 'HJECAFLK',  # Option 216
+    'ACEFHIKL': 'HEICAFLK',  # Option 217
+    'ACEFHIJL': 'HJECAFLI',  # Option 218
+    'ACEFHIJK': 'HJECAFIK',  # Option 219
+    'ACEFGJKL': 'EGJCAFLK',  # Option 220
+    'ACEFGIKL': 'EGICAFLK',  # Option 221
+    'ACEFGIJL': 'EGJCAFLI',  # Option 222
+    'ACEFGIJK': 'EGJCAFIK',  # Option 223
+    'ACEFGHKL': 'HGECAFLK',  # Option 224
+    'ACEFGHJL': 'HGJCAFLE',  # Option 225
+    'ACEFGHJK': 'HGJCAFEK',  # Option 226
+    'ACEFGHIL': 'HGECAFLI',  # Option 227
+    'ACEFGHIK': 'HGECAFIK',  # Option 228
+    'ACEFGHIJ': 'HGJCAFEI',  # Option 229
+    'ACDHIJKL': 'HJICADLK',  # Option 230
+    'ACDGIJKL': 'IGJCADLK',  # Option 231
+    'ACDGHJKL': 'HGJCADLK',  # Option 232
+    'ACDGHIKL': 'HGICADLK',  # Option 233
+    'ACDGHIJL': 'HGJCADLI',  # Option 234
+    'ACDGHIJK': 'HGJCADIK',  # Option 235
+    'ACDFIJKL': 'CJIDAFLK',  # Option 236
+    'ACDFHJKL': 'HJFCADLK',  # Option 237
+    'ACDFHIKL': 'HFICADLK',  # Option 238
+    'ACDFHIJL': 'HJFCADLI',  # Option 239
+    'ACDFHIJK': 'HJFCADIK',  # Option 240
+    'ACDFGJKL': 'CGJDAFLK',  # Option 241
+    'ACDFGIKL': 'CGIDAFLK',  # Option 242
+    'ACDFGIJL': 'CGJDAFLI',  # Option 243
+    'ACDFGIJK': 'CGJDAFIK',  # Option 244
+    'ACDFGHKL': 'HGFCADLK',  # Option 245
+    'ACDFGHJL': 'CGJDAFLH',  # Option 246
+    'ACDFGHJK': 'HGJCAFDK',  # Option 247
+    'ACDFGHIL': 'HGFCADLI',  # Option 248
+    'ACDFGHIK': 'HGFCADIK',  # Option 249
+    'ACDFGHIJ': 'HGJCAFDI',  # Option 250
+    'ACDEIJKL': 'EJICADLK',  # Option 251
+    'ACDEHJKL': 'HJECADLK',  # Option 252
+    'ACDEHIKL': 'HEICADLK',  # Option 253
+    'ACDEHIJL': 'HJECADLI',  # Option 254
+    'ACDEHIJK': 'HJECADIK',  # Option 255
+    'ACDEGJKL': 'EGJCADLK',  # Option 256
+    'ACDEGIKL': 'EGICADLK',  # Option 257
+    'ACDEGIJL': 'EGJCADLI',  # Option 258
+    'ACDEGIJK': 'EGJCADIK',  # Option 259
+    'ACDEGHKL': 'HGECADLK',  # Option 260
+    'ACDEGHJL': 'HGJCADLE',  # Option 261
+    'ACDEGHJK': 'HGJCADEK',  # Option 262
+    'ACDEGHIL': 'HGECADLI',  # Option 263
+    'ACDEGHIK': 'HGECADIK',  # Option 264
+    'ACDEGHIJ': 'HGJCADEI',  # Option 265
+    'ACDEFJKL': 'CJEDAFLK',  # Option 266
+    'ACDEFIKL': 'CEIDAFLK',  # Option 267
+    'ACDEFIJL': 'CJEDAFLI',  # Option 268
+    'ACDEFIJK': 'CJEDAFIK',  # Option 269
+    'ACDEFHKL': 'HEFCADLK',  # Option 270
+    'ACDEFHJL': 'HJFCADLE',  # Option 271
+    'ACDEFHJK': 'HJECAFDK',  # Option 272
+    'ACDEFHIL': 'HEFCADLI',  # Option 273
+    'ACDEFHIK': 'HEFCADIK',  # Option 274
+    'ACDEFHIJ': 'HJECAFDI',  # Option 275
+    'ACDEFGKL': 'CGEDAFLK',  # Option 276
+    'ACDEFGJL': 'CGJDAFLE',  # Option 277
+    'ACDEFGJK': 'CGJDAFEK',  # Option 278
+    'ACDEFGIL': 'CGEDAFLI',  # Option 279
+    'ACDEFGIK': 'CGEDAFIK',  # Option 280
+    'ACDEFGIJ': 'CGJDAFEI',  # Option 281
+    'ACDEFGHL': 'HGFCADLE',  # Option 282
+    'ACDEFGHK': 'HGECAFDK',  # Option 283
+    'ACDEFGHJ': 'HGJCAFDE',  # Option 284
+    'ACDEFGHI': 'HGECAFDI',  # Option 285
+    'ABGHIJKL': 'HJBAIGLK',  # Option 286
+    'ABFHIJKL': 'HJBAIFLK',  # Option 287
+    'ABFGIJKL': 'IJBFAGLK',  # Option 288
+    'ABFGHJKL': 'HJBFAGLK',  # Option 289
+    'ABFGHIKL': 'HGBAIFLK',  # Option 290
+    'ABFGHIJL': 'HJBFAGLI',  # Option 291
+    'ABFGHIJK': 'HJBFAGIK',  # Option 292
+    'ABEHIJKL': 'EJBAIHLK',  # Option 293
+    'ABEGIJKL': 'EJBAIGLK',  # Option 294
+    'ABEGHJKL': 'EJBAHGLK',  # Option 295
+    'ABEGHIKL': 'EGBAIHLK',  # Option 296
+    'ABEGHIJL': 'EJBAHGLI',  # Option 297
+    'ABEGHIJK': 'EJBAHGIK',  # Option 298
+    'ABEFIJKL': 'EJBAIFLK',  # Option 299
+    'ABEFHJKL': 'EJBFAHLK',  # Option 300
+    'ABEFHIKL': 'EIBFAHLK',  # Option 301
+    'ABEFHIJL': 'EJBFAHLI',  # Option 302
+    'ABEFHIJK': 'EJBFAHIK',  # Option 303
+    'ABEFGJKL': 'EJBFAGLK',  # Option 304
+    'ABEFGIKL': 'EGBAIFLK',  # Option 305
+    'ABEFGIJL': 'EJBFAGLI',  # Option 306
+    'ABEFGIJK': 'EJBFAGIK',  # Option 307
+    'ABEFGHKL': 'EGBFAHLK',  # Option 308
+    'ABEFGHJL': 'HJBFAGLE',  # Option 309
+    'ABEFGHJK': 'HJBFAGEK',  # Option 310
+    'ABEFGHIL': 'EGBFAHLI',  # Option 311
+    'ABEFGHIK': 'EGBFAHIK',  # Option 312
+    'ABEFGHIJ': 'HJBFAGEI',  # Option 313
+    'ABDHIJKL': 'IJBDAHLK',  # Option 314
+    'ABDGIJKL': 'IJBDAGLK',  # Option 315
+    'ABDGHJKL': 'HJBDAGLK',  # Option 316
+    'ABDGHIKL': 'IGBDAHLK',  # Option 317
+    'ABDGHIJL': 'HJBDAGLI',  # Option 318
+    'ABDGHIJK': 'HJBDAGIK',  # Option 319
+    'ABDFIJKL': 'IJBDAFLK',  # Option 320
+    'ABDFHJKL': 'HJBDAFLK',  # Option 321
+    'ABDFHIKL': 'HIBDAFLK',  # Option 322
+    'ABDFHIJL': 'HJBDAFLI',  # Option 323
+    'ABDFHIJK': 'HJBDAFIK',  # Option 324
+    'ABDFGJKL': 'FJBDAGLK',  # Option 325
+    'ABDFGIKL': 'IGBDAFLK',  # Option 326
+    'ABDFGIJL': 'FJBDAGLI',  # Option 327
+    'ABDFGIJK': 'FJBDAGIK',  # Option 328
+    'ABDFGHKL': 'HGBDAFLK',  # Option 329
+    'ABDFGHJL': 'HGBDAFLJ',  # Option 330
+    'ABDFGHJK': 'HGBDAFJK',  # Option 331
+    'ABDFGHIL': 'HGBDAFLI',  # Option 332
+    'ABDFGHIK': 'HGBDAFIK',  # Option 333
+    'ABDFGHIJ': 'HGBDAFIJ',  # Option 334
+    'ABDEIJKL': 'EJBAIDLK',  # Option 335
+    'ABDEHJKL': 'EJBDAHLK',  # Option 336
+    'ABDEHIKL': 'EIBDAHLK',  # Option 337
+    'ABDEHIJL': 'EJBDAHLI',  # Option 338
+    'ABDEHIJK': 'EJBDAHIK',  # Option 339
+    'ABDEGJKL': 'EJBDAGLK',  # Option 340
+    'ABDEGIKL': 'EGBAIDLK',  # Option 341
+    'ABDEGIJL': 'EJBDAGLI',  # Option 342
+    'ABDEGIJK': 'EJBDAGIK',  # Option 343
+    'ABDEGHKL': 'EGBDAHLK',  # Option 344
+    'ABDEGHJL': 'HJBDAGLE',  # Option 345
+    'ABDEGHJK': 'HJBDAGEK',  # Option 346
+    'ABDEGHIL': 'EGBDAHLI',  # Option 347
+    'ABDEGHIK': 'EGBDAHIK',  # Option 348
+    'ABDEGHIJ': 'HJBDAGEI',  # Option 349
+    'ABDEFJKL': 'EJBDAFLK',  # Option 350
+    'ABDEFIKL': 'EIBDAFLK',  # Option 351
+    'ABDEFIJL': 'EJBDAFLI',  # Option 352
+    'ABDEFIJK': 'EJBDAFIK',  # Option 353
+    'ABDEFHKL': 'HEBDAFLK',  # Option 354
+    'ABDEFHJL': 'HJBDAFLE',  # Option 355
+    'ABDEFHJK': 'HJBDAFEK',  # Option 356
+    'ABDEFHIL': 'HEBDAFLI',  # Option 357
+    'ABDEFHIK': 'HEBDAFIK',  # Option 358
+    'ABDEFHIJ': 'HJBDAFEI',  # Option 359
+    'ABDEFGKL': 'EGBDAFLK',  # Option 360
+    'ABDEFGJL': 'EGBDAFLJ',  # Option 361
+    'ABDEFGJK': 'EGBDAFJK',  # Option 362
+    'ABDEFGIL': 'EGBDAFLI',  # Option 363
+    'ABDEFGIK': 'EGBDAFIK',  # Option 364
+    'ABDEFGIJ': 'EGBDAFIJ',  # Option 365
+    'ABDEFGHL': 'HGBDAFLE',  # Option 366
+    'ABDEFGHK': 'HGBDAFEK',  # Option 367
+    'ABDEFGHJ': 'HGBDAFEJ',  # Option 368
+    'ABDEFGHI': 'HGBDAFEI',  # Option 369
+    'ABCHIJKL': 'IJBCAHLK',  # Option 370
+    'ABCGIJKL': 'IJBCAGLK',  # Option 371
+    'ABCGHJKL': 'HJBCAGLK',  # Option 372
+    'ABCGHIKL': 'IGBCAHLK',  # Option 373
+    'ABCGHIJL': 'HJBCAGLI',  # Option 374
+    'ABCGHIJK': 'HJBCAGIK',  # Option 375
+    'ABCFIJKL': 'IJBCAFLK',  # Option 376
+    'ABCFHJKL': 'HJBCAFLK',  # Option 377
+    'ABCFHIKL': 'HIBCAFLK',  # Option 378
+    'ABCFHIJL': 'HJBCAFLI',  # Option 379
+    'ABCFHIJK': 'HJBCAFIK',  # Option 380
+    'ABCFGJKL': 'CJBFAGLK',  # Option 381
+    'ABCFGIKL': 'IGBCAFLK',  # Option 382
+    'ABCFGIJL': 'CJBFAGLI',  # Option 383
+    'ABCFGIJK': 'CJBFAGIK',  # Option 384
+    'ABCFGHKL': 'HGBCAFLK',  # Option 385
+    'ABCFGHJL': 'HGBCAFLJ',  # Option 386
+    'ABCFGHJK': 'HGBCAFJK',  # Option 387
+    'ABCFGHIL': 'HGBCAFLI',  # Option 388
+    'ABCFGHIK': 'HGBCAFIK',  # Option 389
+    'ABCFGHIJ': 'HGBCAFIJ',  # Option 390
+    'ABCEIJKL': 'EJBAICLK',  # Option 391
+    'ABCEHJKL': 'EJBCAHLK',  # Option 392
+    'ABCEHIKL': 'EIBCAHLK',  # Option 393
+    'ABCEHIJL': 'EJBCAHLI',  # Option 394
+    'ABCEHIJK': 'EJBCAHIK',  # Option 395
+    'ABCEGJKL': 'EJBCAGLK',  # Option 396
+    'ABCEGIKL': 'EGBAICLK',  # Option 397
+    'ABCEGIJL': 'EJBCAGLI',  # Option 398
+    'ABCEGIJK': 'EJBCAGIK',  # Option 399
+    'ABCEGHKL': 'EGBCAHLK',  # Option 400
+    'ABCEGHJL': 'HJBCAGLE',  # Option 401
+    'ABCEGHJK': 'HJBCAGEK',  # Option 402
+    'ABCEGHIL': 'EGBCAHLI',  # Option 403
+    'ABCEGHIK': 'EGBCAHIK',  # Option 404
+    'ABCEGHIJ': 'HJBCAGEI',  # Option 405
+    'ABCEFJKL': 'EJBCAFLK',  # Option 406
+    'ABCEFIKL': 'EIBCAFLK',  # Option 407
+    'ABCEFIJL': 'EJBCAFLI',  # Option 408
+    'ABCEFIJK': 'EJBCAFIK',  # Option 409
+    'ABCEFHKL': 'HEBCAFLK',  # Option 410
+    'ABCEFHJL': 'HJBCAFLE',  # Option 411
+    'ABCEFHJK': 'HJBCAFEK',  # Option 412
+    'ABCEFHIL': 'HEBCAFLI',  # Option 413
+    'ABCEFHIK': 'HEBCAFIK',  # Option 414
+    'ABCEFHIJ': 'HJBCAFEI',  # Option 415
+    'ABCEFGKL': 'EGBCAFLK',  # Option 416
+    'ABCEFGJL': 'EGBCAFLJ',  # Option 417
+    'ABCEFGJK': 'EGBCAFJK',  # Option 418
+    'ABCEFGIL': 'EGBCAFLI',  # Option 419
+    'ABCEFGIK': 'EGBCAFIK',  # Option 420
+    'ABCEFGIJ': 'EGBCAFIJ',  # Option 421
+    'ABCEFGHL': 'HGBCAFLE',  # Option 422
+    'ABCEFGHK': 'HGBCAFEK',  # Option 423
+    'ABCEFGHJ': 'HGBCAFEJ',  # Option 424
+    'ABCEFGHI': 'HGBCAFEI',  # Option 425
+    'ABCDIJKL': 'IJBCADLK',  # Option 426
+    'ABCDHJKL': 'HJBCADLK',  # Option 427
+    'ABCDHIKL': 'HIBCADLK',  # Option 428
+    'ABCDHIJL': 'HJBCADLI',  # Option 429
+    'ABCDHIJK': 'HJBCADIK',  # Option 430
+    'ABCDGJKL': 'CJBDAGLK',  # Option 431
+    'ABCDGIKL': 'IGBCADLK',  # Option 432
+    'ABCDGIJL': 'CJBDAGLI',  # Option 433
+    'ABCDGIJK': 'CJBDAGIK',  # Option 434
+    'ABCDGHKL': 'HGBCADLK',  # Option 435
+    'ABCDGHJL': 'HGBCADLJ',  # Option 436
+    'ABCDGHJK': 'HGBCADJK',  # Option 437
+    'ABCDGHIL': 'HGBCADLI',  # Option 438
+    'ABCDGHIK': 'HGBCADIK',  # Option 439
+    'ABCDGHIJ': 'HGBCADIJ',  # Option 440
+    'ABCDFJKL': 'CJBDAFLK',  # Option 441
+    'ABCDFIKL': 'CIBDAFLK',  # Option 442
+    'ABCDFIJL': 'CJBDAFLI',  # Option 443
+    'ABCDFIJK': 'CJBDAFIK',  # Option 444
+    'ABCDFHKL': 'HFBCADLK',  # Option 445
+    'ABCDFHJL': 'CJBDAFLH',  # Option 446
+    'ABCDFHJK': 'HJBCAFDK',  # Option 447
+    'ABCDFHIL': 'HFBCADLI',  # Option 448
+    'ABCDFHIK': 'HFBCADIK',  # Option 449
+    'ABCDFHIJ': 'HJBCAFDI',  # Option 450
+    'ABCDFGKL': 'CGBDAFLK',  # Option 451
+    'ABCDFGJL': 'CGBDAFLJ',  # Option 452
+    'ABCDFGJK': 'CGBDAFJK',  # Option 453
+    'ABCDFGIL': 'CGBDAFLI',  # Option 454
+    'ABCDFGIK': 'CGBDAFIK',  # Option 455
+    'ABCDFGIJ': 'CGBDAFIJ',  # Option 456
+    'ABCDFGHL': 'CGBDAFLH',  # Option 457
+    'ABCDFGHK': 'HGBCAFDK',  # Option 458
+    'ABCDFGHJ': 'HGBCAFDJ',  # Option 459
+    'ABCDFGHI': 'HGBCAFDI',  # Option 460
+    'ABCDEJKL': 'EJBCADLK',  # Option 461
+    'ABCDEIKL': 'EIBCADLK',  # Option 462
+    'ABCDEIJL': 'EJBCADLI',  # Option 463
+    'ABCDEIJK': 'EJBCADIK',  # Option 464
+    'ABCDEHKL': 'HEBCADLK',  # Option 465
+    'ABCDEHJL': 'HJBCADLE',  # Option 466
+    'ABCDEHJK': 'HJBCADEK',  # Option 467
+    'ABCDEHIL': 'HEBCADLI',  # Option 468
+    'ABCDEHIK': 'HEBCADIK',  # Option 469
+    'ABCDEHIJ': 'HJBCADEI',  # Option 470
+    'ABCDEGKL': 'EGBCADLK',  # Option 471
+    'ABCDEGJL': 'EGBCADLJ',  # Option 472
+    'ABCDEGJK': 'EGBCADJK',  # Option 473
+    'ABCDEGIL': 'EGBCADLI',  # Option 474
+    'ABCDEGIK': 'EGBCADIK',  # Option 475
+    'ABCDEGIJ': 'EGBCADIJ',  # Option 476
+    'ABCDEGHL': 'HGBCADLE',  # Option 477
+    'ABCDEGHK': 'HGBCADEK',  # Option 478
+    'ABCDEGHJ': 'HGBCADEJ',  # Option 479
+    'ABCDEGHI': 'HGBCADEI',  # Option 480
+    'ABCDEFKL': 'CEBDAFLK',  # Option 481
+    'ABCDEFJL': 'CJBDAFLE',  # Option 482
+    'ABCDEFJK': 'CJBDAFEK',  # Option 483
+    'ABCDEFIL': 'CEBDAFLI',  # Option 484
+    'ABCDEFIK': 'CEBDAFIK',  # Option 485
+    'ABCDEFIJ': 'CJBDAFEI',  # Option 486
+    'ABCDEFHL': 'HFBCADLE',  # Option 487
+    'ABCDEFHK': 'HEBCAFDK',  # Option 488
+    'ABCDEFHJ': 'HJBCAFDE',  # Option 489
+    'ABCDEFHI': 'HEBCAFDI',  # Option 490
+    'ABCDEFGL': 'CGBDAFLE',  # Option 491
+    'ABCDEFGK': 'CGBDAFEK',  # Option 492
+    'ABCDEFGJ': 'CGBDAFEJ',  # Option 493
+    'ABCDEFGI': 'CGBDAFEI',  # Option 494
+    'ABCDEFGH': 'HGBCAFDE',  # Option 495
+}
 
 
 def assign_third_slots(slots: list[str], third_order: list[str]) -> dict[str, str]:
-    unique_slots = list(dict.fromkeys(slots))
-    rank = {group: idx for idx, group in enumerate(third_order)}
-    assignment: dict[str, str] = {}
-    used: set[str] = set()
-    ordered_slots = sorted(unique_slots, key=lambda slot: len(slot[1:]))
+    """Assign each official third-place slot from the Annex C 495-row matrix."""
+    unique_slots = list(dict.fromkeys(str(slot).strip() for slot in slots))
+    if not unique_slots:
+        return {}
+    unknown_slots = [slot for slot in unique_slots if slot not in FIFA_2026_ANNEX_C_THIRD_PLACE_SLOT_ORDER]
+    if unknown_slots:
+        raise ValueError(f"Unsupported FIFA 2026 third-place slot(s): {', '.join(unknown_slots)}")
 
-    def search(index: int) -> bool:
-        if index >= len(ordered_slots):
-            return True
-        slot = ordered_slots[index]
-        candidates = sorted((group for group in slot[1:] if group in third_order and group not in used), key=lambda group: rank[group])
-        for group in candidates:
-            used.add(group)
-            assignment[slot] = f"3{group}"
-            if search(index + 1):
-                return True
-            used.remove(group)
-            assignment.pop(slot, None)
-        return False
+    groups = tuple(str(group).strip().upper().removeprefix("3") for group in third_order)
+    if len(groups) != 8 or len(set(groups)) != 8 or any(group not in "ABCDEFGHIJKL" for group in groups):
+        raise ValueError("FIFA 2026 third-place assignment requires eight distinct groups A-L")
+    allocation = FIFA_2026_ANNEX_C_THIRD_PLACE_MATRIX.get("".join(sorted(groups)))
+    if allocation is None:
+        raise ValueError("No FIFA 2026 Annex C assignment exists for the qualifying third-place groups")
 
-    if not search(0):
-        for slot in unique_slots:
-            if slot in assignment:
-                continue
-            for group in third_order:
-                key = f"3{group}"
-                if key not in assignment.values():
-                    assignment[slot] = key
-                    break
-    return assignment
+    by_slot = {
+        slot: f"3{group}"
+        for slot, group in zip(FIFA_2026_ANNEX_C_THIRD_PLACE_SLOT_ORDER, allocation)
+    }
+    return {slot: by_slot[slot] for slot in unique_slots}
 
 
 def resolve_bracket_slot(
@@ -2807,8 +3738,6 @@ def resolve_bracket_slot(
         raise ValueError("empty bracket slot")
     if slot.startswith("W") and slot[1:].isdigit():
         match_id = int(slot[1:])
-        if match_id == 100 and match_id not in winners and 96 in winners:
-            match_id = 96
         return winners[match_id]
     if slot.startswith("RU") and slot[2:].isdigit():
         return runners_up[int(slot[2:])]
@@ -2870,56 +3799,110 @@ def simulate_tournament(package: dict[str, object], seed: int = RANDOM_SEED) -> 
 
 
 def rank_group_rows(rows: list[dict[str, object]], match_results: list[dict[str, object]]) -> list[dict[str, object]]:
-    ranked = [dict(row, h2h_pts=0, h2h_gd=0, h2h_gf=0) for row in rows]
-    tied_groups: dict[tuple[int, int, int], list[dict[str, object]]] = defaultdict(list)
-    for row in ranked:
-        tied_groups[(int(row["pts"]), int(row["gd"]), int(row["gf"]))].append(row)
-    for tied in tied_groups.values():
-        if len(tied) <= 1:
-            continue
-        tied_teams = {str(row["team"]) for row in tied}
-        h2h = {team: {"pts": 0, "gd": 0, "gf": 0} for team in tied_teams}
-        for result in match_results:
-            home = str(result["home"])
-            away = str(result["away"])
-            if home not in tied_teams or away not in tied_teams:
-                continue
-            hg = int(result["home_goals"])
-            ag = int(result["away_goals"])
-            h2h[home]["gf"] += hg
-            h2h[home]["gd"] += hg - ag
-            h2h[away]["gf"] += ag
-            h2h[away]["gd"] += ag - hg
-            if hg > ag:
-                h2h[home]["pts"] += 3
-            elif ag > hg:
-                h2h[away]["pts"] += 3
-            else:
-                h2h[home]["pts"] += 1
-                h2h[away]["pts"] += 1
-        for row in tied:
-            row.update({f"h2h_{key}": value for key, value in h2h[str(row["team"])].items()})
-    return sorted(
-        ranked,
-        key=lambda row: (
-            -int(row["pts"]),
-            -int(row["gd"]),
-            -int(row["gf"]),
-            -int(row["wins"]),
-            -int(row["h2h_pts"]),
-            -int(row["h2h_gd"]),
-            -int(row["h2h_gf"]),
-            -float(row["model_rating"]),
-            str(row["team"]),
-        ),
-    )
+    return _rank_group_records(rows, match_results)
+
+
+def run_fifa_2026_rule_self_tests() -> None:
+    """Exercise local FIFA 2026 rule invariants without downloading any data."""
+    expected_combinations = {"".join(groups) for groups in itertools.combinations("ABCDEFGHIJKL", 8)}
+    if set(FIFA_2026_ANNEX_C_THIRD_PLACE_MATRIX) != expected_combinations:
+        raise AssertionError("Annex C matrix must contain each of the 495 third-place combinations")
+
+    option_67 = assign_third_slots(FIFA_2026_ANNEX_C_THIRD_PLACE_SLOT_ORDER, list("BDEFIJKL"))
+    expected_option_67 = {
+        "3CEFHI": "3E",
+        "3EFGIJ": "3J",
+        "3BEFIJ": "3B",
+        "3ABCDF": "3D",
+        "3AEHIJ": "3I",
+        "3CDFGH": "3F",
+        "3DEIJL": "3L",
+        "3EHIJK": "3K",
+    }
+    if option_67 != expected_option_67:
+        raise AssertionError("Annex C option 67 must assign M74 to 3D and M77 to 3F")
+
+    h2h_rows = [
+        {"team": "A", "pts": 3, "gd": 0, "gf": 3, "fair_play_score": 0, "fifa_rank": 1},
+        {"team": "B", "pts": 3, "gd": 0, "gf": 2, "fair_play_score": 0, "fifa_rank": 2},
+        {"team": "C", "pts": 3, "gd": 0, "gf": 2, "fair_play_score": 9, "fifa_rank": 3},
+    ]
+    h2h_matches = [
+        {"home": "A", "away": "B", "home_goals": 2, "away_goals": 1},
+        {"home": "B", "away": "C", "home_goals": 1, "away_goals": 0},
+        {"home": "C", "away": "A", "home_goals": 2, "away_goals": 1},
+    ]
+    if [row["team"] for row in _rank_group_records(h2h_rows, h2h_matches)] != ["A", "B", "C"]:
+        raise AssertionError("Article 13 step 2 must reapply head-to-head only to B and C")
+
+    missing_group_fair_play_rows = [
+        {"team": "Ecuador", "pts": 1, "gd": 0, "gf": 1, "fifa_rank": 25},
+        {"team": "Ghana", "pts": 1, "gd": 0, "gf": 1, "fifa_rank": 45},
+    ]
+    try:
+        _rank_group_records(
+            missing_group_fair_play_rows,
+            [{"home": "Ecuador", "away": "Ghana", "home_goals": 1, "away_goals": 1}],
+        )
+    except ValueError as exc:
+        if "fair-play" not in str(exc):
+            raise AssertionError("Missing group fair play must be reported explicitly") from exc
+    else:
+        raise AssertionError("A terminal group tie must not fall through to FIFA ranking without fair play")
+
+    class _HomePenaltyRandom:
+        def random(self) -> float:
+            return 0.0
+
+    penalty_result = _resolve_knockout_draw("Home", "Away", 1, 1, 2, 2, 0.5, _HomePenaltyRandom())
+    if penalty_result != ("Home", 3, 3, "penalties"):
+        raise AssertionError("Penalty outcomes must retain goals scored in a tied extra time")
+
+    stable_tie_rows = [
+        {"team": f"Top {index}", "pts": 10 - index, "gd": 0, "gf": 0, "fifa_rank": index}
+        for index in range(1, 7)
+    ] + [
+        {"team": "Ecuador", "pts": 3, "gd": 0, "gf": 1, "fifa_rank": 25},
+        {"team": "Ghana", "pts": 3, "gd": 0, "gf": 1, "fifa_rank": 45},
+        {"team": "Ninth", "pts": 2, "gd": 0, "gf": 0, "fifa_rank": 50},
+    ]
+    stable_qualifiers = set(select_best_thirds(pd.DataFrame(stable_tie_rows))["team"])
+    if not {"Ecuador", "Ghana"}.issubset(stable_qualifiers):
+        raise AssertionError("A fair-play-unavailable tie entirely inside the top eight is selection-stable")
+
+    cutoff_tie_rows = [
+        {"team": f"Top {index}", "pts": 10 - index, "gd": 0, "gf": 0, "fifa_rank": index}
+        for index in range(1, 8)
+    ] + [
+        {"team": "Ecuador", "pts": 2, "gd": 0, "gf": 1, "fifa_rank": 25},
+        {"team": "Ghana", "pts": 2, "gd": 0, "gf": 1, "fifa_rank": 45},
+    ]
+    try:
+        select_best_thirds(pd.DataFrame(cutoff_tie_rows))
+    except ValueError as exc:
+        if "fair-play" not in str(exc):
+            raise AssertionError("The cutoff failure must request fair-play data") from exc
+    else:
+        raise AssertionError("A fair-play-unavailable 8/9 tie must not fall through to FIFA ranking")
 
 
 def simulate_group_stage_fast(package: dict[str, object], fixtures: pd.DataFrame, seed: int) -> tuple[dict[str, str], list[str], dict[str, dict[str, object]]]:
     rng = random.Random(seed)
+    fair_play_rng = random.Random(f"{seed}:fifa-fair-play")
     teams = package["squad_strength"]
     table = {
-        row.team_key: {"team": row.team_key, "group": row.group_letter, "pts": 0, "wins": 0, "gf": 0, "ga": 0, "gd": 0, "model_rating": 0.0}
+        row.team_key: {
+            "team": row.team_key,
+            "group": row.group_letter,
+            "pts": 0,
+            "wins": 0,
+            "gf": 0,
+            "ga": 0,
+            "gd": 0,
+            "model_rating": 0.0,
+            "fifa_rank": _package_fifa_rank(package, str(row.team_key)),
+            "fair_play_score": 0,
+        }
         for row in teams.itertuples(index=False)
     }
     group_games = fixtures[fixtures["stage_id"] == GROUP_STAGE_ID]
@@ -2938,6 +3921,8 @@ def simulate_group_stage_fast(package: dict[str, object], fixtures: pd.DataFrame
         table[h]["ga"] += ag
         table[a]["gf"] += ag
         table[a]["ga"] += hg
+        table[h]["fair_play_score"] += sample_simulated_fair_play_score(fair_play_rng)
+        table[a]["fair_play_score"] += sample_simulated_fair_play_score(fair_play_rng)
         table[h]["model_rating"] = states[h].elo
         table[a]["model_rating"] = states[a].elo
         if hg > ag:
@@ -2961,17 +3946,7 @@ def simulate_group_stage_fast(package: dict[str, object], fixtures: pd.DataFrame
         qualifiers[f"1{group}"] = str(ranked[0]["team"])
         qualifiers[f"2{group}"] = str(ranked[1]["team"])
         thirds.append(ranked[2])
-    best_thirds = sorted(
-        thirds,
-        key=lambda row: (
-            -int(row["pts"]),
-            -int(row["gd"]),
-            -int(row["gf"]),
-            -int(row["wins"]),
-            -float(row["model_rating"]),
-            str(row["team"]),
-        ),
-    )[:8]
+    best_thirds = select_best_thirds(pd.DataFrame(thirds)).to_dict("records")
     third_order = []
     for row in best_thirds:
         qualifiers[f"3{row['group']}"] = str(row["team"])

@@ -53,6 +53,7 @@ COPYFILE_DISABLE=1 tar \
   --exclude "./.venv*" \
   --exclude "./build" \
   --exclude "./dist" \
+  --exclude "./release" \
   --exclude "./*.spec" \
   --exclude "./artifacts" \
   --exclude "./win/.env" \

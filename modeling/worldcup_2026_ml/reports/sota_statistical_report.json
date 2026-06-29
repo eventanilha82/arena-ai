@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-19T12:40:49+00:00",
+  "generated_at": "2026-06-29T02:45:01+00:00",
   "version": "worldcup_2026_sota_v3",
   "model_card": {
     "version": "worldcup_2026_sota_v3",
@@ -2991,7 +2991,7 @@
         "test_rows": 0.0
       },
       "baseline_fifa_rank_1x2": {
-        "accuracy": 0.0051,
+        "accuracy": 0.0,
         "test_rows": 0.0
       },
       "baseline_elo_winner_no_draw": {
@@ -2999,66 +2999,66 @@
         "test_rows": 0.0
       },
       "baseline_fifa_rank_winner_no_draw": {
-        "accuracy": 0.0046,
+        "accuracy": 0.0,
         "test_rows": 0.0
       },
       "logistic_1x2": {
-        "accuracy": 0.0031,
-        "top2_accuracy": 0.0004,
-        "log_loss": -0.0022,
-        "draw_recall": 0.0097,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
+        "draw_recall": 0.0,
         "test_rows": 0.0
       },
       "xgb_1x2": {
-        "accuracy": -0.0004,
-        "top2_accuracy": 0.0054,
-        "log_loss": -0.0031,
-        "draw_recall": -0.0064,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
+        "draw_recall": 0.0,
         "test_rows": 0.0
       },
       "xgb_temperature_calibrated_1x2": {
-        "accuracy": -0.0004,
-        "top2_accuracy": 0.0054,
-        "log_loss": -0.0031,
-        "draw_recall": -0.0064,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
+        "draw_recall": 0.0,
         "temperature": 0.0,
         "test_rows": 0.0
       },
       "winner_xgb_no_draw": {
-        "accuracy": 0.0072,
-        "log_loss": -0.004,
-        "brier": -0.0022,
+        "accuracy": 0.0,
+        "log_loss": 0.0,
+        "brier": 0.0,
         "test_rows": 0.0
       },
       "competitive_xgb_1x2": {
-        "accuracy": -0.0016,
-        "top2_accuracy": 0.0005,
-        "log_loss": -0.0056,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
         "test_rows": 0.0
       },
       "poisson_goal_model_1x2": {
         "accuracy": 0.0,
         "top2_accuracy": 0.0,
-        "log_loss": -0.0008,
-        "draw_recall": 0.0016,
-        "home_goal_mae": -0.0009,
-        "away_goal_mae": -0.0011,
+        "log_loss": 0.0,
+        "draw_recall": 0.0,
+        "home_goal_mae": 0.0,
+        "away_goal_mae": 0.0,
         "test_rows": 0.0
       },
       "xgb_count_poisson_1x2": {
-        "accuracy": -0.0004,
-        "top2_accuracy": 0.0027,
-        "log_loss": -0.0031,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
         "draw_recall": 0.0,
-        "home_goal_mae": -0.0022,
-        "away_goal_mae": -0.0026,
+        "home_goal_mae": 0.0,
+        "away_goal_mae": 0.0,
         "test_rows": 0.0
       },
       "stacking_meta_1x2": {
-        "accuracy": -0.0059,
-        "top2_accuracy": -0.0004,
-        "log_loss": -0.0031,
-        "draw_recall": -0.013,
+        "accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "log_loss": 0.0,
+        "draw_recall": 0.0,
         "test_rows": 0.0
       }
     },
@@ -3189,91 +3189,91 @@
         "temperature": 0.8216
       }
     },
-    "monte_carlo_runs": 1000,
-    "sample_champion_seed_2026": "Netherlands",
+    "monte_carlo_runs": 10000,
+    "sample_champion_seed_2026": "Ecuador",
     "top_10_champion_odds": [
       {
-        "team": "Spain",
-        "wins": 185,
-        "champion_probability": 0.185
-      },
-      {
-        "team": "Brazil",
-        "wins": 128,
-        "champion_probability": 0.128
-      },
-      {
         "team": "Germany",
-        "wins": 117,
-        "champion_probability": 0.117
+        "wins": 3666,
+        "champion_probability": 0.3666
       },
       {
-        "team": "Mexico",
-        "wins": 112,
-        "champion_probability": 0.112
-      },
-      {
-        "team": "Czechia",
-        "wins": 96,
-        "champion_probability": 0.096
-      },
-      {
-        "team": "Netherlands",
-        "wins": 73,
-        "champion_probability": 0.073
-      },
-      {
-        "team": "Korea Republic",
-        "wins": 67,
-        "champion_probability": 0.067
-      },
-      {
-        "team": "Uruguay",
-        "wins": 36,
-        "champion_probability": 0.036
+        "team": "Ecuador",
+        "wins": 2620,
+        "champion_probability": 0.262
       },
       {
         "team": "France",
-        "wins": 31,
-        "champion_probability": 0.031
+        "wins": 880,
+        "champion_probability": 0.088
       },
       {
-        "team": "Switzerland",
-        "wins": 28,
-        "champion_probability": 0.028
+        "team": "Brazil",
+        "wins": 617,
+        "champion_probability": 0.0617
+      },
+      {
+        "team": "Portugal",
+        "wins": 511,
+        "champion_probability": 0.0511
+      },
+      {
+        "team": "Côte d'Ivoire",
+        "wins": 270,
+        "champion_probability": 0.027
+      },
+      {
+        "team": "Spain",
+        "wins": 188,
+        "champion_probability": 0.0188
+      },
+      {
+        "team": "Norway",
+        "wins": 167,
+        "champion_probability": 0.0167
+      },
+      {
+        "team": "Colombia",
+        "wins": 136,
+        "champion_probability": 0.0136
+      },
+      {
+        "team": "Netherlands",
+        "wins": 134,
+        "champion_probability": 0.0134
       }
     ]
   },
   "source_fingerprints": {
     "model_package": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/models/model_sota.pkl",
-      "sha256": "82274d68fd54b3aee18dcd2db137f087a99a516a9850ab73aea105d462d11e78",
-      "size_bytes": 4565106,
-      "mtime_ns": 1779038639047286897
+      "sha256": "8fa8a4f06ff1bfc69cf12be7c2751f96bd4f7ecb1e0943cd3b977fcec51104a7",
+      "size_bytes": 5770428,
+      "mtime_ns": 1782691147510121120
     },
     "model_report": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_model_report.json",
-      "sha256": "5192ec1147f2d774e34562a79ebeca0a38d5d6d1092f9e8f13ef204c554b8196",
-      "size_bytes": 97095,
-      "mtime_ns": 1779038639050470500
+      "sha256": "199cef67c98d8ca16b18b20dbf7e2f04a8d44e64c167b798d9ee2332cc40a2bf",
+      "size_bytes": 96990,
+      "mtime_ns": 1782691147525111406
     },
     "training_matches": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv",
       "sha256": "652da5722831d8ed4ba3bddab1032e1f71d1f328db7484fb0c41929c111038b6",
       "size_bytes": 12323223,
-      "mtime_ns": 1779038639027782527
+      "mtime_ns": 1782691147427762170
     },
     "sota_pipeline": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/src/sota_pipeline.py",
-      "sha256": "c4fb0df83adfa66e28dc9f7d69aa3ca61afc71468cb3df2dc6c3edcfbc49bdc4",
-      "size_bytes": 164817,
-      "mtime_ns": 1779193516621869414
+      "sha256": "1d3a91807fc1a6a6b41ad6eba6e2b819821b9452761af224ea13950b61f0bce6",
+      "size_bytes": 205148,
+      "mtime_ns": 1782700032751289136
     },
     "stats_qa_script": {
       "path": "/Users/eventanilha/Projects/arena-ai/scripts/model_stats_qa.py",
-      "sha256": "af6617163c725190638d77e3b051828dadf1351359b1e4658b5493bb782b2d7d",
-      "size_bytes": 86641,
-      "mtime_ns": 1779194405417479773
+      "sha256": "2a64c6fd4b8c8b6ec91ed4005ba701fa79ebe61080cfd3fe5a845cd32cabca8b",
+      "size_bytes": 86764,
+      "mtime_ns": 1782691759744936574
     }
   },
   "raw_data_manifest": {
@@ -3282,8 +3282,8 @@
     "root": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/raw",
     "file_count": 14,
     "csv_file_count": 14,
-    "total_size_bytes": 81082917,
-    "manifest_sha256": "508a0b0651216d38d516c37dc22adc8930c9cc1a498cc6718aa912621ea64429",
+    "total_size_bytes": 81082901,
+    "manifest_sha256": "70ab1b3e3c816e37da3fff9a46c31abe5e5eb604c10300a5e6da1167cbe7e14e",
     "semantic": {
       "required_file_count": 14,
       "required_files_present": true,
@@ -3681,9 +3681,9 @@
       },
       {
         "path": "data/raw/matches.csv",
-        "sha256": "5c17130f9775bf34d2008f55acc42e40b3be8787f264384d234cce4c5cefdfb8",
-        "size_bytes": 5054,
-        "mtime_ns": 1778283427521701803,
+        "sha256": "af024eefbdd226a26bb2e06064a038b0bfb4c1a2e3f0a301b3369c7b20262819",
+        "size_bytes": 5038,
+        "mtime_ns": 1782689830912311260,
         "suffix": ".csv",
         "columns": [
           "id",
@@ -4629,155 +4629,155 @@
     "method": "binomial normal approximation for champion/stage odds; row bootstrap and block bootstrap for diagnostic 1X2 metrics",
     "champion_top_16": [
       {
-        "team": "Spain",
-        "wins": 185,
-        "runs": 1000,
-        "probability": 0.185,
-        "lower_95": 0.160933,
-        "upper_95": 0.209067,
-        "margin_95": 0.024067
-      },
-      {
-        "team": "Brazil",
-        "wins": 128,
-        "runs": 1000,
-        "probability": 0.128,
-        "lower_95": 0.107293,
-        "upper_95": 0.148707,
-        "margin_95": 0.020707
-      },
-      {
         "team": "Germany",
-        "wins": 117,
-        "runs": 1000,
-        "probability": 0.117,
-        "lower_95": 0.097078,
-        "upper_95": 0.136922,
-        "margin_95": 0.019922
-      },
-      {
-        "team": "Mexico",
-        "wins": 112,
-        "runs": 1000,
-        "probability": 0.112,
-        "lower_95": 0.092453,
-        "upper_95": 0.131547,
-        "margin_95": 0.019547
-      },
-      {
-        "team": "Czechia",
-        "wins": 96,
-        "runs": 1000,
-        "probability": 0.096,
-        "lower_95": 0.077741,
-        "upper_95": 0.114259,
-        "margin_95": 0.018259
-      },
-      {
-        "team": "Netherlands",
-        "wins": 73,
-        "runs": 1000,
-        "probability": 0.073,
-        "lower_95": 0.056877,
-        "upper_95": 0.089123,
-        "margin_95": 0.016123
-      },
-      {
-        "team": "Korea Republic",
-        "wins": 67,
-        "runs": 1000,
-        "probability": 0.067,
-        "lower_95": 0.051503,
-        "upper_95": 0.082497,
-        "margin_95": 0.015497
-      },
-      {
-        "team": "Uruguay",
-        "wins": 36,
-        "runs": 1000,
-        "probability": 0.036,
-        "lower_95": 0.024454,
-        "upper_95": 0.047546,
-        "margin_95": 0.011546
-      },
-      {
-        "team": "France",
-        "wins": 31,
-        "runs": 1000,
-        "probability": 0.031,
-        "lower_95": 0.020258,
-        "upper_95": 0.041742,
-        "margin_95": 0.010742
-      },
-      {
-        "team": "Switzerland",
-        "wins": 28,
-        "runs": 1000,
-        "probability": 0.028,
-        "lower_95": 0.017775,
-        "upper_95": 0.038225,
-        "margin_95": 0.010225
+        "wins": 3666,
+        "runs": 10000,
+        "probability": 0.3666,
+        "lower_95": 0.357155,
+        "upper_95": 0.376045,
+        "margin_95": 0.009445
       },
       {
         "team": "Ecuador",
-        "wins": 24,
-        "runs": 1000,
-        "probability": 0.024,
-        "lower_95": 0.014514,
-        "upper_95": 0.033486,
-        "margin_95": 0.009486
+        "wins": 2620,
+        "runs": 10000,
+        "probability": 0.262,
+        "lower_95": 0.253381,
+        "upper_95": 0.270619,
+        "margin_95": 0.008619
       },
       {
-        "team": "Scotland",
-        "wins": 17,
-        "runs": 1000,
-        "probability": 0.017,
-        "lower_95": 0.008988,
-        "upper_95": 0.025012,
-        "margin_95": 0.008012
+        "team": "France",
+        "wins": 880,
+        "runs": 10000,
+        "probability": 0.088,
+        "lower_95": 0.082447,
+        "upper_95": 0.093553,
+        "margin_95": 0.005553
+      },
+      {
+        "team": "Brazil",
+        "wins": 617,
+        "runs": 10000,
+        "probability": 0.0617,
+        "lower_95": 0.056984,
+        "upper_95": 0.066416,
+        "margin_95": 0.004716
       },
       {
         "team": "Portugal",
-        "wins": 12,
-        "runs": 1000,
-        "probability": 0.012,
-        "lower_95": 0.005251,
-        "upper_95": 0.018749,
-        "margin_95": 0.006749
+        "wins": 511,
+        "runs": 10000,
+        "probability": 0.0511,
+        "lower_95": 0.046784,
+        "upper_95": 0.055416,
+        "margin_95": 0.004316
+      },
+      {
+        "team": "Côte d'Ivoire",
+        "wins": 270,
+        "runs": 10000,
+        "probability": 0.027,
+        "lower_95": 0.023823,
+        "upper_95": 0.030177,
+        "margin_95": 0.003177
+      },
+      {
+        "team": "Spain",
+        "wins": 188,
+        "runs": 10000,
+        "probability": 0.0188,
+        "lower_95": 0.016138,
+        "upper_95": 0.021462,
+        "margin_95": 0.002662
+      },
+      {
+        "team": "Norway",
+        "wins": 167,
+        "runs": 10000,
+        "probability": 0.0167,
+        "lower_95": 0.014188,
+        "upper_95": 0.019212,
+        "margin_95": 0.002512
+      },
+      {
+        "team": "Colombia",
+        "wins": 136,
+        "runs": 10000,
+        "probability": 0.0136,
+        "lower_95": 0.01133,
+        "upper_95": 0.01587,
+        "margin_95": 0.00227
+      },
+      {
+        "team": "Netherlands",
+        "wins": 134,
+        "runs": 10000,
+        "probability": 0.0134,
+        "lower_95": 0.011146,
+        "upper_95": 0.015654,
+        "margin_95": 0.002254
+      },
+      {
+        "team": "Mexico",
+        "wins": 131,
+        "runs": 10000,
+        "probability": 0.0131,
+        "lower_95": 0.010871,
+        "upper_95": 0.015329,
+        "margin_95": 0.002229
+      },
+      {
+        "team": "Argentina",
+        "wins": 128,
+        "runs": 10000,
+        "probability": 0.0128,
+        "lower_95": 0.010597,
+        "upper_95": 0.015003,
+        "margin_95": 0.002203
+      },
+      {
+        "team": "Korea Republic",
+        "wins": 80,
+        "runs": 10000,
+        "probability": 0.008,
+        "lower_95": 0.006254,
+        "upper_95": 0.009746,
+        "margin_95": 0.001746
+      },
+      {
+        "team": "Scotland",
+        "wins": 74,
+        "runs": 10000,
+        "probability": 0.0074,
+        "lower_95": 0.00572,
+        "upper_95": 0.00908,
+        "margin_95": 0.00168
       },
       {
         "team": "Morocco",
-        "wins": 12,
-        "runs": 1000,
-        "probability": 0.012,
-        "lower_95": 0.005251,
-        "upper_95": 0.018749,
-        "margin_95": 0.006749
+        "wins": 62,
+        "runs": 10000,
+        "probability": 0.0062,
+        "lower_95": 0.004661,
+        "upper_95": 0.007739,
+        "margin_95": 0.001539
       },
       {
-        "team": "Belgium",
-        "wins": 11,
-        "runs": 1000,
-        "probability": 0.011,
-        "lower_95": 0.004535,
-        "upper_95": 0.017465,
-        "margin_95": 0.006465
-      },
-      {
-        "team": "Canada",
-        "wins": 11,
-        "runs": 1000,
-        "probability": 0.011,
-        "lower_95": 0.004535,
-        "upper_95": 0.017465,
-        "margin_95": 0.006465
+        "team": "Japan",
+        "wins": 48,
+        "runs": 10000,
+        "probability": 0.0048,
+        "lower_95": 0.003445,
+        "upper_95": 0.006155,
+        "margin_95": 0.001355
       }
     ],
     "stage_top_32": [
       {
         "team": "Mexico",
         "stage": "Group Stage",
-        "runs": 1000,
+        "runs": 10000,
         "probability": 1.0,
         "lower_95": 1.0,
         "upper_95": 1.0,
@@ -4786,61 +4786,61 @@
       {
         "team": "Mexico",
         "stage": "Round of 32",
-        "runs": 1000,
-        "probability": 0.983,
-        "lower_95": 0.974988,
-        "upper_95": 0.991012,
-        "margin_95": 0.008012
+        "runs": 10000,
+        "probability": 0.975,
+        "lower_95": 0.97194,
+        "upper_95": 0.97806,
+        "margin_95": 0.00306
       },
       {
         "team": "Mexico",
         "stage": "Round of 16",
-        "runs": 1000,
-        "probability": 0.807,
-        "lower_95": 0.782539,
-        "upper_95": 0.831461,
-        "margin_95": 0.024461
+        "runs": 10000,
+        "probability": 0.8374,
+        "lower_95": 0.830168,
+        "upper_95": 0.844632,
+        "margin_95": 0.007232
       },
       {
         "team": "Mexico",
         "stage": "Quarter-finals",
-        "runs": 1000,
-        "probability": 0.644,
-        "lower_95": 0.614323,
-        "upper_95": 0.673677,
-        "margin_95": 0.029677
+        "runs": 10000,
+        "probability": 0.7293,
+        "lower_95": 0.720591,
+        "upper_95": 0.738009,
+        "margin_95": 0.008709
       },
       {
         "team": "Mexico",
         "stage": "Semi-finals",
-        "runs": 1000,
-        "probability": 0.21,
-        "lower_95": 0.184755,
-        "upper_95": 0.235245,
-        "margin_95": 0.025245
+        "runs": 10000,
+        "probability": 0.0317,
+        "lower_95": 0.028266,
+        "upper_95": 0.035134,
+        "margin_95": 0.003434
       },
       {
         "team": "Mexico",
         "stage": "Final",
-        "runs": 1000,
-        "probability": 0.161,
-        "lower_95": 0.13822,
-        "upper_95": 0.18378,
-        "margin_95": 0.02278
+        "runs": 10000,
+        "probability": 0.0267,
+        "lower_95": 0.02354,
+        "upper_95": 0.02986,
+        "margin_95": 0.00316
       },
       {
         "team": "Mexico",
         "stage": "Champion",
-        "runs": 1000,
-        "probability": 0.112,
-        "lower_95": 0.092453,
-        "upper_95": 0.131547,
-        "margin_95": 0.019547
+        "runs": 10000,
+        "probability": 0.0131,
+        "lower_95": 0.010871,
+        "upper_95": 0.015329,
+        "margin_95": 0.002229
       },
       {
         "team": "South Africa",
         "stage": "Group Stage",
-        "runs": 1000,
+        "runs": 10000,
         "probability": 1.0,
         "lower_95": 1.0,
         "upper_95": 1.0,
@@ -4849,61 +4849,61 @@
       {
         "team": "South Africa",
         "stage": "Round of 32",
-        "runs": 1000,
-        "probability": 0.202,
-        "lower_95": 0.177115,
-        "upper_95": 0.226885,
-        "margin_95": 0.024885
+        "runs": 10000,
+        "probability": 0.2397,
+        "lower_95": 0.231333,
+        "upper_95": 0.248067,
+        "margin_95": 0.008367
       },
       {
         "team": "South Africa",
         "stage": "Round of 16",
-        "runs": 1000,
-        "probability": 0.048,
-        "lower_95": 0.034751,
-        "upper_95": 0.061249,
-        "margin_95": 0.013249
+        "runs": 10000,
+        "probability": 0.0492,
+        "lower_95": 0.044961,
+        "upper_95": 0.053439,
+        "margin_95": 0.004239
       },
       {
         "team": "South Africa",
         "stage": "Quarter-finals",
-        "runs": 1000,
-        "probability": 0.028,
-        "lower_95": 0.017775,
-        "upper_95": 0.038225,
-        "margin_95": 0.010225
+        "runs": 10000,
+        "probability": 0.0298,
+        "lower_95": 0.026467,
+        "upper_95": 0.033133,
+        "margin_95": 0.003333
       },
       {
         "team": "South Africa",
         "stage": "Semi-finals",
-        "runs": 1000,
-        "probability": 0.01,
-        "lower_95": 0.003833,
-        "upper_95": 0.016167,
-        "margin_95": 0.006167
+        "runs": 10000,
+        "probability": 0.0005,
+        "lower_95": 6.2e-05,
+        "upper_95": 0.000938,
+        "margin_95": 0.000438
       },
       {
         "team": "South Africa",
         "stage": "Final",
-        "runs": 1000,
-        "probability": 0.002,
+        "runs": 10000,
+        "probability": 0.0004,
+        "lower_95": 8e-06,
+        "upper_95": 0.000792,
+        "margin_95": 0.000392
+      },
+      {
+        "team": "South Africa",
+        "stage": "Champion",
+        "runs": 10000,
+        "probability": 0.0003,
         "lower_95": 0.0,
-        "upper_95": 0.004769,
-        "margin_95": 0.002769
-      },
-      {
-        "team": "South Africa",
-        "stage": "Champion",
-        "runs": 1000,
-        "probability": 0.0,
-        "lower_95": 0.0,
-        "upper_95": 0.0,
-        "margin_95": 0.0
+        "upper_95": 0.000639,
+        "margin_95": 0.000339
       },
       {
         "team": "Korea Republic",
         "stage": "Group Stage",
-        "runs": 1000,
+        "runs": 10000,
         "probability": 1.0,
         "lower_95": 1.0,
         "upper_95": 1.0,
@@ -4912,61 +4912,61 @@
       {
         "team": "Korea Republic",
         "stage": "Round of 32",
-        "runs": 1000,
-        "probability": 0.63,
-        "lower_95": 0.600075,
-        "upper_95": 0.659925,
-        "margin_95": 0.029925
+        "runs": 10000,
+        "probability": 0.5609,
+        "lower_95": 0.551173,
+        "upper_95": 0.570627,
+        "margin_95": 0.009727
       },
       {
         "team": "Korea Republic",
         "stage": "Round of 16",
-        "runs": 1000,
-        "probability": 0.307,
-        "lower_95": 0.278411,
-        "upper_95": 0.335589,
-        "margin_95": 0.028589
+        "runs": 10000,
+        "probability": 0.3485,
+        "lower_95": 0.339161,
+        "upper_95": 0.357839,
+        "margin_95": 0.009339
       },
       {
         "team": "Korea Republic",
         "stage": "Quarter-finals",
-        "runs": 1000,
-        "probability": 0.247,
-        "lower_95": 0.22027,
-        "upper_95": 0.27373,
-        "margin_95": 0.02673
+        "runs": 10000,
+        "probability": 0.2913,
+        "lower_95": 0.282395,
+        "upper_95": 0.300205,
+        "margin_95": 0.008905
       },
       {
         "team": "Korea Republic",
         "stage": "Semi-finals",
-        "runs": 1000,
-        "probability": 0.124,
-        "lower_95": 0.103572,
-        "upper_95": 0.144428,
-        "margin_95": 0.020428
+        "runs": 10000,
+        "probability": 0.0131,
+        "lower_95": 0.010871,
+        "upper_95": 0.015329,
+        "margin_95": 0.002229
       },
       {
         "team": "Korea Republic",
         "stage": "Final",
-        "runs": 1000,
-        "probability": 0.089,
-        "lower_95": 0.071351,
-        "upper_95": 0.106649,
-        "margin_95": 0.017649
+        "runs": 10000,
+        "probability": 0.0117,
+        "lower_95": 0.009592,
+        "upper_95": 0.013808,
+        "margin_95": 0.002108
       },
       {
         "team": "Korea Republic",
         "stage": "Champion",
-        "runs": 1000,
-        "probability": 0.067,
-        "lower_95": 0.051503,
-        "upper_95": 0.082497,
-        "margin_95": 0.015497
+        "runs": 10000,
+        "probability": 0.008,
+        "lower_95": 0.006254,
+        "upper_95": 0.009746,
+        "margin_95": 0.001746
       },
       {
         "team": "Czechia",
         "stage": "Group Stage",
-        "runs": 1000,
+        "runs": 10000,
         "probability": 1.0,
         "lower_95": 1.0,
         "upper_95": 1.0,
@@ -4975,61 +4975,61 @@
       {
         "team": "Czechia",
         "stage": "Round of 32",
-        "runs": 1000,
-        "probability": 0.924,
-        "lower_95": 0.907575,
-        "upper_95": 0.940425,
-        "margin_95": 0.016425
+        "runs": 10000,
+        "probability": 0.9268,
+        "lower_95": 0.921695,
+        "upper_95": 0.931905,
+        "margin_95": 0.005105
       },
       {
         "team": "Czechia",
         "stage": "Round of 16",
-        "runs": 1000,
-        "probability": 0.652,
-        "lower_95": 0.622476,
-        "upper_95": 0.681524,
-        "margin_95": 0.029524
+        "runs": 10000,
+        "probability": 0.6438,
+        "lower_95": 0.634414,
+        "upper_95": 0.653186,
+        "margin_95": 0.009386
       },
       {
         "team": "Czechia",
         "stage": "Quarter-finals",
-        "runs": 1000,
-        "probability": 0.483,
-        "lower_95": 0.452028,
-        "upper_95": 0.513972,
-        "margin_95": 0.030972
+        "runs": 10000,
+        "probability": 0.5152,
+        "lower_95": 0.505405,
+        "upper_95": 0.524995,
+        "margin_95": 0.009795
       },
       {
         "team": "Czechia",
         "stage": "Semi-finals",
-        "runs": 1000,
-        "probability": 0.221,
-        "lower_95": 0.195283,
-        "upper_95": 0.246717,
-        "margin_95": 0.025717
+        "runs": 10000,
+        "probability": 0.019,
+        "lower_95": 0.016324,
+        "upper_95": 0.021676,
+        "margin_95": 0.002676
       },
       {
         "team": "Czechia",
         "stage": "Final",
-        "runs": 1000,
-        "probability": 0.134,
-        "lower_95": 0.112886,
-        "upper_95": 0.155114,
-        "margin_95": 0.021114
+        "runs": 10000,
+        "probability": 0.0144,
+        "lower_95": 0.012065,
+        "upper_95": 0.016735,
+        "margin_95": 0.002335
       },
       {
         "team": "Czechia",
         "stage": "Champion",
-        "runs": 1000,
-        "probability": 0.096,
-        "lower_95": 0.077741,
-        "upper_95": 0.114259,
-        "margin_95": 0.018259
+        "runs": 10000,
+        "probability": 0.0044,
+        "lower_95": 0.003103,
+        "upper_95": 0.005697,
+        "margin_95": 0.001297
       },
       {
         "team": "Canada",
         "stage": "Group Stage",
-        "runs": 1000,
+        "runs": 10000,
         "probability": 1.0,
         "lower_95": 1.0,
         "upper_95": 1.0,
@@ -5038,29 +5038,29 @@
       {
         "team": "Canada",
         "stage": "Round of 32",
-        "runs": 1000,
-        "probability": 0.971,
-        "lower_95": 0.960599,
-        "upper_95": 0.981401,
-        "margin_95": 0.010401
+        "runs": 10000,
+        "probability": 0.9724,
+        "lower_95": 0.969189,
+        "upper_95": 0.975611,
+        "margin_95": 0.003211
       },
       {
         "team": "Canada",
         "stage": "Round of 16",
-        "runs": 1000,
-        "probability": 0.378,
-        "lower_95": 0.347946,
-        "upper_95": 0.408054,
-        "margin_95": 0.030054
+        "runs": 10000,
+        "probability": 0.3108,
+        "lower_95": 0.301729,
+        "upper_95": 0.319871,
+        "margin_95": 0.009071
       },
       {
         "team": "Canada",
         "stage": "Quarter-finals",
-        "runs": 1000,
-        "probability": 0.263,
-        "lower_95": 0.235712,
-        "upper_95": 0.290288,
-        "margin_95": 0.027288
+        "runs": 10000,
+        "probability": 0.2601,
+        "lower_95": 0.251502,
+        "upper_95": 0.268698,
+        "margin_95": 0.008598
       }
     ],
     "metric_bootstrap": {
@@ -7656,7 +7656,8 @@
     ],
     "stage_bracket_runs": [
       1000,
-      2000
+      2000,
+      5000
     ],
     "stability_gate": {
       "max_top16_abs_delta": 0.015,
@@ -7664,7 +7665,7 @@
       "leader_change_allowed": false,
       "max_stage_top16_abs_delta": 0.035,
       "max_stage_top16_churn": 4,
-      "max_pair_top8_abs_delta": 0.02,
+      "max_pair_top8_nested_z": 4.0,
       "max_pair_top8_churn": 16
     },
     "final_comparison": {
@@ -7674,150 +7675,195 @@
       "comparison": "union_top16_abs_delta",
       "union_team_count": 17,
       "entered_top16": [
-        "Japan"
+        "England"
       ],
       "exited_top16": [
-        "Belgium"
+        "Türkiye"
       ],
       "top16_churn_count": 2,
-      "max_top16_abs_delta": 0.0106,
-      "mean_top16_abs_delta": 0.003688
+      "max_top16_abs_delta": 0.0048,
+      "mean_top16_abs_delta": 0.001365
     },
     "stage_bracket_final_comparison": {
       "baseline": false,
-      "previous_runs": 1000,
+      "previous_runs": 2000,
       "stage_top16": {
         "Round of 32": {
           "entered": [],
           "exited": [],
           "churn_count": 0,
-          "max_abs_delta": 0.007,
-          "mean_abs_delta": 0.002281
+          "max_abs_delta": 0.0066,
+          "mean_abs_delta": 0.00245,
+          "max_nested_z": 2.835353,
+          "max_nested_z_name": "England"
         },
         "Round of 16": {
           "entered": [],
           "exited": [],
           "churn_count": 0,
-          "max_abs_delta": 0.013,
-          "mean_abs_delta": 0.005
+          "max_abs_delta": 0.0158,
+          "mean_abs_delta": 0.004431,
+          "max_nested_z": 2.506155,
+          "max_nested_z_name": "Colombia"
         },
         "Quarterfinals": {
-          "entered": [
-            "Germany"
-          ],
-          "exited": [
-            "France"
-          ],
-          "churn_count": 2,
-          "max_abs_delta": 0.026,
-          "mean_abs_delta": 0.008912
+          "entered": [],
+          "exited": [],
+          "churn_count": 0,
+          "max_abs_delta": 0.0195,
+          "mean_abs_delta": 0.007288,
+          "max_nested_z": 2.501999,
+          "max_nested_z_name": "Mexico"
         },
         "Semifinals": {
-          "entered": [],
-          "exited": [],
-          "churn_count": 0,
-          "max_abs_delta": 0.016,
-          "mean_abs_delta": 0.007062
+          "entered": [
+            "Türkiye"
+          ],
+          "exited": [
+            "Croatia"
+          ],
+          "churn_count": 2,
+          "max_abs_delta": 0.0164,
+          "mean_abs_delta": 0.005076,
+          "max_nested_z": 2.254703,
+          "max_nested_z_name": "Spain"
         },
         "Final": {
-          "entered": [],
-          "exited": [],
-          "churn_count": 0,
-          "max_abs_delta": 0.0185,
-          "mean_abs_delta": 0.005875
+          "entered": [
+            "Japan"
+          ],
+          "exited": [
+            "Czechia"
+          ],
+          "churn_count": 2,
+          "max_abs_delta": 0.0098,
+          "mean_abs_delta": 0.003453,
+          "max_nested_z": 2.227431,
+          "max_nested_z_name": "Japan"
         }
       },
       "pair_top8": {
         "Round of 32": {
-          "entered": [],
-          "exited": [],
-          "churn_count": 0,
-          "max_abs_delta": 0.0115,
-          "mean_abs_delta": 0.00575
+          "entered": [
+            "Brazil | Japan"
+          ],
+          "exited": [
+            "Brazil | Tunisia"
+          ],
+          "churn_count": 2,
+          "max_abs_delta": 0.0101,
+          "mean_abs_delta": 0.006456,
+          "max_nested_z": 1.313856,
+          "max_nested_z_name": "Bosnia and Herzegovina | Türkiye"
         },
         "Round of 16": {
-          "entered": [],
-          "exited": [],
-          "churn_count": 0,
-          "max_abs_delta": 0.0095,
-          "mean_abs_delta": 0.003187
+          "entered": [
+            "Portugal | Spain"
+          ],
+          "exited": [
+            "Portugal | Switzerland"
+          ],
+          "churn_count": 2,
+          "max_abs_delta": 0.0202,
+          "mean_abs_delta": 0.008422,
+          "max_nested_z": 2.608373,
+          "max_nested_z_name": "Portugal | Spain"
         },
         "Quarterfinals": {
           "entered": [],
           "exited": [],
           "churn_count": 0,
-          "max_abs_delta": 0.0125,
-          "mean_abs_delta": 0.006563
+          "max_abs_delta": 0.0134,
+          "mean_abs_delta": 0.005087,
+          "max_nested_z": 1.818258,
+          "max_nested_z_name": "Portugal | Türkiye"
         },
         "Semifinals": {
-          "entered": [],
-          "exited": [],
-          "churn_count": 0,
-          "max_abs_delta": 0.0095,
-          "mean_abs_delta": 0.004562
+          "entered": [
+            "Brazil | Jordan",
+            "France | Portugal"
+          ],
+          "exited": [
+            "Brazil | Spain",
+            "Germany | Spain"
+          ],
+          "churn_count": 4,
+          "max_abs_delta": 0.0092,
+          "mean_abs_delta": 0.00451,
+          "max_nested_z": 1.978754,
+          "max_nested_z_name": "Germany | Spain"
         },
         "Final": {
           "entered": [],
           "exited": [],
           "churn_count": 0,
-          "max_abs_delta": 0.007,
-          "mean_abs_delta": 0.0035
+          "max_abs_delta": 0.0072,
+          "mean_abs_delta": 0.0033,
+          "max_nested_z": 1.703996,
+          "max_nested_z_name": "Argentina | Germany"
         }
       },
       "finalist_top16": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.0185,
-        "mean_abs_delta": 0.005875
+        "entered": [
+          "Japan"
+        ],
+        "exited": [
+          "Czechia"
+        ],
+        "churn_count": 2,
+        "max_abs_delta": 0.0164,
+        "mean_abs_delta": 0.005012,
+        "max_nested_z": 1.870471,
+        "max_nested_z_name": "Spain"
       },
-      "max_stage_top16_abs_delta": 0.026,
+      "max_stage_top16_abs_delta": 0.0195,
       "max_stage_top16_churn": 2,
-      "max_pair_top8_abs_delta": 0.0125,
-      "max_pair_top8_churn": 0,
-      "max_finalist_top16_abs_delta": 0.0185,
-      "max_finalist_top16_churn": 0
+      "max_pair_top8_abs_delta": 0.0202,
+      "max_pair_top8_churn": 4,
+      "max_pair_top8_nested_z": 2.608373,
+      "max_finalist_top16_abs_delta": 0.0164,
+      "max_finalist_top16_churn": 2
     },
     "summary": {
       "max_runs": 10000,
       "min_runs": 5000,
-      "max_stage_bracket_runs": 2000,
+      "max_stage_bracket_runs": 5000,
       "min_stage_bracket_runs": 1000,
-      "leader_at_max_runs": "Spain",
-      "leader_probability_at_max_runs": 0.16,
+      "leader_at_max_runs": "Germany",
+      "leader_probability_at_max_runs": 0.3697,
       "csv_path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_monte_carlo_stability.csv",
       "stage_bracket_csv_path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_monte_carlo_stage_bracket_stability.csv"
     },
     "source_fingerprints": {
       "model_package": {
         "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/models/model_sota.pkl",
-        "sha256": "82274d68fd54b3aee18dcd2db137f087a99a516a9850ab73aea105d462d11e78",
-        "size_bytes": 4565106,
-        "mtime_ns": 1779038639047286897
+        "sha256": "8fa8a4f06ff1bfc69cf12be7c2751f96bd4f7ecb1e0943cd3b977fcec51104a7",
+        "size_bytes": 5770428,
+        "mtime_ns": 1782691147510121120
       },
       "model_report": {
         "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_model_report.json",
-        "sha256": "5192ec1147f2d774e34562a79ebeca0a38d5d6d1092f9e8f13ef204c554b8196",
-        "size_bytes": 97095,
-        "mtime_ns": 1779038639050470500
+        "sha256": "199cef67c98d8ca16b18b20dbf7e2f04a8d44e64c167b798d9ee2332cc40a2bf",
+        "size_bytes": 96990,
+        "mtime_ns": 1782691147525111406
       },
       "training_matches": {
         "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv",
         "sha256": "652da5722831d8ed4ba3bddab1032e1f71d1f328db7484fb0c41929c111038b6",
         "size_bytes": 12323223,
-        "mtime_ns": 1779038639027782527
+        "mtime_ns": 1782691147427762170
       },
       "sota_pipeline": {
         "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/src/sota_pipeline.py",
-        "sha256": "c4fb0df83adfa66e28dc9f7d69aa3ca61afc71468cb3df2dc6c3edcfbc49bdc4",
-        "size_bytes": 164817,
-        "mtime_ns": 1779193516621869414
+        "sha256": "1d3a91807fc1a6a6b41ad6eba6e2b819821b9452761af224ea13950b61f0bce6",
+        "size_bytes": 205148,
+        "mtime_ns": 1782700032751289136
       },
       "mc_stability_script": {
         "path": "/Users/eventanilha/Projects/arena-ai/scripts/monte_carlo_stability.py",
-        "sha256": "0bdafd05b719f21403a6ae5dbb244301596a827511f51f8f86e61e51f0563f5f",
-        "size_bytes": 28065,
-        "mtime_ns": 1779068608864827481
+        "sha256": "d20e93617818c863c3ac22a4bc60d53ab2636e6ae2ac7854f40d1ed3fbfcf525",
+        "size_bytes": 29605,
+        "mtime_ns": 1782691759529097682
       }
     }
   },

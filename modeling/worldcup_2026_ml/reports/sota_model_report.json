@@ -87,7 +87,7 @@
       "test_rows": 0.0
     },
     "baseline_fifa_rank_1x2": {
-      "accuracy": 0.0051,
+      "accuracy": 0.0,
       "test_rows": 0.0
     },
     "baseline_elo_winner_no_draw": {
@@ -95,66 +95,66 @@
       "test_rows": 0.0
     },
     "baseline_fifa_rank_winner_no_draw": {
-      "accuracy": 0.0046,
+      "accuracy": 0.0,
       "test_rows": 0.0
     },
     "logistic_1x2": {
-      "accuracy": 0.0031,
-      "top2_accuracy": 0.0004,
-      "log_loss": -0.0022,
-      "draw_recall": 0.0097,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     },
     "xgb_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0054,
-      "log_loss": -0.0031,
-      "draw_recall": -0.0064,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     },
     "xgb_temperature_calibrated_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0054,
-      "log_loss": -0.0031,
-      "draw_recall": -0.0064,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "temperature": 0.0,
       "test_rows": 0.0
     },
     "winner_xgb_no_draw": {
-      "accuracy": 0.0072,
-      "log_loss": -0.004,
-      "brier": -0.0022,
+      "accuracy": 0.0,
+      "log_loss": 0.0,
+      "brier": 0.0,
       "test_rows": 0.0
     },
     "competitive_xgb_1x2": {
-      "accuracy": -0.0016,
-      "top2_accuracy": 0.0005,
-      "log_loss": -0.0056,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
       "test_rows": 0.0
     },
     "poisson_goal_model_1x2": {
       "accuracy": 0.0,
       "top2_accuracy": 0.0,
-      "log_loss": -0.0008,
-      "draw_recall": 0.0016,
-      "home_goal_mae": -0.0009,
-      "away_goal_mae": -0.0011,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
+      "home_goal_mae": 0.0,
+      "away_goal_mae": 0.0,
       "test_rows": 0.0
     },
     "xgb_count_poisson_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0027,
-      "log_loss": -0.0031,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
       "draw_recall": 0.0,
-      "home_goal_mae": -0.0022,
-      "away_goal_mae": -0.0026,
+      "home_goal_mae": 0.0,
+      "away_goal_mae": 0.0,
       "test_rows": 0.0
     },
     "stacking_meta_1x2": {
-      "accuracy": -0.0059,
-      "top2_accuracy": -0.0004,
-      "log_loss": -0.0031,
-      "draw_recall": -0.013,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     }
   },
@@ -3206,58 +3206,58 @@
     },
     "description": "Leakage-free nested-temporal selected classifier/Poisson policy with draw floor/ceiling guardrails; draw_xgb was removed because zero-weight inactive models are not SOTA/KISS."
   },
-  "monte_carlo_runs": 1000,
-  "sample_champion_seed_2026": "Netherlands",
+  "monte_carlo_runs": 10000,
+  "sample_champion_seed_2026": "Ecuador",
   "top_10_champion_odds": [
     {
-      "team": "Spain",
-      "wins": 185,
-      "champion_probability": 0.185
-    },
-    {
-      "team": "Brazil",
-      "wins": 128,
-      "champion_probability": 0.128
-    },
-    {
       "team": "Germany",
-      "wins": 117,
-      "champion_probability": 0.117
+      "wins": 3666,
+      "champion_probability": 0.3666
     },
     {
-      "team": "Mexico",
-      "wins": 112,
-      "champion_probability": 0.112
-    },
-    {
-      "team": "Czechia",
-      "wins": 96,
-      "champion_probability": 0.096
-    },
-    {
-      "team": "Netherlands",
-      "wins": 73,
-      "champion_probability": 0.073
-    },
-    {
-      "team": "Korea Republic",
-      "wins": 67,
-      "champion_probability": 0.067
-    },
-    {
-      "team": "Uruguay",
-      "wins": 36,
-      "champion_probability": 0.036
+      "team": "Ecuador",
+      "wins": 2620,
+      "champion_probability": 0.262
     },
     {
       "team": "France",
-      "wins": 31,
-      "champion_probability": 0.031
+      "wins": 880,
+      "champion_probability": 0.088
     },
     {
-      "team": "Switzerland",
-      "wins": 28,
-      "champion_probability": 0.028
+      "team": "Brazil",
+      "wins": 617,
+      "champion_probability": 0.0617
+    },
+    {
+      "team": "Portugal",
+      "wins": 511,
+      "champion_probability": 0.0511
+    },
+    {
+      "team": "C\u00f4te d'Ivoire",
+      "wins": 270,
+      "champion_probability": 0.027
+    },
+    {
+      "team": "Spain",
+      "wins": 188,
+      "champion_probability": 0.0188
+    },
+    {
+      "team": "Norway",
+      "wins": 167,
+      "champion_probability": 0.0167
+    },
+    {
+      "team": "Colombia",
+      "wins": 136,
+      "champion_probability": 0.0136
+    },
+    {
+      "team": "Netherlands",
+      "wins": 134,
+      "champion_probability": 0.0134
     }
   ],
   "artifacts": {

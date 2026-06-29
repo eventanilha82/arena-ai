@@ -12,6 +12,19 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_SOURCE_INTEGRITY_PATHS = (
+    "src/arena_ai/main.py",
+    "src/arena_ai/worldcup_model.py",
+    "modeling/worldcup_2026_ml/src/sota_pipeline.py",
+    "modeling/worldcup_2026_ml/models/model_sota.pkl",
+    "modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl",
+    "modeling/worldcup_2026_ml/reports/sota_model_report.json",
+    "Makefile",
+    "scripts/build_assets_qa.py",
+    "scripts/package_release_artifacts.py",
+    "pyproject.toml",
+    "uv.lock",
+)
 
 
 def sha256(path: Path) -> str:
@@ -30,18 +43,17 @@ def run_text(args: list[str]) -> str | None:
     return result.stdout.strip() or None
 
 
-def zip_directory_fallback(source: Path, target: Path) -> None:
+def zip_directory(source: Path, target: Path) -> None:
     source = source.resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     base = source.parent
     with ZipFile(target, "w", ZIP_DEFLATED) as archive:
         for path in sorted(source.rglob("*")):
-            rel = path.relative_to(base)
             if path.is_dir():
                 continue
-            info = ZipInfo.from_file(path, rel.as_posix())
-            mode = path.stat().st_mode & 0o777
-            info.external_attr = mode << 16
+            relative_path = path.relative_to(base)
+            info = ZipInfo.from_file(path, relative_path.as_posix())
+            info.external_attr = (path.stat().st_mode & 0o777) << 16
             archive.write(path, info.filename)
 
 
@@ -53,7 +65,7 @@ def zip_mac_app(mac_app: Path, target: Path) -> str:
             check=True,
         )
         return "ditto"
-    zip_directory_fallback(mac_app, target)
+    zip_directory(mac_app, target)
     return "zipfile"
 
 
@@ -66,6 +78,61 @@ def file_entry(path: Path, role: str) -> dict[str, object]:
     }
 
 
+def source_integrity() -> dict[str, object]:
+    status = run_text(["git", "status", "--porcelain=v1"])
+    files = []
+    for relative_path in RELEASE_SOURCE_INTEGRITY_PATHS:
+        path = ROOT / relative_path
+        if not path.is_file():
+            raise SystemExit(f"missing release source file: {path}")
+        files.append(
+            {
+                "path": relative_path,
+                "size_bytes": path.stat().st_size,
+                "sha256": sha256(path),
+            }
+        )
+    return {
+        "git_head": run_text(["git", "rev-parse", "HEAD"]),
+        "git_branch": run_text(["git", "branch", "--show-current"]),
+        "git_worktree_clean": not bool(status),
+        "git_status_porcelain": status.splitlines() if status else [],
+        "files": files,
+    }
+
+
+def write_release_metadata(
+    out: Path,
+    *,
+    app_name: str,
+    artifacts: list[dict[str, object]],
+    mac_zip_method: str,
+) -> None:
+    manifest = {
+        "app_name": app_name,
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "git_head": run_text(["git", "rev-parse", "--short", "HEAD"]),
+        "git_branch": run_text(["git", "branch", "--show-current"]),
+        "release_scope": "macos_windows_app",
+        "source_integrity": source_integrity(),
+        "mac_zip_method": mac_zip_method,
+        "artifacts": artifacts,
+    }
+    manifest_path = out / "release-manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    checksum_lines = [f"{entry['sha256']}  {Path(str(entry['path'])).name}" for entry in artifacts]
+    checksum_lines.append(f"{sha256(manifest_path)}  {manifest_path.name}")
+    (out / "SHA256SUMS").write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+    for entry in artifacts:
+        print(f"{entry['role']}: {entry['path']} {entry['size_bytes']} bytes {entry['sha256']}")
+    print(f"manifest: {manifest_path.relative_to(ROOT)}")
+    print(f"checksums: {(out / 'SHA256SUMS').relative_to(ROOT)}")
+
+
+def resolve_path(value: Path) -> Path:
+    return (ROOT / value).resolve() if not value.is_absolute() else value
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Package Arena AI Mac/Windows release artifacts.")
     parser.add_argument("--app-name", default="ArenaAI")
@@ -74,9 +141,9 @@ def main() -> int:
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
-    mac_app = (ROOT / args.mac_app).resolve() if not args.mac_app.is_absolute() else args.mac_app
-    windows_zip = (ROOT / args.windows_zip).resolve() if not args.windows_zip.is_absolute() else args.windows_zip
-    out = (ROOT / args.out).resolve() if not args.out.is_absolute() else args.out
+    mac_app = resolve_path(args.mac_app)
+    windows_zip = resolve_path(args.windows_zip)
+    out = resolve_path(args.out)
     if not mac_app.is_dir():
         raise SystemExit(f"missing mac app bundle: {mac_app}")
     if not windows_zip.is_file():
@@ -85,33 +152,17 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     mac_zip = out / f"{args.app_name}-mac-latest.zip"
     windows_release_zip = out / f"{args.app_name}-windows-latest.zip"
-    if mac_zip.exists():
-        mac_zip.unlink()
-    if windows_release_zip.exists():
-        windows_release_zip.unlink()
+    for artifact in (mac_zip, windows_release_zip):
+        if artifact.exists():
+            artifact.unlink()
 
     mac_zip_method = zip_mac_app(mac_app, mac_zip)
     shutil.copy2(windows_zip, windows_release_zip)
-
     artifacts = [
         file_entry(mac_zip, "mac_app_zip"),
         file_entry(windows_release_zip, "windows_app_zip"),
     ]
-    sha_lines = [f"{entry['sha256']}  {Path(str(entry['path'])).name}" for entry in artifacts]
-    (out / "SHA256SUMS").write_text("\n".join(sha_lines) + "\n", encoding="utf-8")
-    manifest = {
-        "app_name": args.app_name,
-        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-        "git_head": run_text(["git", "rev-parse", "--short", "HEAD"]),
-        "git_branch": run_text(["git", "branch", "--show-current"]),
-        "mac_zip_method": mac_zip_method,
-        "artifacts": artifacts,
-    }
-    (out / "release-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    for entry in artifacts:
-        print(f"{entry['role']}: {entry['path']} {entry['size_bytes']} bytes {entry['sha256']}")
-    print(f"manifest: {(out / 'release-manifest.json').relative_to(ROOT)}")
-    print(f"checksums: {(out / 'SHA256SUMS').relative_to(ROOT)}")
+    write_release_metadata(out, app_name=args.app_name, artifacts=artifacts, mac_zip_method=mac_zip_method)
     return 0
 
 

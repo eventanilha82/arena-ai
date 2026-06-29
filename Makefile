@@ -1,4 +1,4 @@
-.PHONY: help sync run console smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
+.PHONY: help sync run console bolao bolao-grupos bolao-qa bolao-mc-stability smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
 
 APP_NAME := ArenaAI
 PYTHON ?= .venv/bin/python
@@ -17,6 +17,11 @@ RELEASE_DIR := release
 MAC_RELEASE_ARTIFACT := $(RELEASE_DIR)/$(APP_NAME)-mac-latest.zip
 WINDOWS_RELEASE_ARTIFACT := $(RELEASE_DIR)/$(APP_NAME)-windows-latest.zip
 TAG ?=
+BOLAO_QA_RUNS ?= 100
+BOLAO_QA_SEED ?= 2026
+BOLAO_MC_RUNS ?= 1000,2000
+BOLAO_MC_SEED ?= 20260628
+BOLAO_MC_INDEPENDENT_SEEDS ?= 20260628,20260629,20260630
 
 ifeq ($(OS),Windows_NT)
 	PYI_DATA_SEP := ;
@@ -36,10 +41,14 @@ help:
 	@printf "make sync          instala dependencias com uv\n"
 	@printf "make run           abre o jogo Pygame\n"
 	@printf "make console       abre o console do modelo SOTA\n"
+	@printf "make bolao         fase fixa + top 10 Monte Carlo + escolha interativa\n"
+	@printf "make bolao-grupos  lista placares e classificacao fixa dos grupos\n"
+	@printf "make bolao-qa      valida CSV, grupos e Monte Carlo curto sem interacao\n"
+	@printf "make bolao-mc-stability audita grupos fixos + forma + mata-mata em 1k/2k e seeds independentes\n"
 	@printf "make smoke         compila, importa modelo e roda 1 predicao\n"
 	@printf "make validate      roda gate essencial de assets/UI/audio-smoke/modelo\n"
 	@printf "make stats-qa      gera auditoria estatistica: calibracao, IC, ablation, empate e Dixon-Coles\n"
-	@printf "make mc-stability  roda Monte Carlo offline 5k/10k + fases/chaves 1k/2k\n"
+	@printf "make mc-stability  roda Monte Carlo offline 5k/10k + fases/chaves 1k/2k/5k\n"
 	@printf "make runtime-cache gera cache de predições e banco de 1000 Copas para a UI\n"
 	@printf "make runtime-cache-check valida o cache runtime sem regenerar\n"
 	@printf "make aaa-qa        roda QA visual/performance completo\n"
@@ -69,6 +78,22 @@ run:
 console:
 	uv run python modeling/worldcup_2026_ml/src/console.py
 
+bolao:
+	uv run arena-bolao
+
+bolao-grupos:
+	uv run arena-bolao --somente-grupos
+
+bolao-qa:
+	@printf "[make] bolao semantic QA\n"
+	$(PYTHON) scripts/bolao_qa.py --runs $(BOLAO_QA_RUNS) --seed $(BOLAO_QA_SEED)
+
+bolao-mc-stability:
+	@printf "[make] compile bolao Monte Carlo stability\n"
+	$(PYTHON) -m compileall -q src/arena_ai/bolao.py scripts/bolao_mc_stability.py
+	@printf "[make] bolao Monte Carlo stability $(BOLAO_MC_RUNS)\n"
+	$(PYTHON) scripts/bolao_mc_stability.py --runs $(BOLAO_MC_RUNS) --seed $(BOLAO_MC_SEED) --independent-seeds $(BOLAO_MC_INDEPENDENT_SEEDS)
+
 smoke:
 	@printf "[make] compile smoke\n"
 	$(PYTHON) -m compileall -q src/arena_ai modeling/worldcup_2026_ml/src/sota_pipeline.py modeling/worldcup_2026_ml/src/console.py scripts/smoke_model.py
@@ -82,6 +107,7 @@ validate:
 	$(PYTHON) -m compileall -q src/arena_ai modeling/worldcup_2026_ml/src/sota_pipeline.py modeling/worldcup_2026_ml/src/console.py scripts
 	@printf "[make] model smoke\n"
 	$(PYTHON) scripts/smoke_model.py
+	$(MAKE) bolao-qa
 	@printf "[make] standard validation\n"
 	$(PYTHON) scripts/validate_visuals.py --suite standard
 	@printf "[make] audio smoke\n"
@@ -96,8 +122,8 @@ stats-qa:
 mc-stability:
 	@printf "[make] compile mc-stability\n"
 	$(PYTHON) -m compileall -q modeling/worldcup_2026_ml/src/sota_pipeline.py scripts/monte_carlo_stability.py
-	@printf "[make] Monte Carlo offline stability 5k/10k + fases/chaves 1k/2k\n"
-	$(PYTHON) scripts/monte_carlo_stability.py --runs 5000,10000 --stage-runs 1000,2000 --workers 8 --chunk-size 25 --stage-chunk-size 25
+	@printf "[make] Monte Carlo offline stability 5k/10k + fases/chaves 1k/2k/5k\n"
+	$(PYTHON) scripts/monte_carlo_stability.py --runs 5000,10000 --stage-runs 1000,2000,5000 --workers 8 --chunk-size 25 --stage-chunk-size 25
 
 runtime-cache:
 	@printf "[make] compile runtime-cache\n"
@@ -137,6 +163,7 @@ build-assets-qa:
 release-qa:
 	$(MAKE) runtime-cache
 	$(MAKE) validate
+	$(MAKE) bolao-mc-stability
 	$(MAKE) aaa-qa
 	$(MAKE) build-assets-qa
 

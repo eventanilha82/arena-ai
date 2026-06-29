@@ -1,9 +1,9 @@
 {
   "root": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/raw",
   "file_count": 14,
-  "total_size_bytes": 81082917,
+  "total_size_bytes": 81082901,
   "csv_file_count": 14,
-  "manifest_sha256": "508a0b0651216d38d516c37dc22adc8930c9cc1a498cc6718aa912621ea64429",
+  "manifest_sha256": "70ab1b3e3c816e37da3fff9a46c31abe5e5eb604c10300a5e6da1167cbe7e14e",
   "semantic": {
     "required_file_count": 14,
     "required_files_present": true,
@@ -401,9 +401,9 @@
     },
     {
       "path": "data/raw/matches.csv",
-      "sha256": "5c17130f9775bf34d2008f55acc42e40b3be8787f264384d234cce4c5cefdfb8",
-      "size_bytes": 5054,
-      "mtime_ns": 1778283427521701803,
+      "sha256": "af024eefbdd226a26bb2e06064a038b0bfb4c1a2e3f0a301b3369c7b20262819",
+      "size_bytes": 5038,
+      "mtime_ns": 1782689830912311260,
       "suffix": ".csv",
       "columns": [
         "id",

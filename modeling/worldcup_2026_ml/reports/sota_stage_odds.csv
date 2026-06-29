@@ -1,337 +1,337 @@
 team,stage,probability
 Mexico,Group Stage,1.0
-Mexico,Round of 32,0.983
-Mexico,Round of 16,0.807
-Mexico,Quarter-finals,0.644
-Mexico,Semi-finals,0.21
-Mexico,Final,0.161
-Mexico,Champion,0.112
+Mexico,Round of 32,0.975
+Mexico,Round of 16,0.8374
+Mexico,Quarter-finals,0.7293
+Mexico,Semi-finals,0.0317
+Mexico,Final,0.0267
+Mexico,Champion,0.0131
 South Africa,Group Stage,1.0
-South Africa,Round of 32,0.202
-South Africa,Round of 16,0.048
-South Africa,Quarter-finals,0.028
-South Africa,Semi-finals,0.01
-South Africa,Final,0.002
-South Africa,Champion,0.0
+South Africa,Round of 32,0.2397
+South Africa,Round of 16,0.0492
+South Africa,Quarter-finals,0.0298
+South Africa,Semi-finals,0.0005
+South Africa,Final,0.0004
+South Africa,Champion,0.0003
 Korea Republic,Group Stage,1.0
-Korea Republic,Round of 32,0.63
-Korea Republic,Round of 16,0.307
-Korea Republic,Quarter-finals,0.247
-Korea Republic,Semi-finals,0.124
-Korea Republic,Final,0.089
-Korea Republic,Champion,0.067
+Korea Republic,Round of 32,0.5609
+Korea Republic,Round of 16,0.3485
+Korea Republic,Quarter-finals,0.2913
+Korea Republic,Semi-finals,0.0131
+Korea Republic,Final,0.0117
+Korea Republic,Champion,0.008
 Czechia,Group Stage,1.0
-Czechia,Round of 32,0.924
-Czechia,Round of 16,0.652
-Czechia,Quarter-finals,0.483
-Czechia,Semi-finals,0.221
-Czechia,Final,0.134
-Czechia,Champion,0.096
+Czechia,Round of 32,0.9268
+Czechia,Round of 16,0.6438
+Czechia,Quarter-finals,0.5152
+Czechia,Semi-finals,0.019
+Czechia,Final,0.0144
+Czechia,Champion,0.0044
 Canada,Group Stage,1.0
-Canada,Round of 32,0.971
-Canada,Round of 16,0.378
-Canada,Quarter-finals,0.263
-Canada,Semi-finals,0.044
-Canada,Final,0.017
-Canada,Champion,0.011
+Canada,Round of 32,0.9724
+Canada,Round of 16,0.3108
+Canada,Quarter-finals,0.2601
+Canada,Semi-finals,0.008
+Canada,Final,0.0015
+Canada,Champion,0.0011
 Bosnia and Herzegovina,Group Stage,1.0
-Bosnia and Herzegovina,Round of 32,0.497
-Bosnia and Herzegovina,Round of 16,0.055
-Bosnia and Herzegovina,Quarter-finals,0.019
-Bosnia and Herzegovina,Semi-finals,0.003
-Bosnia and Herzegovina,Final,0.001
-Bosnia and Herzegovina,Champion,0.001
+Bosnia and Herzegovina,Round of 32,0.5549
+Bosnia and Herzegovina,Round of 16,0.0317
+Bosnia and Herzegovina,Quarter-finals,0.0192
+Bosnia and Herzegovina,Semi-finals,0.001
+Bosnia and Herzegovina,Final,0.0004
+Bosnia and Herzegovina,Champion,0.0001
 Qatar,Group Stage,1.0
-Qatar,Round of 32,0.233
-Qatar,Round of 16,0.016
-Qatar,Quarter-finals,0.005
-Qatar,Semi-finals,0.0
-Qatar,Final,0.0
-Qatar,Champion,0.0
+Qatar,Round of 32,0.1717
+Qatar,Round of 16,0.0129
+Qatar,Quarter-finals,0.0089
+Qatar,Semi-finals,0.0006
+Qatar,Final,0.0003
+Qatar,Champion,0.0001
 Switzerland,Group Stage,1.0
-Switzerland,Round of 32,0.973
-Switzerland,Round of 16,0.628
-Switzerland,Quarter-finals,0.496
-Switzerland,Semi-finals,0.101
-Switzerland,Final,0.046
-Switzerland,Champion,0.028
+Switzerland,Round of 32,0.971
+Switzerland,Round of 16,0.6821
+Switzerland,Quarter-finals,0.6152
+Switzerland,Semi-finals,0.0296
+Switzerland,Final,0.0043
+Switzerland,Champion,0.0026
 Brazil,Group Stage,1.0
-Brazil,Round of 32,0.979
-Brazil,Round of 16,0.65
-Brazil,Quarter-finals,0.59
-Brazil,Semi-finals,0.174
-Brazil,Final,0.155
-Brazil,Champion,0.128
+Brazil,Round of 32,0.9868
+Brazil,Round of 16,0.6472
+Brazil,Quarter-finals,0.5832
+Brazil,Semi-finals,0.5538
+Brazil,Final,0.5158
+Brazil,Champion,0.0617
 Morocco,Group Stage,1.0
-Morocco,Round of 32,0.752
-Morocco,Round of 16,0.16
-Morocco,Quarter-finals,0.124
-Morocco,Semi-finals,0.037
-Morocco,Final,0.033
-Morocco,Champion,0.012
+Morocco,Round of 32,0.7839
+Morocco,Round of 16,0.122
+Morocco,Quarter-finals,0.0912
+Morocco,Semi-finals,0.0578
+Morocco,Final,0.0506
+Morocco,Champion,0.0062
 Haiti,Group Stage,1.0
-Haiti,Round of 32,0.128
-Haiti,Round of 16,0.009
-Haiti,Quarter-finals,0.004
-Haiti,Semi-finals,0.001
-Haiti,Final,0.0
+Haiti,Round of 32,0.1273
+Haiti,Round of 16,0.0076
+Haiti,Quarter-finals,0.0047
+Haiti,Semi-finals,0.0018
+Haiti,Final,0.0006
 Haiti,Champion,0.0
 Scotland,Group Stage,1.0
-Scotland,Round of 32,0.876
-Scotland,Round of 16,0.296
-Scotland,Quarter-finals,0.227
-Scotland,Semi-finals,0.06
-Scotland,Final,0.046
-Scotland,Champion,0.017
+Scotland,Round of 32,0.8469
+Scotland,Round of 16,0.3127
+Scotland,Quarter-finals,0.2563
+Scotland,Semi-finals,0.2317
+Scotland,Final,0.184
+Scotland,Champion,0.0074
 USA,Group Stage,1.0
-USA,Round of 32,0.922
-USA,Round of 16,0.739
-USA,Quarter-finals,0.331
-USA,Semi-finals,0.246
-USA,Final,0.03
-USA,Champion,0.001
+USA,Round of 32,0.9277
+USA,Round of 16,0.7591
+USA,Quarter-finals,0.3031
+USA,Semi-finals,0.0298
+USA,Final,0.0024
+USA,Champion,0.0014
 Paraguay,Group Stage,1.0
-Paraguay,Round of 32,0.492
-Paraguay,Round of 16,0.199
-Paraguay,Quarter-finals,0.102
-Paraguay,Semi-finals,0.083
-Paraguay,Final,0.006
-Paraguay,Champion,0.001
+Paraguay,Round of 32,0.5568
+Paraguay,Round of 16,0.2119
+Paraguay,Quarter-finals,0.0541
+Paraguay,Semi-finals,0.0088
+Paraguay,Final,0.0026
+Paraguay,Champion,0.0016
 Australia,Group Stage,1.0
-Australia,Round of 32,0.422
-Australia,Round of 16,0.18
-Australia,Quarter-finals,0.105
-Australia,Semi-finals,0.078
-Australia,Final,0.005
-Australia,Champion,0.0
+Australia,Round of 32,0.3444
+Australia,Round of 16,0.1762
+Australia,Quarter-finals,0.0361
+Australia,Semi-finals,0.0069
+Australia,Final,0.0015
+Australia,Champion,0.001
 Türkiye,Group Stage,1.0
-Türkiye,Round of 32,0.928
-Türkiye,Round of 16,0.784
-Türkiye,Quarter-finals,0.301
-Türkiye,Semi-finals,0.22
-Türkiye,Final,0.019
-Türkiye,Champion,0.003
+Türkiye,Round of 32,0.9355
+Türkiye,Round of 16,0.7883
+Türkiye,Quarter-finals,0.5293
+Türkiye,Semi-finals,0.037
+Türkiye,Final,0.0048
+Türkiye,Champion,0.0033
 Germany,Group Stage,1.0
-Germany,Round of 32,0.985
-Germany,Round of 16,0.858
-Germany,Quarter-finals,0.201
-Germany,Semi-finals,0.14
-Germany,Final,0.124
-Germany,Champion,0.117
+Germany,Round of 32,0.9875
+Germany,Round of 16,0.8867
+Germany,Quarter-finals,0.4747
+Germany,Semi-finals,0.4522
+Germany,Final,0.4214
+Germany,Champion,0.3666
 Curaçao,Group Stage,1.0
-Curaçao,Round of 32,0.114
-Curaçao,Round of 16,0.015
-Curaçao,Quarter-finals,0.0
-Curaçao,Semi-finals,0.0
+Curaçao,Round of 32,0.1469
+Curaçao,Round of 16,0.0162
+Curaçao,Quarter-finals,0.0008
+Curaçao,Semi-finals,0.0003
 Curaçao,Final,0.0
 Curaçao,Champion,0.0
 Côte d'Ivoire,Group Stage,1.0
-Côte d'Ivoire,Round of 32,0.596
-Côte d'Ivoire,Round of 16,0.239
-Côte d'Ivoire,Quarter-finals,0.031
-Côte d'Ivoire,Semi-finals,0.005
-Côte d'Ivoire,Final,0.004
-Côte d'Ivoire,Champion,0.003
+Côte d'Ivoire,Round of 32,0.5464
+Côte d'Ivoire,Round of 16,0.2743
+Côte d'Ivoire,Quarter-finals,0.0539
+Côte d'Ivoire,Semi-finals,0.0435
+Côte d'Ivoire,Final,0.0365
+Côte d'Ivoire,Champion,0.027
 Ecuador,Group Stage,1.0
-Ecuador,Round of 32,0.938
-Ecuador,Round of 16,0.685
-Ecuador,Quarter-finals,0.094
-Ecuador,Semi-finals,0.052
-Ecuador,Final,0.031
-Ecuador,Champion,0.024
+Ecuador,Round of 32,0.953
+Ecuador,Round of 16,0.7072
+Ecuador,Quarter-finals,0.3944
+Ecuador,Semi-finals,0.365
+Ecuador,Final,0.3167
+Ecuador,Champion,0.262
 Netherlands,Group Stage,1.0
-Netherlands,Round of 32,0.962
-Netherlands,Round of 16,0.667
-Netherlands,Quarter-finals,0.549
-Netherlands,Semi-finals,0.486
-Netherlands,Final,0.428
-Netherlands,Champion,0.073
+Netherlands,Round of 32,0.9667
+Netherlands,Round of 16,0.6574
+Netherlands,Quarter-finals,0.1381
+Netherlands,Semi-finals,0.0337
+Netherlands,Final,0.0309
+Netherlands,Champion,0.0134
 Japan,Group Stage,1.0
-Japan,Round of 32,0.653
-Japan,Round of 16,0.159
-Japan,Quarter-finals,0.131
-Japan,Semi-finals,0.082
-Japan,Final,0.07
-Japan,Champion,0.007
+Japan,Round of 32,0.6968
+Japan,Round of 16,0.1364
+Japan,Quarter-finals,0.0513
+Japan,Semi-finals,0.0248
+Japan,Final,0.0218
+Japan,Champion,0.0048
 Sweden,Group Stage,1.0
-Sweden,Round of 32,0.471
-Sweden,Round of 16,0.07
-Sweden,Quarter-finals,0.04
-Sweden,Semi-finals,0.02
-Sweden,Final,0.019
-Sweden,Champion,0.003
+Sweden,Round of 32,0.4253
+Sweden,Round of 16,0.0502
+Sweden,Quarter-finals,0.0142
+Sweden,Semi-finals,0.0048
+Sweden,Final,0.0038
+Sweden,Champion,0.0005
 Tunisia,Group Stage,1.0
-Tunisia,Round of 32,0.672
-Tunisia,Round of 16,0.135
-Tunisia,Quarter-finals,0.081
-Tunisia,Semi-finals,0.057
-Tunisia,Final,0.048
-Tunisia,Champion,0.0
+Tunisia,Round of 32,0.6625
+Tunisia,Round of 16,0.1739
+Tunisia,Quarter-finals,0.0146
+Tunisia,Semi-finals,0.0057
+Tunisia,Final,0.0043
+Tunisia,Champion,0.0007
 Belgium,Group Stage,1.0
-Belgium,Round of 32,0.972
-Belgium,Round of 16,0.77
-Belgium,Quarter-finals,0.7
-Belgium,Semi-finals,0.095
-Belgium,Final,0.023
-Belgium,Champion,0.011
+Belgium,Round of 32,0.976
+Belgium,Round of 16,0.7238
+Belgium,Quarter-finals,0.0845
+Belgium,Semi-finals,0.0089
+Belgium,Final,0.0008
+Belgium,Champion,0.0006
 Egypt,Group Stage,1.0
-Egypt,Round of 32,0.497
-Egypt,Round of 16,0.081
-Egypt,Quarter-finals,0.057
-Egypt,Semi-finals,0.009
-Egypt,Final,0.001
+Egypt,Round of 32,0.5212
+Egypt,Round of 16,0.0604
+Egypt,Quarter-finals,0.0066
+Egypt,Semi-finals,0.0003
+Egypt,Final,0.0
 Egypt,Champion,0.0
 IR Iran,Group Stage,1.0
-IR Iran,Round of 32,0.625
-IR Iran,Round of 16,0.089
-IR Iran,Quarter-finals,0.061
-IR Iran,Semi-finals,0.017
-IR Iran,Final,0.002
+IR Iran,Round of 32,0.5908
+IR Iran,Round of 16,0.071
+IR Iran,Quarter-finals,0.0083
+IR Iran,Semi-finals,0.0012
+IR Iran,Final,0.0
 IR Iran,Champion,0.0
 New Zealand,Group Stage,1.0
-New Zealand,Round of 32,0.611
-New Zealand,Round of 16,0.089
-New Zealand,Quarter-finals,0.052
-New Zealand,Semi-finals,0.004
+New Zealand,Round of 32,0.6161
+New Zealand,Round of 16,0.1485
+New Zealand,Quarter-finals,0.0029
+New Zealand,Semi-finals,0.0002
 New Zealand,Final,0.0
 New Zealand,Champion,0.0
 Spain,Group Stage,1.0
-Spain,Round of 32,0.997
-Spain,Round of 16,0.708
-Spain,Quarter-finals,0.626
-Spain,Semi-finals,0.57
-Spain,Final,0.196
-Spain,Champion,0.185
+Spain,Round of 32,0.9949
+Spain,Round of 16,0.6176
+Spain,Quarter-finals,0.1677
+Spain,Semi-finals,0.164
+Spain,Final,0.0269
+Spain,Champion,0.0188
 Cape Verde Islands,Group Stage,1.0
-Cape Verde Islands,Round of 32,0.211
-Cape Verde Islands,Round of 16,0.009
-Cape Verde Islands,Quarter-finals,0.002
-Cape Verde Islands,Semi-finals,0.001
+Cape Verde Islands,Round of 32,0.2719
+Cape Verde Islands,Round of 16,0.0078
+Cape Verde Islands,Quarter-finals,0.0011
+Cape Verde Islands,Semi-finals,0.0001
 Cape Verde Islands,Final,0.0
 Cape Verde Islands,Champion,0.0
 Saudi Arabia,Group Stage,1.0
-Saudi Arabia,Round of 32,0.268
-Saudi Arabia,Round of 16,0.008
-Saudi Arabia,Quarter-finals,0.002
-Saudi Arabia,Semi-finals,0.001
+Saudi Arabia,Round of 32,0.2105
+Saudi Arabia,Round of 16,0.0105
+Saudi Arabia,Quarter-finals,0.0018
+Saudi Arabia,Semi-finals,0.0013
 Saudi Arabia,Final,0.0
 Saudi Arabia,Champion,0.0
 Uruguay,Group Stage,1.0
-Uruguay,Round of 32,0.962
-Uruguay,Round of 16,0.363
-Uruguay,Quarter-finals,0.264
-Uruguay,Semi-finals,0.235
-Uruguay,Final,0.04
-Uruguay,Champion,0.036
+Uruguay,Round of 32,0.9601
+Uruguay,Round of 16,0.447
+Uruguay,Quarter-finals,0.0598
+Uruguay,Semi-finals,0.0546
+Uruguay,Final,0.0028
+Uruguay,Champion,0.0012
 France,Group Stage,1.0
-France,Round of 32,0.975
-France,Round of 16,0.72
-France,Quarter-finals,0.179
-France,Semi-finals,0.158
-France,Final,0.142
-France,Champion,0.031
+France,Round of 32,0.982
+France,Round of 16,0.6576
+France,Quarter-finals,0.1152
+France,Semi-finals,0.1048
+France,Final,0.0997
+France,Champion,0.088
 Senegal,Group Stage,1.0
-Senegal,Round of 32,0.662
-Senegal,Round of 16,0.111
-Senegal,Quarter-finals,0.044
-Senegal,Semi-finals,0.008
-Senegal,Final,0.007
-Senegal,Champion,0.001
+Senegal,Round of 32,0.6934
+Senegal,Round of 16,0.0853
+Senegal,Quarter-finals,0.0186
+Senegal,Semi-finals,0.0033
+Senegal,Final,0.0021
+Senegal,Champion,0.0012
 Iraq,Group Stage,1.0
-Iraq,Round of 32,0.172
-Iraq,Round of 16,0.011
-Iraq,Quarter-finals,0.001
-Iraq,Semi-finals,0.0
-Iraq,Final,0.0
-Iraq,Champion,0.0
+Iraq,Round of 32,0.162
+Iraq,Round of 16,0.01
+Iraq,Quarter-finals,0.0006
+Iraq,Semi-finals,0.0001
+Iraq,Final,0.0001
+Iraq,Champion,0.0001
 Norway,Group Stage,1.0
-Norway,Round of 32,0.885
-Norway,Round of 16,0.365
-Norway,Quarter-finals,0.057
-Norway,Semi-finals,0.035
-Norway,Final,0.029
-Norway,Champion,0.004
+Norway,Round of 32,0.8713
+Norway,Round of 16,0.3769
+Norway,Quarter-finals,0.0299
+Norway,Semi-finals,0.0241
+Norway,Final,0.0203
+Norway,Champion,0.0167
 Argentina,Group Stage,1.0
-Argentina,Round of 32,0.984
-Argentina,Round of 16,0.782
-Argentina,Quarter-finals,0.233
-Argentina,Semi-finals,0.071
-Argentina,Final,0.007
-Argentina,Champion,0.002
+Argentina,Round of 32,0.9865
+Argentina,Round of 16,0.7386
+Argentina,Quarter-finals,0.7072
+Argentina,Semi-finals,0.6886
+Argentina,Final,0.0943
+Argentina,Champion,0.0128
 Algeria,Group Stage,1.0
-Algeria,Round of 32,0.496
-Algeria,Round of 16,0.062
-Algeria,Quarter-finals,0.017
-Algeria,Semi-finals,0.007
-Algeria,Final,0.0
-Algeria,Champion,0.0
+Algeria,Round of 32,0.5348
+Algeria,Round of 16,0.0491
+Algeria,Quarter-finals,0.0332
+Algeria,Semi-finals,0.0262
+Algeria,Final,0.001
+Algeria,Champion,0.0001
 Austria,Group Stage,1.0
-Austria,Round of 32,0.578
-Austria,Round of 16,0.082
-Austria,Quarter-finals,0.034
-Austria,Semi-finals,0.009
-Austria,Final,0.0
-Austria,Champion,0.0
+Austria,Round of 32,0.5295
+Austria,Round of 16,0.0526
+Austria,Quarter-finals,0.0332
+Austria,Semi-finals,0.0267
+Austria,Final,0.0014
+Austria,Champion,0.0001
 Jordan,Group Stage,1.0
-Jordan,Round of 32,0.63
-Jordan,Round of 16,0.08
-Jordan,Quarter-finals,0.012
-Jordan,Semi-finals,0.002
-Jordan,Final,0.0
+Jordan,Round of 32,0.6272
+Jordan,Round of 16,0.1322
+Jordan,Quarter-finals,0.1029
+Jordan,Semi-finals,0.0821
+Jordan,Final,0.0009
 Jordan,Champion,0.0
 Portugal,Group Stage,1.0
-Portugal,Round of 32,0.996
-Portugal,Round of 16,0.892
-Portugal,Quarter-finals,0.184
-Portugal,Semi-finals,0.166
-Portugal,Final,0.028
-Portugal,Champion,0.012
+Portugal,Round of 32,0.9893
+Portugal,Round of 16,0.9156
+Portugal,Quarter-finals,0.5518
+Portugal,Semi-finals,0.4765
+Portugal,Final,0.0539
+Portugal,Champion,0.0511
 Congo DR,Group Stage,1.0
-Congo DR,Round of 32,0.306
-Congo DR,Round of 16,0.07
-Congo DR,Quarter-finals,0.001
-Congo DR,Semi-finals,0.001
-Congo DR,Final,0.0
-Congo DR,Champion,0.0
+Congo DR,Round of 32,0.3531
+Congo DR,Round of 16,0.0618
+Congo DR,Quarter-finals,0.0318
+Congo DR,Semi-finals,0.0255
+Congo DR,Final,0.0003
+Congo DR,Champion,0.0002
 Uzbekistan,Group Stage,1.0
-Uzbekistan,Round of 32,0.264
-Uzbekistan,Round of 16,0.052
-Uzbekistan,Quarter-finals,0.005
-Uzbekistan,Semi-finals,0.003
-Uzbekistan,Final,0.0
-Uzbekistan,Champion,0.0
+Uzbekistan,Round of 32,0.2232
+Uzbekistan,Round of 16,0.0898
+Uzbekistan,Quarter-finals,0.055
+Uzbekistan,Semi-finals,0.0445
+Uzbekistan,Final,0.0013
+Uzbekistan,Champion,0.001
 Colombia,Group Stage,1.0
-Colombia,Round of 32,0.973
-Colombia,Round of 16,0.833
-Colombia,Quarter-finals,0.116
-Colombia,Semi-finals,0.1
-Colombia,Final,0.016
-Colombia,Champion,0.005
+Colombia,Round of 32,0.9658
+Colombia,Round of 16,0.8422
+Colombia,Quarter-finals,0.2896
+Colombia,Semi-finals,0.2279
+Colombia,Final,0.0156
+Colombia,Champion,0.0136
 England,Group Stage,1.0
-England,Round of 32,0.983
-England,Round of 16,0.785
-England,Quarter-finals,0.224
-England,Semi-finals,0.045
-England,Final,0.037
-England,Champion,0.007
+England,Round of 32,0.9847
+England,Round of 16,0.7528
+England,Quarter-finals,0.1738
+England,Semi-finals,0.0444
+England,Final,0.018
+England,Champion,0.0048
 Croatia,Group Stage,1.0
-Croatia,Round of 32,0.81
-Croatia,Round of 16,0.188
-Croatia,Quarter-finals,0.027
-Croatia,Semi-finals,0.009
-Croatia,Final,0.004
-Croatia,Champion,0.002
+Croatia,Round of 32,0.83
+Croatia,Round of 16,0.1542
+Croatia,Quarter-finals,0.0436
+Croatia,Semi-finals,0.0288
+Croatia,Final,0.0031
+Croatia,Champion,0.0024
 Ghana,Group Stage,1.0
-Ghana,Round of 32,0.207
-Ghana,Round of 16,0.01
-Ghana,Quarter-finals,0.0
-Ghana,Semi-finals,0.0
+Ghana,Round of 32,0.2354
+Ghana,Round of 16,0.0121
+Ghana,Quarter-finals,0.0013
+Ghana,Semi-finals,0.0009
 Ghana,Final,0.0
 Ghana,Champion,0.0
 Panama,Group Stage,1.0
-Panama,Round of 32,0.633
-Panama,Round of 16,0.104
-Panama,Quarter-finals,0.006
-Panama,Semi-finals,0.0
-Panama,Final,0.0
+Panama,Round of 32,0.6235
+Panama,Round of 16,0.1389
+Panama,Quarter-finals,0.0106
+Panama,Semi-finals,0.0039
+Panama,Final,0.0001
 Panama,Champion,0.0

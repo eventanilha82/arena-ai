@@ -33,11 +33,15 @@ SOTA_PIPELINE_REL = "modeling/worldcup_2026_ml/src/sota_pipeline.py"
 MODEL_PACKAGE_REL = "modeling/worldcup_2026_ml/models/model_sota.pkl"
 RUNTIME_PREDICTION_CACHE_REL = "modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl"
 MODEL_REPORT_REL = "modeling/worldcup_2026_ml/reports/sota_model_report.json"
+OBSERVED_GROUP_RESULTS_REL = "modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv"
+OBSERVED_SNAPSHOT_METADATA_REL = "modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_snapshot.json"
 MODEL_RUNTIME_FILES = (
     SOTA_PIPELINE_REL,
     MODEL_PACKAGE_REL,
     RUNTIME_PREDICTION_CACHE_REL,
     MODEL_REPORT_REL,
+    OBSERVED_GROUP_RESULTS_REL,
+    OBSERVED_SNAPSHOT_METADATA_REL,
 )
 MIN_RUNTIME_CACHE_RUNS = 1000
 

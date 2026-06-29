@@ -2997,7 +2997,7 @@ Esta seção preserva no relatório canônico o resumo que antes ficava em `mode
       "test_rows": 0.0
     },
     "baseline_fifa_rank_1x2": {
-      "accuracy": 0.0051,
+      "accuracy": 0.0,
       "test_rows": 0.0
     },
     "baseline_elo_winner_no_draw": {
@@ -3005,66 +3005,66 @@ Esta seção preserva no relatório canônico o resumo que antes ficava em `mode
       "test_rows": 0.0
     },
     "baseline_fifa_rank_winner_no_draw": {
-      "accuracy": 0.0046,
+      "accuracy": 0.0,
       "test_rows": 0.0
     },
     "logistic_1x2": {
-      "accuracy": 0.0031,
-      "top2_accuracy": 0.0004,
-      "log_loss": -0.0022,
-      "draw_recall": 0.0097,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     },
     "xgb_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0054,
-      "log_loss": -0.0031,
-      "draw_recall": -0.0064,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     },
     "xgb_temperature_calibrated_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0054,
-      "log_loss": -0.0031,
-      "draw_recall": -0.0064,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "temperature": 0.0,
       "test_rows": 0.0
     },
     "winner_xgb_no_draw": {
-      "accuracy": 0.0072,
-      "log_loss": -0.004,
-      "brier": -0.0022,
+      "accuracy": 0.0,
+      "log_loss": 0.0,
+      "brier": 0.0,
       "test_rows": 0.0
     },
     "competitive_xgb_1x2": {
-      "accuracy": -0.0016,
-      "top2_accuracy": 0.0005,
-      "log_loss": -0.0056,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
       "test_rows": 0.0
     },
     "poisson_goal_model_1x2": {
       "accuracy": 0.0,
       "top2_accuracy": 0.0,
-      "log_loss": -0.0008,
-      "draw_recall": 0.0016,
-      "home_goal_mae": -0.0009,
-      "away_goal_mae": -0.0011,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
+      "home_goal_mae": 0.0,
+      "away_goal_mae": 0.0,
       "test_rows": 0.0
     },
     "xgb_count_poisson_1x2": {
-      "accuracy": -0.0004,
-      "top2_accuracy": 0.0027,
-      "log_loss": -0.0031,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
       "draw_recall": 0.0,
-      "home_goal_mae": -0.0022,
-      "away_goal_mae": -0.0026,
+      "home_goal_mae": 0.0,
+      "away_goal_mae": 0.0,
       "test_rows": 0.0
     },
     "stacking_meta_1x2": {
-      "accuracy": -0.0059,
-      "top2_accuracy": -0.0004,
-      "log_loss": -0.0031,
-      "draw_recall": -0.013,
+      "accuracy": 0.0,
+      "top2_accuracy": 0.0,
+      "log_loss": 0.0,
+      "draw_recall": 0.0,
       "test_rows": 0.0
     }
   },
@@ -3195,58 +3195,58 @@ Esta seção preserva no relatório canônico o resumo que antes ficava em `mode
       "temperature": 0.8216
     }
   },
-  "monte_carlo_runs": 1000,
-  "sample_champion_seed_2026": "Netherlands",
+  "monte_carlo_runs": 10000,
+  "sample_champion_seed_2026": "Ecuador",
   "top_10_champion_odds": [
     {
-      "team": "Spain",
-      "wins": 185,
-      "champion_probability": 0.185
-    },
-    {
-      "team": "Brazil",
-      "wins": 128,
-      "champion_probability": 0.128
-    },
-    {
       "team": "Germany",
-      "wins": 117,
-      "champion_probability": 0.117
+      "wins": 3666,
+      "champion_probability": 0.3666
     },
     {
-      "team": "Mexico",
-      "wins": 112,
-      "champion_probability": 0.112
-    },
-    {
-      "team": "Czechia",
-      "wins": 96,
-      "champion_probability": 0.096
-    },
-    {
-      "team": "Netherlands",
-      "wins": 73,
-      "champion_probability": 0.073
-    },
-    {
-      "team": "Korea Republic",
-      "wins": 67,
-      "champion_probability": 0.067
-    },
-    {
-      "team": "Uruguay",
-      "wins": 36,
-      "champion_probability": 0.036
+      "team": "Ecuador",
+      "wins": 2620,
+      "champion_probability": 0.262
     },
     {
       "team": "France",
-      "wins": 31,
-      "champion_probability": 0.031
+      "wins": 880,
+      "champion_probability": 0.088
     },
     {
-      "team": "Switzerland",
-      "wins": 28,
-      "champion_probability": 0.028
+      "team": "Brazil",
+      "wins": 617,
+      "champion_probability": 0.0617
+    },
+    {
+      "team": "Portugal",
+      "wins": 511,
+      "champion_probability": 0.0511
+    },
+    {
+      "team": "C\u00f4te d'Ivoire",
+      "wins": 270,
+      "champion_probability": 0.027
+    },
+    {
+      "team": "Spain",
+      "wins": 188,
+      "champion_probability": 0.0188
+    },
+    {
+      "team": "Norway",
+      "wins": 167,
+      "champion_probability": 0.0167
+    },
+    {
+      "team": "Colombia",
+      "wins": 136,
+      "champion_probability": 0.0136
+    },
+    {
+      "team": "Netherlands",
+      "wins": 134,
+      "champion_probability": 0.0134
     }
   ]
 }
@@ -3302,33 +3302,33 @@ Freshness dos artefatos:
 {
   "model_package": {
     "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/models/model_sota.pkl",
-    "sha256": "82274d68fd54b3aee18dcd2db137f087a99a516a9850ab73aea105d462d11e78",
-    "size_bytes": 4565106,
-    "mtime_ns": 1779038639047286897
+    "sha256": "8fa8a4f06ff1bfc69cf12be7c2751f96bd4f7ecb1e0943cd3b977fcec51104a7",
+    "size_bytes": 5770428,
+    "mtime_ns": 1782691147510121120
   },
   "model_report": {
     "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_model_report.json",
-    "sha256": "5192ec1147f2d774e34562a79ebeca0a38d5d6d1092f9e8f13ef204c554b8196",
-    "size_bytes": 97095,
-    "mtime_ns": 1779038639050470500
+    "sha256": "199cef67c98d8ca16b18b20dbf7e2f04a8d44e64c167b798d9ee2332cc40a2bf",
+    "size_bytes": 96990,
+    "mtime_ns": 1782691147525111406
   },
   "training_matches": {
     "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv",
     "sha256": "652da5722831d8ed4ba3bddab1032e1f71d1f328db7484fb0c41929c111038b6",
     "size_bytes": 12323223,
-    "mtime_ns": 1779038639027782527
+    "mtime_ns": 1782691147427762170
   },
   "sota_pipeline": {
     "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/src/sota_pipeline.py",
-    "sha256": "c4fb0df83adfa66e28dc9f7d69aa3ca61afc71468cb3df2dc6c3edcfbc49bdc4",
-    "size_bytes": 164817,
-    "mtime_ns": 1779193516621869414
+    "sha256": "1d3a91807fc1a6a6b41ad6eba6e2b819821b9452761af224ea13950b61f0bce6",
+    "size_bytes": 205148,
+    "mtime_ns": 1782700032751289136
   },
   "stats_qa_script": {
     "path": "/Users/eventanilha/Projects/arena-ai/scripts/model_stats_qa.py",
-    "sha256": "af6617163c725190638d77e3b051828dadf1351359b1e4658b5493bb782b2d7d",
-    "size_bytes": 86641,
-    "mtime_ns": 1779194405417479773
+    "sha256": "2a64c6fd4b8c8b6ec91ed4005ba701fa79ebe61080cfd3fe5a845cd32cabca8b",
+    "size_bytes": 86764,
+    "mtime_ns": 1782691759744936574
   }
 }
 ```
@@ -3341,8 +3341,8 @@ Manifesto completo dos dados brutos:
   "csv_path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_raw_data_manifest.csv",
   "file_count": 14,
   "csv_file_count": 14,
-  "total_size_bytes": 81082917,
-  "manifest_sha256": "508a0b0651216d38d516c37dc22adc8930c9cc1a498cc6718aa912621ea64429",
+  "total_size_bytes": 81082901,
+  "manifest_sha256": "70ab1b3e3c816e37da3fff9a46c31abe5e5eb604c10300a5e6da1167cbe7e14e",
   "semantic": {
     "required_file_count": 14,
     "required_files_present": true,
@@ -3583,26 +3583,26 @@ Campeão:
 
 | team | wins | probability | lower_95 | upper_95 | margin_95 |
 | --- | --- | --- | --- | --- | --- |
-| Spain | 185 | 0.185 | 0.160933 | 0.209067 | 0.024067 |
-| Brazil | 128 | 0.128 | 0.107293 | 0.148707 | 0.020707 |
-| Germany | 117 | 0.117 | 0.097078 | 0.136922 | 0.019922 |
-| Mexico | 112 | 0.112 | 0.092453 | 0.131547 | 0.019547 |
-| Czechia | 96 | 0.096 | 0.077741 | 0.114259 | 0.018259 |
-| Netherlands | 73 | 0.073 | 0.056877 | 0.089123 | 0.016123 |
-| Korea Republic | 67 | 0.067 | 0.051503 | 0.082497 | 0.015497 |
-| Uruguay | 36 | 0.036 | 0.024454 | 0.047546 | 0.011546 |
+| Germany | 3666 | 0.3666 | 0.357155 | 0.376045 | 0.009445 |
+| Ecuador | 2620 | 0.262 | 0.253381 | 0.270619 | 0.008619 |
+| France | 880 | 0.088 | 0.082447 | 0.093553 | 0.005553 |
+| Brazil | 617 | 0.0617 | 0.056984 | 0.066416 | 0.004716 |
+| Portugal | 511 | 0.0511 | 0.046784 | 0.055416 | 0.004316 |
+| Côte d'Ivoire | 270 | 0.027 | 0.023823 | 0.030177 | 0.003177 |
+| Spain | 188 | 0.0188 | 0.016138 | 0.021462 | 0.002662 |
+| Norway | 167 | 0.0167 | 0.014188 | 0.019212 | 0.002512 |
 
 Fases:
 
 | team | stage | probability | lower_95 | upper_95 | margin_95 |
 | --- | --- | --- | --- | --- | --- |
 | Mexico | Group Stage | 1.0 | 1.0 | 1.0 | 0.0 |
-| Mexico | Round of 32 | 0.983 | 0.974988 | 0.991012 | 0.008012 |
-| Mexico | Round of 16 | 0.807 | 0.782539 | 0.831461 | 0.024461 |
-| Mexico | Quarter-finals | 0.644 | 0.614323 | 0.673677 | 0.029677 |
-| Mexico | Semi-finals | 0.21 | 0.184755 | 0.235245 | 0.025245 |
-| Mexico | Final | 0.161 | 0.13822 | 0.18378 | 0.02278 |
-| Mexico | Champion | 0.112 | 0.092453 | 0.131547 | 0.019547 |
+| Mexico | Round of 32 | 0.975 | 0.97194 | 0.97806 | 0.00306 |
+| Mexico | Round of 16 | 0.8374 | 0.830168 | 0.844632 | 0.007232 |
+| Mexico | Quarter-finals | 0.7293 | 0.720591 | 0.738009 | 0.008709 |
+| Mexico | Semi-finals | 0.0317 | 0.028266 | 0.035134 | 0.003434 |
+| Mexico | Final | 0.0267 | 0.02354 | 0.02986 | 0.00316 |
+| Mexico | Champion | 0.0131 | 0.010871 | 0.015329 | 0.002229 |
 | South Africa | Group Stage | 1.0 | 1.0 | 1.0 | 0.0 |
 
 Bootstrap por bloco temporal/torneio:
@@ -3637,7 +3637,8 @@ Estabilidade Monte Carlo offline:
   ],
   "stage_bracket_runs": [
     1000,
-    2000
+    2000,
+    5000
   ],
   "stability_gate": {
     "max_top16_abs_delta": 0.015,
@@ -3645,7 +3646,7 @@ Estabilidade Monte Carlo offline:
     "leader_change_allowed": false,
     "max_stage_top16_abs_delta": 0.035,
     "max_stage_top16_churn": 4,
-    "max_pair_top8_abs_delta": 0.02,
+    "max_pair_top8_nested_z": 4.0,
     "max_pair_top8_churn": 16
   },
   "final_comparison": {
@@ -3655,150 +3656,195 @@ Estabilidade Monte Carlo offline:
     "comparison": "union_top16_abs_delta",
     "union_team_count": 17,
     "entered_top16": [
-      "Japan"
+      "England"
     ],
     "exited_top16": [
-      "Belgium"
+      "T\u00fcrkiye"
     ],
     "top16_churn_count": 2,
-    "max_top16_abs_delta": 0.0106,
-    "mean_top16_abs_delta": 0.003688
+    "max_top16_abs_delta": 0.0048,
+    "mean_top16_abs_delta": 0.001365
   },
   "stage_bracket_final_comparison": {
     "baseline": false,
-    "previous_runs": 1000,
+    "previous_runs": 2000,
     "stage_top16": {
       "Round of 32": {
         "entered": [],
         "exited": [],
         "churn_count": 0,
-        "max_abs_delta": 0.007,
-        "mean_abs_delta": 0.002281
+        "max_abs_delta": 0.0066,
+        "mean_abs_delta": 0.00245,
+        "max_nested_z": 2.835353,
+        "max_nested_z_name": "England"
       },
       "Round of 16": {
         "entered": [],
         "exited": [],
         "churn_count": 0,
-        "max_abs_delta": 0.013,
-        "mean_abs_delta": 0.005
+        "max_abs_delta": 0.0158,
+        "mean_abs_delta": 0.004431,
+        "max_nested_z": 2.506155,
+        "max_nested_z_name": "Colombia"
       },
       "Quarterfinals": {
-        "entered": [
-          "Germany"
-        ],
-        "exited": [
-          "France"
-        ],
-        "churn_count": 2,
-        "max_abs_delta": 0.026,
-        "mean_abs_delta": 0.008912
+        "entered": [],
+        "exited": [],
+        "churn_count": 0,
+        "max_abs_delta": 0.0195,
+        "mean_abs_delta": 0.007288,
+        "max_nested_z": 2.501999,
+        "max_nested_z_name": "Mexico"
       },
       "Semifinals": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.016,
-        "mean_abs_delta": 0.007062
+        "entered": [
+          "T\u00fcrkiye"
+        ],
+        "exited": [
+          "Croatia"
+        ],
+        "churn_count": 2,
+        "max_abs_delta": 0.0164,
+        "mean_abs_delta": 0.005076,
+        "max_nested_z": 2.254703,
+        "max_nested_z_name": "Spain"
       },
       "Final": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.0185,
-        "mean_abs_delta": 0.005875
+        "entered": [
+          "Japan"
+        ],
+        "exited": [
+          "Czechia"
+        ],
+        "churn_count": 2,
+        "max_abs_delta": 0.0098,
+        "mean_abs_delta": 0.003453,
+        "max_nested_z": 2.227431,
+        "max_nested_z_name": "Japan"
       }
     },
     "pair_top8": {
       "Round of 32": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.0115,
-        "mean_abs_delta": 0.00575
+        "entered": [
+          "Brazil | Japan"
+        ],
+        "exited": [
+          "Brazil | Tunisia"
+        ],
+        "churn_count": 2,
+        "max_abs_delta": 0.0101,
+        "mean_abs_delta": 0.006456,
+        "max_nested_z": 1.313856,
+        "max_nested_z_name": "Bosnia and Herzegovina | T\u00fcrkiye"
       },
       "Round of 16": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.0095,
-        "mean_abs_delta": 0.003187
+        "entered": [
+          "Portugal | Spain"
+        ],
+        "exited": [
+          "Portugal | Switzerland"
+        ],
+        "churn_count": 2,
+        "max_abs_delta": 0.0202,
+        "mean_abs_delta": 0.008422,
+        "max_nested_z": 2.608373,
+        "max_nested_z_name": "Portugal | Spain"
       },
       "Quarterfinals": {
         "entered": [],
         "exited": [],
         "churn_count": 0,
-        "max_abs_delta": 0.0125,
-        "mean_abs_delta": 0.006563
+        "max_abs_delta": 0.0134,
+        "mean_abs_delta": 0.005087,
+        "max_nested_z": 1.818258,
+        "max_nested_z_name": "Portugal | T\u00fcrkiye"
       },
       "Semifinals": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
-        "max_abs_delta": 0.0095,
-        "mean_abs_delta": 0.004562
+        "entered": [
+          "Brazil | Jordan",
+          "France | Portugal"
+        ],
+        "exited": [
+          "Brazil | Spain",
+          "Germany | Spain"
+        ],
+        "churn_count": 4,
+        "max_abs_delta": 0.0092,
+        "mean_abs_delta": 0.00451,
+        "max_nested_z": 1.978754,
+        "max_nested_z_name": "Germany | Spain"
       },
       "Final": {
         "entered": [],
         "exited": [],
         "churn_count": 0,
-        "max_abs_delta": 0.007,
-        "mean_abs_delta": 0.0035
+        "max_abs_delta": 0.0072,
+        "mean_abs_delta": 0.0033,
+        "max_nested_z": 1.703996,
+        "max_nested_z_name": "Argentina | Germany"
       }
     },
     "finalist_top16": {
-      "entered": [],
-      "exited": [],
-      "churn_count": 0,
-      "max_abs_delta": 0.0185,
-      "mean_abs_delta": 0.005875
+      "entered": [
+        "Japan"
+      ],
+      "exited": [
+        "Czechia"
+      ],
+      "churn_count": 2,
+      "max_abs_delta": 0.0164,
+      "mean_abs_delta": 0.005012,
+      "max_nested_z": 1.870471,
+      "max_nested_z_name": "Spain"
     },
-    "max_stage_top16_abs_delta": 0.026,
+    "max_stage_top16_abs_delta": 0.0195,
     "max_stage_top16_churn": 2,
-    "max_pair_top8_abs_delta": 0.0125,
-    "max_pair_top8_churn": 0,
-    "max_finalist_top16_abs_delta": 0.0185,
-    "max_finalist_top16_churn": 0
+    "max_pair_top8_abs_delta": 0.0202,
+    "max_pair_top8_churn": 4,
+    "max_pair_top8_nested_z": 2.608373,
+    "max_finalist_top16_abs_delta": 0.0164,
+    "max_finalist_top16_churn": 2
   },
   "summary": {
     "max_runs": 10000,
     "min_runs": 5000,
-    "max_stage_bracket_runs": 2000,
+    "max_stage_bracket_runs": 5000,
     "min_stage_bracket_runs": 1000,
-    "leader_at_max_runs": "Spain",
-    "leader_probability_at_max_runs": 0.16,
+    "leader_at_max_runs": "Germany",
+    "leader_probability_at_max_runs": 0.3697,
     "csv_path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_monte_carlo_stability.csv",
     "stage_bracket_csv_path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_monte_carlo_stage_bracket_stability.csv"
   },
   "source_fingerprints": {
     "model_package": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/models/model_sota.pkl",
-      "sha256": "82274d68fd54b3aee18dcd2db137f087a99a516a9850ab73aea105d462d11e78",
-      "size_bytes": 4565106,
-      "mtime_ns": 1779038639047286897
+      "sha256": "8fa8a4f06ff1bfc69cf12be7c2751f96bd4f7ecb1e0943cd3b977fcec51104a7",
+      "size_bytes": 5770428,
+      "mtime_ns": 1782691147510121120
     },
     "model_report": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/sota_model_report.json",
-      "sha256": "5192ec1147f2d774e34562a79ebeca0a38d5d6d1092f9e8f13ef204c554b8196",
-      "size_bytes": 97095,
-      "mtime_ns": 1779038639050470500
+      "sha256": "199cef67c98d8ca16b18b20dbf7e2f04a8d44e64c167b798d9ee2332cc40a2bf",
+      "size_bytes": 96990,
+      "mtime_ns": 1782691147525111406
     },
     "training_matches": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv",
       "sha256": "652da5722831d8ed4ba3bddab1032e1f71d1f328db7484fb0c41929c111038b6",
       "size_bytes": 12323223,
-      "mtime_ns": 1779038639027782527
+      "mtime_ns": 1782691147427762170
     },
     "sota_pipeline": {
       "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/src/sota_pipeline.py",
-      "sha256": "c4fb0df83adfa66e28dc9f7d69aa3ca61afc71468cb3df2dc6c3edcfbc49bdc4",
-      "size_bytes": 164817,
-      "mtime_ns": 1779193516621869414
+      "sha256": "1d3a91807fc1a6a6b41ad6eba6e2b819821b9452761af224ea13950b61f0bce6",
+      "size_bytes": 205148,
+      "mtime_ns": 1782700032751289136
     },
     "mc_stability_script": {
       "path": "/Users/eventanilha/Projects/arena-ai/scripts/monte_carlo_stability.py",
-      "sha256": "0bdafd05b719f21403a6ae5dbb244301596a827511f51f8f86e61e51f0563f5f",
-      "size_bytes": 28065,
-      "mtime_ns": 1779068608864827481
+      "sha256": "d20e93617818c863c3ac22a4bc60d53ab2636e6ae2ac7854f40d1ed3fbfcf525",
+      "size_bytes": 29605,
+      "mtime_ns": 1782691759529097682
     }
   }
 }

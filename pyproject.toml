@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 arena-ai = "arena_ai.main:main"
+arena-bolao = "arena_ai.bolao:main"
 
 [tool.uv]
 package = true
