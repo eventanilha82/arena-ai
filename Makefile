@@ -1,4 +1,4 @@
-.PHONY: help sync run console bolao bolao-grupos bolao-qa bolao-mc-stability smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
+.PHONY: help sync run console bolao bolao-grupos bolao-qa bolao-mc-stability bolao-top10-audit smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
 
 APP_NAME := ArenaAI
 PYTHON ?= .venv/bin/python
@@ -45,6 +45,7 @@ help:
 	@printf "make bolao-grupos  lista placares e classificacao fixa dos grupos\n"
 	@printf "make bolao-qa      valida CSV, grupos e Monte Carlo curto sem interacao\n"
 	@printf "make bolao-mc-stability audita grupos fixos + forma + mata-mata em 1k/2k e seeds independentes\n"
+	@printf "make bolao-top10-audit audita os favoritos por simetria, forma e pênaltis neutros\n"
 	@printf "make smoke         compila, importa modelo e roda 1 predicao\n"
 	@printf "make validate      roda gate essencial de assets/UI/audio-smoke/modelo\n"
 	@printf "make stats-qa      gera auditoria estatistica: calibracao, IC, ablation, empate e Dixon-Coles\n"
@@ -93,6 +94,11 @@ bolao-mc-stability:
 	$(PYTHON) -m compileall -q src/arena_ai/bolao.py scripts/bolao_mc_stability.py
 	@printf "[make] bolao Monte Carlo stability $(BOLAO_MC_RUNS)\n"
 	$(PYTHON) scripts/bolao_mc_stability.py --runs $(BOLAO_MC_RUNS) --seed $(BOLAO_MC_SEED) --independent-seeds $(BOLAO_MC_INDEPENDENT_SEEDS)
+
+bolao-top10-audit:
+	@printf "[make] top-10 bias audit\n"
+	$(PYTHON) -m compileall -q src/arena_ai/bolao.py modeling/worldcup_2026_ml/src/sota_pipeline.py scripts/bolao_top10_bias_audit.py
+	$(PYTHON) scripts/bolao_top10_bias_audit.py --runs 2000 --seed 20260629 --top 10
 
 smoke:
 	@printf "[make] compile smoke\n"

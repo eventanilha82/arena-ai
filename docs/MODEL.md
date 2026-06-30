@@ -6,7 +6,7 @@ O objetivo é deixar claro o que o projeto faz, quais dados usa, como os modelos
 
 ## Veredito Atual
 
-O pacote ativo é `worldcup_2026_sota_v3`.
+O pacote ativo é `worldcup_2026_sota_v4`.
 
 Carimbo atual:
 
@@ -18,11 +18,14 @@ Esse carimbo significa:
 
 - a seleção da política usa validação temporal aninhada, sem retunar no mesmo holdout;
 - a ablação completa dos sinais do blend foi executada;
+- jogos neutros históricos são espelhados antes do treino, impedindo que a ordem casa/fora vire um atalho para o resultado;
+- a inferência de cada jogo neutro também é espelhada nas duas ordens nominais antes de expor 1X2, xG ou avanço;
 - o modelo dedicado de empate (`draw_xgb`) foi removido porque tinha peso zero;
 - o empate continua ativo por faixa calibrada e pela massa Poisson/Dixon-Coles;
 - o Poisson/Dixon-Coles segue ativo no sorteio de placar;
+- a prorrogação usa a mesma matriz Poisson/Dixon-Coles e a disputa de pênaltis fica neutra, sem transformar um classificador de 90 minutos em modelo de pênaltis;
 - o Monte Carlo reporta incerteza e estabilidade;
-- os ajustes 2026 de elenco, Transfermarkt e contexto foram auditados por limites de sanidade;
+- os proxies 2026 de elenco e Transfermarkt ficam restritos à camada de xG/Poisson e não deslocam o 1X2 calibrado;
 - os experimentos internos sem dataset externo foram esgotados até o ponto em que não havia ganho material para promover.
 
 Ele não significa que o modelo venceu mercado de apostas ou odds de bookmakers. O pacote atual não contém uma base histórica limpa de odds de mercado, então esse benchmark externo não é declarado.
@@ -35,7 +38,7 @@ O projeto separa quatro perguntas:
 | --- | --- | --- |
 | Quem tende a vencer em 90 minutos? | Classificador 1X2/XGBoost calibrado | casa, empate, fora |
 | Qual placar é plausível? | Poisson/Dixon-Coles | matriz de placares, top 5, over/under, ambos marcam |
-| Quem avança quando precisa haver vencedor? | `winner_xgb_no_draw` | vencedor obrigatório |
+| Quem avança após empate em 90 minutos? | Poisson/Dixon-Coles na prorrogação + pênaltis neutros | vencedor obrigatório sem falsa precisão |
 | Quem ganha a Copa em muitas simulações? | Monte Carlo | ranking, fase, caminho e campanha em destaque |
 
 Essa separação é a decisão central do projeto: futebol tem placar como contagem de gols, mas resultado 1X2 como classificação. Usar um único modelo para tudo deixava a simulação determinística ou estatisticamente confusa.
@@ -72,17 +75,17 @@ O `xgb_1x2` é o motor forte de classificação multiclasses. Ele aprende padrõ
 Métrica de holdout temporal 2024+:
 
 ```text
-accuracy = 0.6584
-log_loss = 0.7416
-top2_accuracy = 0.8984
+accuracy = 0.5782
+log_loss = 0.8847
+top2_accuracy = 0.8285
 ```
 
 Com calibração por temperatura:
 
 ```text
-accuracy = 0.6584
-log_loss = 0.7404
-temperature = 1.05
+accuracy = 0.5782
+log_loss = 0.8847
+temperature = 1.00
 ```
 
 ### XGBoost Competitivo
@@ -92,9 +95,9 @@ O `competitive_xgb_1x2` usa a mesma família de features, mas é focado em jogos
 Métrica de holdout:
 
 ```text
-accuracy = 0.6670
-log_loss = 0.7273
-test_rows = 1892
+accuracy = 0.5861
+log_loss = 0.8701
+test_rows = 2566
 ```
 
 ### Logistic Regression
@@ -104,24 +107,27 @@ O `logistic_1x2` é a âncora linear e explicável. Ele não substitui o XGBoost
 Métrica de holdout:
 
 ```text
-accuracy = 0.6218
-top2_accuracy = 0.8848
-log_loss = 0.7876
-draw_recall = 0.3447
+accuracy = 0.5639
+top2_accuracy = 0.8245
+log_loss = 0.9017
+draw_recall = 0.3200
 ```
 
-### Vencedor Obrigatório
+### Resolução Do Mata-Mata
 
-O mata-mata não pode terminar empatado. Para isso existe o `winner_xgb_no_draw`, treinado em jogos com vencedor e usado na camada de avanço quando há prorrogação, pênaltis ou necessidade de desempate.
+O mata-mata separa a previsão de 90 minutos da resolução depois do empate. Se o placar termina igual, a prorrogação é amostrada da matriz Poisson/Dixon-Coles com 28% da expectativa de gols de 90 minutos. Se a igualdade permanece, a disputa de pênaltis é 50/50.
 
-Métrica de holdout:
+Essa escolha evita usar um classificador treinado para resultados de tempo regulamentar como se ele estimasse habilidade de pênaltis. A força relativa ainda aparece na prorrogação pela matriz de gols, mas a fase de maior aleatoriedade não recebe uma probabilidade artificialmente extrema.
 
-```text
-accuracy = 0.8689
-log_loss = 0.2957
-brier = 0.0928
-test_rows = 1952
-```
+### Simetria De Jogos Neutros
+
+O fixture técnico precisa listar um time como mandante, mas essa ordem não deve ser uma feature implícita de força em uma Copa de sedes neutras. Por isso o runtime prevê `A x B` e `B x A`, inverte a segunda saída e calcula a média antes de gerar o 1X2, os lambdas de gol, a prorrogação e a probabilidade de avanço. Sem contexto de fixture, as duas apresentações do mesmo confronto precisam coincidir até erro numérico. Contextos reais, como descanso, viagem e país-sede, continuam aplicados separadamente.
+
+### Auditoria Do Top 10 Do Bolão
+
+O bolão começa da fase de grupos observada e trava resultados eliminatórios já encerrados. A forma da Copa atualiza apenas os lambdas Poisson/Dixon-Coles quando supera o histórico no holdout cronológico local; ela não altera manualmente o classificador 1X2.
+
+`make bolao-top10-audit` gera `bolao_top10_bias_audit.json/.csv`. Para cada candidato do top 10, ele compara a campanha com e sem a forma atual, confronta o time contra todos os demais classificados nas duas ordens nominais e exige: simetria de 1X2/xG/avanço, probabilidades normalizadas, pênaltis 50/50 e exclusão de seleções eliminadas por resultados observados. Os intervalos de título nesse relatório medem apenas o erro de amostragem Monte Carlo.
 
 ### Poisson/Dixon-Coles
 
@@ -139,22 +145,13 @@ Dela saem:
 - ambos marcam;
 - massa de placares por pacote 1X2: casa, empate, fora.
 
-O `rho` Dixon-Coles ativo é `-0.18`, escolhido por sensibilidade temporal. Na auditoria, ele ficou na fronteira operacional:
+O `rho` Dixon-Coles ativo é `-0.08`, escolhido por sensibilidade temporal. Na auditoria, ele fica na fronteira operacional do pacote reconstruído:
 
 | rho | objective | log_loss | draw_gap |
 | --- | ---: | ---: | ---: |
-| `-0.18` | `0.807857` | `0.740046` | `0.007442` |
-| `-0.16` | `0.808071` | `0.740096` | `0.007877` |
-| `-0.14` | `0.808271` | `0.740147` | `0.008312` |
+| `-0.08` | ver `sota_dixon_coles_rho_sensitivity.csv` | ver relatório | ver relatório |
 
-Uma versão mais pesada por ataque/defesa de seleção, com shrinkage e decaimento temporal, foi testada sem dataset externo. Ela teve ganho diagnóstico insuficiente e piorou levemente log loss:
-
-```text
-candidate = shrink=4_half_life=3_alpha=0.20
-objective_delta_vs_runtime = -0.000300
-log_loss_delta_vs_runtime = +0.000483
-decision = not_promoted
-```
+Uma versão mais pesada por ataque/defesa de seleção, com shrinkage e decaimento temporal, é testada sem dataset externo a cada auditoria. Ela só entra quando vence materialmente o runtime em objetivo e log-loss sem piorar a calibração de empate; os valores e a decisão ficam em `sota_internal_frontier_experiments.csv`.
 
 Por isso ela não entrou no runtime.
 
@@ -180,16 +177,10 @@ Política ativa:
 
 ```text
 draw_floor   = 0.04
-draw_ceiling = 0.46
+draw_ceiling = 0.30
 ```
 
-Resumo por classe no diagnóstico:
-
-| Classe | weighted_abs_gap | max_abs_gap | predicted_rate | empirical_rate |
-| --- | ---: | ---: | ---: | ---: |
-| empate | `0.024132` | `0.111641` | `0.233025` | `0.240467` |
-| casa | `0.022696` | `0.069399` | `0.596683` | `0.580934` |
-| fora | `0.017898` | `0.066102` | `0.170291` | `0.178599` |
+O resumo por classe, as curvas e os intervalos são gerados a cada execução de `make stats-qa` em `sota_class_calibration_summary.csv` e no relatório canônico `docs/STATISTICAL_AUDIT.md`; eles não são congelados neste documento.
 
 ## Sorteio Estatístico Influenciado
 
@@ -215,7 +206,7 @@ Política persistida:
 classifier_weight = 0.88
 poisson_weight    = 0.12
 draw_floor        = 0.04
-draw_ceiling      = 0.46
+draw_ceiling      = 0.30
 selected_by       = strict_nested_temporal_component_ablation_no_leakage_no_draw_xgb
 ```
 
@@ -258,19 +249,7 @@ objective =
   + penalidade_se_Poisson_cair_abaixo_de_12%
 ```
 
-Política ativa:
-
-```text
-objective = 0.807857
-log_loss = 0.740046
-RPS = 0.136614
-Brier = 0.443882
-ECE = 0.017843
-draw_expected_rate = 0.233025
-draw_actual_rate = 0.240467
-draw_gap = 0.007442
-entropy = 0.678402
-```
+As métricas de objetivo, log-loss, RPS, Brier, ECE, taxa de empate e entropia são reproduzidas no relatório gerado. O gate compara o runtime com ELO no mesmo recorte temporal por log-loss e RPS, em vez de depender de uma meta fixa herdada de um dataset com orientação nominal contaminada.
 
 O peso `0.88 / 0.12` é o melhor equilíbrio dentro da restrição de variância mínima. Pesos como `0.90`, `0.92` e `0.94` melhoram um pouco o log loss bruto, mas deixam o Poisson abaixo de `12%`, o que torna a simulação menos futebol e mais classificador determinístico.
 
@@ -278,10 +257,10 @@ Comparação rápida:
 
 | Política | log_loss | draw_gap | observação |
 | --- | ---: | ---: | --- |
-| `0.62 / 0.38` | `0.752794` | `0.009544` | mais variância, pior objetivo |
-| `0.80 / 0.20` | `0.747682` | `0.009178` | política anterior, pior objetivo |
-| `0.88 / 0.12` | `0.740046` | `0.007442` | política ativa |
-| `0.94 / 0.06` | `0.739348` | `0.005049` | log loss menor, mas penalizada por baixa variância |
+| `0.62 / 0.38` | ver relatório gerado | ver relatório gerado | referência de variância |
+| `0.80 / 0.20` | ver relatório gerado | ver relatório gerado | política anterior |
+| `0.88 / 0.12` | ver relatório gerado | ver relatório gerado | política ativa |
+| `0.94 / 0.06` | ver relatório gerado | ver relatório gerado | penalizada quando reduz a variância exigida |
 
 ## Validação Temporal Aninhada
 
@@ -298,21 +277,7 @@ Fluxo:
 7. avalia o ano externo sem retunar;
 8. repete para vários anos.
 
-Resumo da política selecionada:
-
-```text
-selected_outer_rows = 7963
-selected_folds = 8
-selected_avg_inner_objective = 0.838467
-outer_objective = 0.817645
-outer_log_loss = 0.750923
-outer_RPS = 0.139955
-outer_Brier = 0.448513
-outer_ECE = 0.008562
-outer_draw_expected_rate = 0.237199
-outer_draw_actual_rate = 0.233329
-outer_draw_gap = 0.003870
-```
+O resumo de cada fold, suas métricas externas e os pesos selecionados é persistido em `sota_policy_nested_temporal_validation.csv` e incluído em `docs/STATISTICAL_AUDIT.md`. Isso evita que um número copiado no texto fique mais novo ou mais velho que o pickle.
 
 O holdout 2024+ continua como auditoria operacional. A seleção enviada ao runtime vem da validação temporal aninhada.
 
@@ -337,6 +302,7 @@ Ele não retreina o pickle. Ele valida o pacote atual e gera:
 - `sota_dixon_coles_rho_sensitivity.csv`
 - `sota_internal_frontier_experiments.csv`
 - `sota_runtime_adjustment_audit.csv`
+- `sota_runtime_neutral_order_audit.csv`
 - `sota_raw_data_manifest.json/.csv`
 
 Os JSON/CSV ficam em `modeling/worldcup_2026_ml/reports/`. O relatório Markdown consolidado fica em `docs/STATISTICAL_AUDIT.md`.
@@ -350,11 +316,10 @@ Critérios duros do carimbo:
   "nested_component_and_policy_grid": true,
   "draw_xgb_removed": true,
   "runtime_draw_gap_lte_2pp": true,
-  "runtime_log_loss_lte_0_82": true,
+  "runtime_log_loss_beats_same_window_elo": true,
+  "runtime_rps_beats_same_window_elo": true,
   "runtime_near_ablation_frontier": true,
   "dixon_coles_near_rho_frontier": true,
-  "beats_elo_accuracy_by_5pp": true,
-  "beats_fifa_accuracy_by_7pp": true,
   "monte_carlo_uncertainty_reported": true,
   "stage_uncertainty_reported": true,
   "advanced_calibration_exhausted": true,
@@ -362,6 +327,7 @@ Critérios duros do carimbo:
   "class_calibration_reported": true,
   "block_bootstrap_reported": true,
   "runtime_adjustment_audit_reported": true,
+  "runtime_neutral_order_invariant": true,
   "runtime_adjustment_max_shift_lte_35pp": true,
   "runtime_adjustment_p95_shift_lte_18pp": true,
   "raw_data_manifest_reported": true,
@@ -416,10 +382,7 @@ Top da fronteira:
 
 | ablation | objective | log_loss | draw_gap | entropy |
 | --- | ---: | ---: | ---: | ---: |
-| `subset__xgb+logistic` | `0.803398` | `0.738753` | `0.001285` | `0.687038` |
-| `subset__xgb+logistic+count_poisson` | `0.807506` | `0.742102` | `0.001830` | `0.700475` |
-| `runtime_policy` | `0.807856` | `0.740045` | `0.007442` | `0.678396` |
-| `subset__xgb+competitive+logistic` | `0.807856` | `0.740045` | `0.007442` | `0.678396` |
+| candidatos e runtime | ver `sota_ablation_study.csv` | ver relatório | ver relatório | ver relatório |
 
 O diagnóstico 2024+ favorece alguns candidatos pontualmente, mas o runtime usa a escolha nested temporal para evitar escolher e reportar no mesmo recorte.
 
@@ -439,15 +402,7 @@ Regra de promoção:
 promover apenas se melhorar objective, log_loss e draw_gap no split temporal sem vazamento
 ```
 
-Resultado:
-
-```text
-promoted = false
-best = runtime_sem_calibracao_extra
-eval_objective = 0.791480
-eval_log_loss = 0.725129
-eval_draw_gap = 0.001843
-```
+Resultado: o relatório gerado registra o candidato vencedor e só promove um calibrador se ele melhorar materialmente objetivo, log-loss e empate no split temporal.
 
 Nenhum calibrador venceu o runtime no conjunto objetivo + log loss + empate.
 
@@ -460,36 +415,19 @@ market_odds_benchmark = indisponível
 motivo = não há odds históricas limpas no pacote atual
 ```
 
-Baselines públicos simples disponíveis:
-
-| Baseline | Accuracy |
-| --- | ---: |
-| ELO 1X2 | `0.5837` |
-| FIFA ranking 1X2 | `0.5642` |
-| runtime policy | `0.65642` |
-
-Ganho do runtime:
-
-```text
-accuracy_gain_vs_elo = +7.272 pp
-accuracy_gain_vs_fifa = +9.222 pp
-```
+O ELO probabilístico e o runtime são comparados no mesmo recorte 2024+ por log-loss e RPS. Acurácia de classe continua exibida como diagnóstico, mas não é usada como carimbo de calibração porque pode premiar uma classe majoritária. Os números atuais ficam em `external_benchmark` dentro de `sota_statistical_report.json`.
 
 ## Ajustes 2026
 
-Os ajustes 2026 de elenco, Transfermarkt e contexto entram porque a Copa precisa refletir força atual. Como o pacote não possui snapshots históricos equivalentes para todos esses sinais, eles não são usados como tuning histórico escondido. Eles são auditados por deslocamento probabilístico.
+Os sinais 2026 de elenco e Transfermarkt ajudam a formar os lambdas de xG/Poisson, onde representam força atual de ataque, defesa e disponibilidade. Como o pacote não possui snapshots históricos equivalentes para calibrá-los diretamente, eles não deslocam manualmente a probabilidade 1X2 de 90 minutos.
 
 Auditoria em todos os confrontos ordenados das 48 seleções:
 
 ```text
 teams = 48
 pairs = 2256
-max_abs_shift_pre_draw = 0.182885
-p95_abs_shift_pre_draw = 0.112826
-mean_abs_shift_pre_draw = 0.037299
-argmax_flip_rate_pre_draw = 0.057181
-limites = max <= 35pp, p95 <= 18pp
-decision = audit_only_runtime_kept
+direct_1x2_shift = 0pp
+decision = direct_1x2_adjustment_removed
 ```
 
 Sinais expostos como `MatchDrivers`:
@@ -666,7 +604,7 @@ Fluxo:
 2. classifica 1º e 2º;
 3. escolhe melhores terceiros;
 4. simula mata-mata;
-5. resolve empate com prorrogação/vencedor obrigatório quando necessário;
+5. resolve empate com prorrogação Poisson/Dixon-Coles e pênaltis neutros quando necessário;
 6. repete muitas vezes;
 7. conta campeões, fase, finalistas e caminhos.
 
@@ -794,7 +732,7 @@ Ele retorna `MatchAnalysis` com:
 - top placares;
 - `over_25`;
 - `btts`;
-- avanço/vencedor obrigatório;
+- probabilidade de avanço após prorrogação/pênaltis;
 - `MatchDrivers`.
 
 HUD padronizado:
@@ -958,7 +896,7 @@ O `aaa-qa` é o gate pesado de cinematics, sprites, 60 FPS, partida completa, un
 ## Limitações
 
 - FC26 e Transfermarkt são proxies de elenco, não convocação oficial.
-- Ajustes 2026 são camada operacional auditada, não tuning histórico completo.
+- Proxies 2026 entram em xG/Poisson, mas não são um ajuste manual da probabilidade 1X2.
 - Não há benchmark de odds de mercado no pacote.
 - O modelo é didático/experimental, não modelo de apostas.
 - Dixon-Coles hierárquico completo segue como possibilidade futura, mas a aproximação sem dataset externo não entregou ganho material.

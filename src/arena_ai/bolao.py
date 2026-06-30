@@ -5,7 +5,7 @@ import hashlib
 import json
 import random
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from math import log, sqrt
 from pathlib import Path
@@ -25,6 +25,7 @@ from arena_ai.worldcup_model import SOTA_ROOT, WorldCupModel, sota
 GROUPS = tuple("ABCDEFGHIJKL")
 OBSERVED_GROUP_RESULTS_PATH = SOTA_ROOT / "data" / "observed" / "worldcup_2026_group_stage_results.csv"
 OBSERVED_SNAPSHOT_METADATA_PATH = SOTA_ROOT / "data" / "observed" / "worldcup_2026_group_stage_snapshot.json"
+OBSERVED_KNOCKOUT_RESULTS_PATH = SOTA_ROOT / "data" / "observed" / "worldcup_2026_knockout_results.csv"
 OBSERVED_SNAPSHOT_SCHEMA_VERSION = 1
 OBSERVED_SNAPSHOT_KIND = "manual_local"
 OBSERVED_GROUP_MATCH_MINIMUM_DURATION = pd.Timedelta(hours=2)
@@ -124,6 +125,7 @@ class GroupStageBoard:
     policy: dict[str, object]
     form: TournamentForm
     snapshot: ObservedSnapshotMetadata
+    knockout_results: dict[int, ObservedKnockoutResult]
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,31 @@ class ObservedResult:
     home_goals: int
     away_goals: int
     source: str
+
+
+@dataclass(frozen=True)
+class ObservedKnockoutResult:
+    match_number: int
+    round_name: str
+    home: str
+    away: str
+    home_goals_90: int
+    away_goals_90: int
+    extra_time_home_goals: int
+    extra_time_away_goals: int
+    winner: str
+    resolution: str
+    shootout_home: int | None
+    shootout_away: int | None
+    source: str
+
+    @property
+    def home_goals(self) -> int:
+        return self.home_goals_90 + self.extra_time_home_goals
+
+    @property
+    def away_goals(self) -> int:
+        return self.away_goals_90 + self.extra_time_away_goals
 
 
 @dataclass(frozen=True)
@@ -438,6 +465,150 @@ def parse_observed_goal(value: object, match_number: int) -> int:
     if numeric < 0 or not numeric.is_integer():
         raise ValueError(f"Placar inválido no jogo {match_number}")
     return int(numeric)
+
+
+def parse_optional_observed_goal(value: object, match_number: int, field: str) -> int | None:
+    if pd.isna(value) or str(value).strip() == "":
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{field} inválido no jogo {match_number}") from error
+    if numeric < 0 or not numeric.is_integer():
+        raise ValueError(f"{field} inválido no jogo {match_number}")
+    return int(numeric)
+
+
+def load_observed_knockout_results(
+    model: WorldCupModel,
+    board: GroupStageBoard,
+) -> dict[int, ObservedKnockoutResult]:
+    """Load only completed knockout matches and require their real bracket inputs."""
+    if not OBSERVED_KNOCKOUT_RESULTS_PATH.is_file():
+        return {}
+    try:
+        frame = pd.read_csv(OBSERVED_KNOCKOUT_RESULTS_PATH)
+    except pd.errors.EmptyDataError as error:
+        raise ValueError("CSV de resultados do mata-mata está vazio") from error
+    required_columns = {
+        "match_number",
+        "round",
+        "home_team",
+        "away_team",
+        "home_goals_90",
+        "away_goals_90",
+        "extra_time_home_goals",
+        "extra_time_away_goals",
+        "winner",
+        "resolution",
+        "shootout_home",
+        "shootout_away",
+        "source",
+    }
+    missing_columns = sorted(required_columns.difference(frame.columns))
+    if missing_columns:
+        raise ValueError(f"CSV de resultados do mata-mata sem colunas obrigatórias: {', '.join(missing_columns)}")
+
+    fixtures = model.fixtures[model.fixtures["stage_id"] > sota.GROUP_STAGE_ID].sort_values("match_number")
+    fixture_by_number = {int(row.match_number): row for row in fixtures.itertuples(index=False)}
+    loaded: dict[int, ObservedKnockoutResult] = {}
+    for row in frame.itertuples(index=False):
+        match_number = int(row.match_number)
+        if match_number in loaded:
+            raise ValueError(f"CSV de resultados do mata-mata contém jogo duplicado: {match_number}")
+        fixture = fixture_by_number.get(match_number)
+        if fixture is None:
+            raise ValueError(f"CSV de resultados do mata-mata referencia jogo inexistente: {match_number}")
+        round_name = str(row.round).strip()
+        if round_name != str(fixture.stage):
+            raise ValueError(f"CSV do mata-mata informa fase incorreta no jogo {match_number}: {round_name}")
+        home = sota.canonical_team(str(row.home_team))
+        away = sota.canonical_team(str(row.away_team))
+        winner = sota.canonical_team(str(row.winner))
+        if not home or not away or home == away or winner not in {home, away}:
+            raise ValueError(f"CSV do mata-mata contém equipes inválidas no jogo {match_number}")
+        resolution = str(row.resolution).strip()
+        if resolution not in {"90min", "extra_time", "penalties"}:
+            raise ValueError(f"CSV do mata-mata contém resolução inválida no jogo {match_number}")
+        source = str(row.source).strip()
+        if not source or source.lower() == "nan":
+            raise ValueError(f"CSV do mata-mata sem proveniência no jogo {match_number}")
+        home_goals_90 = parse_observed_goal(row.home_goals_90, match_number)
+        away_goals_90 = parse_observed_goal(row.away_goals_90, match_number)
+        extra_time_home_goals = parse_observed_goal(row.extra_time_home_goals, match_number)
+        extra_time_away_goals = parse_observed_goal(row.extra_time_away_goals, match_number)
+        shootout_home = parse_optional_observed_goal(row.shootout_home, match_number, "shootout_home")
+        shootout_away = parse_optional_observed_goal(row.shootout_away, match_number, "shootout_away")
+        full_home_goals = home_goals_90 + extra_time_home_goals
+        full_away_goals = away_goals_90 + extra_time_away_goals
+        if resolution == "90min":
+            if home_goals_90 == away_goals_90 or extra_time_home_goals or extra_time_away_goals:
+                raise ValueError(f"resultado em 90min inválido no jogo {match_number}")
+            if shootout_home is not None or shootout_away is not None:
+                raise ValueError(f"resultado em 90min não pode conter disputa de pênaltis no jogo {match_number}")
+            expected_winner = home if home_goals_90 > away_goals_90 else away
+        elif resolution == "extra_time":
+            if home_goals_90 != away_goals_90 or full_home_goals == full_away_goals:
+                raise ValueError(f"resultado na prorrogação inválido no jogo {match_number}")
+            if shootout_home is not None or shootout_away is not None:
+                raise ValueError(f"resultado na prorrogação não pode conter disputa de pênaltis no jogo {match_number}")
+            expected_winner = home if full_home_goals > full_away_goals else away
+        else:
+            if home_goals_90 != away_goals_90 or full_home_goals != full_away_goals:
+                raise ValueError(f"resultado nos pênaltis inválido no jogo {match_number}")
+            if shootout_home is None or shootout_away is None or shootout_home == shootout_away:
+                raise ValueError(f"disputa de pênaltis inválida no jogo {match_number}")
+            expected_winner = home if shootout_home > shootout_away else away
+        if winner != expected_winner:
+            raise ValueError(f"vencedor do mata-mata não confere com o placar no jogo {match_number}")
+        loaded[match_number] = ObservedKnockoutResult(
+            match_number=match_number,
+            round_name=round_name,
+            home=home,
+            away=away,
+            home_goals_90=home_goals_90,
+            away_goals_90=away_goals_90,
+            extra_time_home_goals=extra_time_home_goals,
+            extra_time_away_goals=extra_time_away_goals,
+            winner=winner,
+            resolution=resolution,
+            shootout_home=shootout_home,
+            shootout_away=shootout_away,
+            source=source,
+        )
+
+    knockout_games = list(fixtures.itertuples(index=False))
+    round32_slots = [
+        slot
+        for game in knockout_games
+        if int(game.stage_id) == 2
+        for slot in sota.parse_match_label(game.match_label)
+        if slot.startswith("3")
+    ]
+    third_slot_assignment = sota.assign_third_slots(round32_slots, board.third_order)
+    winners: dict[int, str] = {}
+    runners_up: dict[int, str] = {}
+    for match_number in sorted(loaded):
+        fixture = fixture_by_number[match_number]
+        left_slot, right_slot = sota.parse_match_label(fixture.match_label)
+        try:
+            expected_home = sota.resolve_bracket_slot(left_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
+            expected_away = sota.resolve_bracket_slot(right_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
+        except (KeyError, ValueError) as error:
+            raise ValueError(
+                "CSV do mata-mata não representa uma foto de chave resolvível; "
+                f"faltam resultados anteriores ao jogo {match_number}"
+            ) from error
+        observed = loaded[match_number]
+        if (observed.home, observed.away) != (expected_home, expected_away):
+            raise ValueError(
+                f"CSV do mata-mata não confere com a chave no jogo {match_number}: "
+                f"esperado {expected_home} x {expected_away}"
+            )
+        loser = observed.away if observed.winner == observed.home else observed.home
+        winners[match_number] = observed.winner
+        runners_up[match_number] = loser
+    return loaded
 
 
 def build_tournament_form(model: WorldCupModel, observed_results: dict[int, ObservedResult]) -> TournamentForm:
@@ -792,14 +963,11 @@ def form_aware_match(
         float(policy["classifier_weight"]),
     )
 
-    raw_draw = max(1e-9, float(prediction["p_draw_90"]))
-    home_advances_if_draw = float(
-        np.clip(
-            (float(prediction["p_home_advances"]) - float(prediction["p_home_win_90"])) / raw_draw,
-            0.05,
-            0.95,
-        )
+    resolution_policy = knockout_resolution_policy(
+        {"home_xg": home_xg, "away_xg": away_xg},
+        rho=rho,
     )
+    home_advances_if_draw = float(resolution_policy.home_advances_if_draw)
     adjusted = dict(prediction)
     adjusted.update(
         {
@@ -951,7 +1119,7 @@ def build_group_stage_board(model: WorldCupModel) -> GroupStageBoard:
     for matches in matches_by_group.values():
         matches.sort(key=lambda match: match.match_number)
 
-    return GroupStageBoard(
+    board = GroupStageBoard(
         matches_by_group=matches_by_group,
         standings=standings,
         qualified_teams=qualified_teams,
@@ -962,7 +1130,9 @@ def build_group_stage_board(model: WorldCupModel) -> GroupStageBoard:
         policy=policy,
         form=form,
         snapshot=snapshot,
+        knockout_results={},
     )
+    return replace(board, knockout_results=load_observed_knockout_results(model, board))
 
 
 def choose_group_score(
@@ -1078,14 +1248,18 @@ def simulate_form_aware_knockout(
         home = sota.resolve_bracket_slot(left_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
         away = sota.resolve_bracket_slot(right_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
         context = sota.fixture_context(game, team_context, home, away)
-        distribution = form_aware_match(model, board.form, home, away, knockout=True, context=context)
-        winner, _home_goals, _away_goals, _resolution = sample_form_aware_knockout_result(
-            distribution,
-            home,
-            away,
-            rng,
-            rho=rho,
-        )
+        observed = observed_knockout_for_game(board, game, home, away)
+        if observed is None:
+            distribution = form_aware_match(model, board.form, home, away, knockout=True, context=context)
+            winner, _home_goals, _away_goals, _resolution = sample_form_aware_knockout_result(
+                distribution,
+                home,
+                away,
+                rng,
+                rho=rho,
+            )
+        else:
+            winner = observed.winner
         loser = away if winner == home else home
         winners[int(game.match_number)] = winner
         runners_up[int(game.match_number)] = loser
@@ -1095,6 +1269,20 @@ def simulate_form_aware_knockout(
     if not final_winner:
         raise RuntimeError("Chave eliminatória sem final")
     return final_winner
+
+
+def observed_knockout_for_game(
+    board: GroupStageBoard,
+    game: object,
+    home: str,
+    away: str,
+) -> ObservedKnockoutResult | None:
+    observed = board.knockout_results.get(int(game.match_number))
+    if observed is None:
+        return None
+    if (observed.home, observed.away) != (home, away):
+        raise RuntimeError(f"resultado observado não confere com a chave no jogo {int(game.match_number)}")
+    return observed
 
 
 def sample_form_aware_knockout_result(
@@ -1143,14 +1331,33 @@ def build_conditioned_knockout(model: WorldCupModel, board: GroupStageBoard, cha
         home = sota.resolve_bracket_slot(left_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
         away = sota.resolve_bracket_slot(right_slot, board.qualifiers, winners, runners_up, third_slot_assignment)
         context = sota.fixture_context(game, team_context, home, away)
-        winner, home_goals, away_goals, resolution, meta = conditioned_knockout_result(
-            model,
-            board.form,
-            home,
-            away,
-            champion,
-            context=context,
-        )
+        observed = observed_knockout_for_game(board, game, home, away)
+        if observed is None:
+            winner, home_goals, away_goals, resolution, meta = conditioned_knockout_result(
+                model,
+                board.form,
+                home,
+                away,
+                champion,
+                context=context,
+            )
+            meta["is_observed"] = False
+        else:
+            if champion in {home, away} and champion != observed.winner:
+                raise ValueError(f"{champion} já foi eliminado no resultado observado do jogo {int(game.match_number)}.")
+            winner = observed.winner
+            home_goals = observed.home_goals
+            away_goals = observed.away_goals
+            resolution = observed.resolution
+            meta = {
+                "conditioned_for_champion": "",
+                "is_observed": True,
+                "observed_source": observed.source,
+                "observed_home_goals_90": float(observed.home_goals_90),
+                "observed_away_goals_90": float(observed.away_goals_90),
+                "observed_shootout_home": float(observed.shootout_home) if observed.shootout_home is not None else -1.0,
+                "observed_shootout_away": float(observed.shootout_away) if observed.shootout_away is not None else -1.0,
+            }
         sota.update_team_context(team_context, home, away, game)
         loser = away if winner == home else home
         winners[int(game.match_number)] = winner
@@ -1368,6 +1575,7 @@ def display_name_map(model: WorldCupModel) -> dict[str, str]:
 def render_intro(console: Console, board: GroupStageBoard) -> None:
     total_group_matches = sum(len(matches) for matches in board.matches_by_group.values())
     observed_matches = len(board.form.observed_results)
+    locked_knockout_matches = len(board.knockout_results)
     snapshot = board.snapshot
     form = board.form
     if form.is_enabled:
@@ -1389,14 +1597,15 @@ def render_intro(console: Console, board: GroupStageBoard) -> None:
         form_line = "[yellow]Foto atual:[/yellow] histórico preservado; não há resultados observados para calibrar"
     console.print(
         Panel(
-            "[bold white]Fase de grupos atualizada[/bold white]\n"
+            "[bold white]Copa atualizada[/bold white]\n"
             f"[green]Resultados registrados:[/green] {observed_matches}/{total_group_matches} no CSV interno "
             f"({snapshot.source_label}; as-of {snapshot.as_of_utc_text}) | "
             f"[cyan]projeções pendentes:[/cyan] {total_group_matches - observed_matches}\n"
+            f"[green]Mata-mata confirmado:[/green] {locked_knockout_matches} jogo(s) travado(s) no CSV interno\n"
             "[yellow]Proveniência:[/yellow] snapshot manual local; sem fonte FIFA ou validação independente.\n"
             "[cyan]Sem seed:[/cyan] a mesma base de resultados e forma preserva o mesmo placar projetado.\n"
             f"[cyan]Política:[/cyan] {float(board.policy['classifier_weight']):.0%} classificador 1X2 + "
-            f"{float(board.policy['poisson_weight']):.0%} Poisson/Dixon-Coles\n"
+            f"{float(board.policy['poisson_weight']):.0%} Poisson/Dixon-Coles | prorrogação DC + pênaltis 50/50\n"
             f"{form_line}\n"
             "[green]Avançam:[/green] 1º e 2º de cada grupo + 8 melhores terceiros",
             title="[bold cyan]Bolão Arena AI[/bold cyan]",
@@ -1439,7 +1648,7 @@ def render_monte_carlo_ranking(
         Panel(
             f"[bold white]{runs} Copas Monte Carlo[/bold white]\n"
             f"[cyan]Top:[/cyan] {top_n} campeões mais frequentes | [cyan]Seed MC:[/cyan] {seed}\n"
-            f"A simulação parte da fase de grupos fixa atual e {form_line} "
+            f"A simulação parte da fase de grupos fixa, preserva {len(board.knockout_results)} resultado(s) já encerrado(s) e {form_line} "
             "A tabela mostra somente o IC 95% do erro de amostragem MC, não a incerteza total do modelo.",
             title="[bold cyan]Ranking de Campeões[/bold cyan]",
             border_style="cyan",

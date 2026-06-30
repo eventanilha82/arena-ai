@@ -1,91 +1,91 @@
 experiment,family,candidate,calibration_rows,evaluation_rows,cal_objective,eval_objective,eval_objective_delta_vs_identity,eval_log_loss,eval_log_loss_delta_vs_identity,eval_ece,eval_draw_gap,eval_accuracy,promoted,decision,note,eval_objective_delta_vs_runtime,eval_log_loss_delta_vs_runtime
-advanced_calibration,identity,runtime_sem_calibracao_extra,1298,1272,0.828091,0.79148,0.0,0.725129,0.0,0.04215,0.001843,0.660377,False,not_promoted,"nao entrou: nenhum calibrador venceu o runtime em objetivo, log_loss e empate no split temporal 2024->2025+",,
-advanced_calibration,temperature,T=1.00,1298,1272,0.828091,0.79148,0.0,0.725129,0.0,0.04215,0.001843,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=0.95,1298,1272,0.832811,0.792379,0.000899,0.724746,-0.000383,0.033322,0.00445,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.05,1298,1272,0.825352,0.794533,0.003053,0.726337,0.001208,0.03717,0.007713,0.660377,False,candidate,,,
-advanced_calibration,vector_scaling,C=2.00_plain,1298,1272,0.818167,0.795756,0.004276,0.723909,-0.00122,0.03299,0.017429,0.667453,False,candidate,,,
-advanced_calibration,vector_scaling,C=1.00_plain,1298,1272,0.818082,0.795813,0.004333,0.723944,-0.001185,0.033708,0.017449,0.668239,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.50_plain,1298,1272,0.818144,0.795859,0.004379,0.724044,-0.001085,0.032437,0.017559,0.667453,False,candidate,,,
-advanced_calibration,vector_scaling,C=5.00_plain,1298,1272,0.818295,0.795946,0.004466,0.7239,-0.001229,0.035272,0.0174,0.666667,False,candidate,,,
-advanced_calibration,vector_scaling,C=10.00_plain,1298,1272,0.818307,0.796088,0.004608,0.723899,-0.00123,0.036977,0.017391,0.665094,False,candidate,,,
-advanced_calibration,temperature,T=0.90,1298,1272,0.838929,0.796559,0.005079,0.725394,0.000265,0.029176,0.011198,0.660377,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.50_plain,1298,1272,0.817345,0.796775,0.005295,0.724871,-0.000258,0.032955,0.017572,0.668239,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=1.00_plain,1298,1272,0.817194,0.796945,0.005465,0.724959,-0.00017,0.034346,0.017479,0.669025,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.20_plain,1298,1272,0.818038,0.796953,0.005473,0.724535,-0.000594,0.038225,0.017846,0.663522,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=2.00_plain,1298,1272,0.817041,0.797181,0.005701,0.725035,-9.4e-05,0.036202,0.017387,0.667453,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=5.00_plain,1298,1272,0.817157,0.797434,0.005954,0.725082,-4.7e-05,0.03857,0.017337,0.668239,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.20_plain,1298,1272,0.817833,0.797449,0.005969,0.724971,-0.000158,0.038426,0.017907,0.663522,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=10.00_plain,1298,1272,0.817167,0.797607,0.006127,0.7251,-2.9e-05,0.040411,0.017325,0.667453,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.10_plain,1298,1272,0.819393,0.798021,0.006541,0.725582,0.000453,0.035285,0.018333,0.662736,False,candidate,,,
-advanced_calibration,temperature,T=1.10,1298,1272,0.824791,0.798261,0.006781,0.728206,0.003077,0.030616,0.013191,0.660377,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.10_plain,1298,1272,0.819335,0.798277,0.006797,0.725644,0.000515,0.037896,0.018317,0.664308,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.05_plain,1298,1272,0.822468,0.799797,0.008317,0.727486,0.002357,0.029357,0.01895,0.665094,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.05_plain,1298,1272,0.822022,0.800161,0.008681,0.727885,0.002756,0.028125,0.019001,0.664308,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.03_plain,1298,1272,0.826343,0.80299,0.01151,0.730258,0.005129,0.028541,0.019699,0.664308,False,candidate,,,
-advanced_calibration,temperature,T=1.15,1298,1272,0.824607,0.803412,0.011932,0.730604,0.005475,0.036516,0.018304,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=0.85,1298,1272,0.847592,0.803618,0.012138,0.727333,0.002204,0.040414,0.018434,0.660377,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.03_plain,1298,1272,0.8254,0.804156,0.012676,0.731017,0.005888,0.033125,0.019637,0.661164,False,candidate,,,
-advanced_calibration,temperature,T=1.20,1298,1272,0.828711,0.808992,0.017512,0.733423,0.008294,0.043744,0.023079,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=0.80,1298,1272,0.858339,0.812765,0.021285,0.730895,0.005766,0.052578,0.026192,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.25,1298,1272,0.833601,0.814822,0.023342,0.736577,0.011448,0.05111,0.02754,0.660377,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.01_plain,1298,1272,0.838313,0.819562,0.028082,0.743325,0.018196,0.051828,0.021348,0.657233,False,candidate,,,
-advanced_calibration,temperature,T=1.30,1298,1272,0.838213,0.820841,0.029361,0.739994,0.014865,0.058665,0.03171,0.660377,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.01_plain,1298,1272,0.838192,0.820989,0.029509,0.745076,0.019947,0.045729,0.021462,0.654874,False,candidate,,,
-advanced_calibration,isotonic,classwise_isotonic,1298,1272,0.795121,0.822054,0.030574,0.75099,0.025861,0.037534,0.012337,0.665094,False,candidate,"calibracao por classe, renormalizada",,
-advanced_calibration,temperature,T=0.75,1298,1272,0.872014,0.82444,0.03296,0.736508,0.011379,0.065377,0.034509,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.35,1298,1272,0.843653,0.827026,0.035546,0.743616,0.018487,0.066818,0.03561,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.40,1298,1272,0.849046,0.833135,0.041655,0.747395,0.022266,0.073065,0.039261,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.45,1298,1272,0.854561,0.839131,0.047651,0.751291,0.026162,0.077423,0.042679,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=0.70,1298,1272,0.889126,0.839245,0.047765,0.744731,0.019602,0.078847,0.043422,0.660377,False,candidate,,,
-advanced_calibration,temperature,T=1.50,1298,1272,0.860143,0.845365,0.053885,0.75527,0.030141,0.084625,0.045883,0.660377,False,candidate,,,
-advanced_calibration,vector_scaling,C=10.00_balanced,1298,1272,0.957214,0.931911,0.140431,0.81538,0.090251,0.026108,0.102895,0.612421,False,candidate,,,
-advanced_calibration,vector_scaling,C=5.00_balanced,1298,1272,0.957279,0.932073,0.140593,0.81539,0.090261,0.027873,0.102921,0.612421,False,candidate,,,
-advanced_calibration,vector_scaling,C=2.00_balanced,1298,1272,0.957292,0.932326,0.140846,0.815405,0.090276,0.03019,0.103053,0.612421,False,candidate,,,
-advanced_calibration,vector_scaling,C=1.00_balanced,1298,1272,0.957258,0.932397,0.140917,0.815512,0.090383,0.029405,0.103106,0.613994,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=10.00_balanced,1298,1272,0.957578,0.932452,0.140972,0.815793,0.090664,0.027571,0.103003,0.618711,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.50_balanced,1298,1272,0.957246,0.932544,0.141064,0.815644,0.090515,0.027966,0.103414,0.615566,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=5.00_balanced,1298,1272,0.957608,0.932591,0.141111,0.81581,0.090681,0.028668,0.103075,0.617925,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=2.00_balanced,1298,1272,0.957656,0.932629,0.141149,0.815823,0.090694,0.028409,0.103163,0.619497,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=1.00_balanced,1298,1272,0.957477,0.932819,0.141339,0.815806,0.090677,0.030481,0.103242,0.620283,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.50_balanced,1298,1272,0.957483,0.933227,0.141747,0.815828,0.090699,0.033814,0.103475,0.620283,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.20_balanced,1298,1272,0.957115,0.934199,0.142719,0.816152,0.091023,0.039066,0.103982,0.615566,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.20_balanced,1298,1272,0.95783,0.934343,0.142863,0.816123,0.090994,0.039683,0.104159,0.618711,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.10_balanced,1298,1272,0.958528,0.935831,0.144351,0.816957,0.091828,0.042099,0.105002,0.615566,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.10_balanced,1298,1272,0.957928,0.936459,0.144979,0.817282,0.092153,0.047479,0.104903,0.615566,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.05_balanced,1298,1272,0.961192,0.939843,0.148363,0.819288,0.094159,0.053357,0.106311,0.615566,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.05_balanced,1298,1272,0.960358,0.940156,0.148676,0.819696,0.094567,0.054091,0.106263,0.616352,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.03_balanced,1298,1272,0.964918,0.94452,0.15304,0.822406,0.097277,0.063129,0.107488,0.609277,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.03_balanced,1298,1272,0.963845,0.946246,0.154766,0.823098,0.097969,0.076606,0.107673,0.621069,False,candidate,,,
-advanced_calibration,dirichlet_logistic,C=0.01_balanced,1298,1272,0.978801,0.962747,0.171267,0.835971,0.110842,0.092789,0.110012,0.61478,False,candidate,,,
-advanced_calibration,vector_scaling,C=0.01_balanced,1298,1272,0.980014,0.967649,0.176169,0.837843,0.112714,0.12592,0.110791,0.622642,False,candidate,,,
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.20,29819,2570,,0.807557,,0.740529,,0.016488,0.006112,0.657588,False,not_promoted,nao entrou: ganho diagnostico insuficiente e/ou log_loss pior que o PoissonRegressor+Dixon-Coles atual,-0.0003,0.000483
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.10,29819,2570,,0.807585,,0.740221,,0.01701,0.006777,0.656809,False,candidate,blend do Poisson atual com força ataque/defesa,-0.000272,0.000175
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.05,29819,2570,,0.807696,,0.740114,,0.017868,0.007109,0.656809,False,candidate,blend do Poisson atual com força ataque/defesa,-0.000161,6.8e-05
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.30,29819,2570,,0.807765,,0.740938,,0.017594,0.005447,0.658366,False,candidate,blend do Poisson atual com força ataque/defesa,-9.2e-05,0.000892
-dixon_coles_team_strength,runtime,poisson_regressor_dixon_coles,29819,2570,,0.807857,,0.740046,,0.017843,0.007442,0.65642,False,candidate,referencia Poisson/DC atual do runtime,0.0,0.0
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.50,29819,2570,,0.808292,,0.741989,,0.01809,0.004117,0.658366,False,candidate,blend do Poisson atual com força ataque/defesa,0.000435,0.001943
-dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=4_half_life=3_alpha=0.75,29819,2570,,0.809424,,0.743643,,0.020042,0.002454,0.659144,False,candidate,blend do Poisson atual com força ataque/defesa,0.001567,0.003597
-dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=3,29819,2570,,0.810769,,0.745598,,0.020507,0.000791,0.659144,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.002912,0.005552
-dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=5,29819,2570,,0.810805,,0.74566,,0.019678,0.000896,0.659922,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.002948,0.005614
-dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=5,29819,2570,,0.811102,,0.745987,,0.020424,0.000652,0.659533,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003245,0.005941
-dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=8,29819,2570,,0.811193,,0.74585,,0.021055,0.001101,0.659533,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003336,0.005804
-dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=3,29819,2570,,0.811233,,0.746061,,0.021944,0.000479,0.658755,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003376,0.006015
-dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=8,29819,2570,,0.811352,,0.746095,,0.020897,0.000904,0.659922,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003495,0.006049
-dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=3,29819,2570,,0.811461,,0.746475,,0.020681,0.000237,0.658755,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003604,0.006429
-dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=8,29819,2570,,0.811482,,0.746317,,0.020543,0.000733,0.659922,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003625,0.006271
-dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=5,29819,2570,,0.811502,,0.746284,,0.022627,0.00045,0.657588,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003645,0.006238
-dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=5,29819,2570,,0.811739,,0.746804,,0.020481,0.000135,0.658366,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003882,0.006758
-dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=8,29819,2570,,0.811799,,0.74671,,0.020866,0.000453,0.658366,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.003942,0.006664
-dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=none,29819,2570,,0.811914,,0.746626,,0.016374,0.001841,0.660311,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004057,0.00658
-dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=none,29819,2570,,0.812015,,0.746751,,0.016554,0.001737,0.660311,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004158,0.006705
-dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=none,29819,2570,,0.812075,,0.746864,,0.01634,0.001641,0.660311,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004218,0.006818
-dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=3,29819,2570,,0.812098,,0.747177,,0.020155,0.000113,0.658366,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004241,0.007131
-dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=8,29819,2570,,0.812241,,0.747205,,0.021588,0.000139,0.658366,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004384,0.007159
-dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=none,29819,2570,,0.812312,,0.747062,,0.017663,0.001465,0.660311,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004455,0.007016
-dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=5,29819,2570,,0.812428,,0.747444,,0.020434,0.000192,0.658755,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004571,0.007398
-dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=none,29819,2570,,0.812682,,0.747309,,0.020261,0.001237,0.6607,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.004825,0.007263
-dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=none,29819,2570,,0.812871,,0.747611,,0.020159,0.000955,0.659144,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.005014,0.007565
-dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=8,29819,2570,,0.812896,,0.747809,,0.02163,0.000186,0.658755,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.005039,0.007763
-dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=3,29819,2570,,0.813194,,0.747996,,0.021419,0.000443,0.657977,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.005337,0.00795
-dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=5,29819,2570,,0.813475,,0.748194,,0.0221,0.000502,0.657977,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.005618,0.008148
-dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=3,29819,2570,,0.81435,,0.748885,,0.022766,0.000721,0.657588,False,candidate,ataque/defesa por selecao com shrinkage temporal,0.006493,0.008839
+advanced_calibration,temperature,T=1.05,1800,1699,0.999653,0.936606,-0.002008,0.856819,0.000677,0.051508,0.0005,0.589759,False,not_promoted,"nao entrou: nenhum calibrador venceu o runtime em objetivo, log_loss e empate no split temporal 2024->2025+",,
+advanced_calibration,identity,runtime_sem_calibracao_extra,1800,1699,1.004288,0.938614,0.0,0.856142,0.0,0.064566,0.004423,0.589759,False,candidate,referencia do runtime atual,,
+advanced_calibration,temperature,T=1.00,1800,1699,1.004288,0.938614,0.0,0.856142,0.0,0.064566,0.004423,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.10,1800,1699,0.99637,0.939322,0.000708,0.858061,0.001919,0.045113,0.005075,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.95,1800,1699,1.010219,0.939833,0.001219,0.856183,4.1e-05,0.050709,0.009728,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.90,1800,1699,1.017728,0.942949,0.004335,0.857135,0.000993,0.045984,0.015455,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.15,1800,1699,0.994114,0.943169,0.004555,0.859748,0.003606,0.048366,0.009331,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.20,1800,1699,0.992875,0.947148,0.008534,0.861784,0.005642,0.049945,0.013299,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.85,1800,1699,1.02717,0.94821,0.009596,0.859244,0.003102,0.050029,0.021647,0.589759,False,candidate,,,
+advanced_calibration,vector_scaling,C=10.00_plain,1800,1699,0.98397,0.950354,0.01174,0.859098,0.002956,0.043056,0.028985,0.590936,False,candidate,,,
+advanced_calibration,vector_scaling,C=5.00_plain,1800,1699,0.983939,0.950407,0.011793,0.859106,0.002964,0.04377,0.028961,0.590936,False,candidate,,,
+advanced_calibration,vector_scaling,C=2.00_plain,1800,1699,0.983921,0.950535,0.011921,0.859134,0.002992,0.045442,0.028891,0.590936,False,candidate,,,
+advanced_calibration,vector_scaling,C=1.00_plain,1800,1699,0.983865,0.950629,0.012015,0.85919,0.003048,0.046552,0.028787,0.58917,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.50_plain,1800,1699,0.984164,0.950675,0.012061,0.859316,0.003174,0.046656,0.028601,0.587993,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.20_plain,1800,1699,0.98459,0.950793,0.012179,0.859775,0.003633,0.04434,0.028249,0.587993,False,candidate,,,
+advanced_calibration,temperature,T=1.25,1800,1699,0.992663,0.950868,0.012254,0.864092,0.00795,0.045842,0.017001,0.589759,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.50_plain,1800,1699,0.983768,0.951077,0.012463,0.859952,0.00381,0.042255,0.028768,0.590347,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.20_plain,1800,1699,0.984001,0.951158,0.012544,0.860063,0.003921,0.044744,0.028303,0.589759,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=2.00_plain,1800,1699,0.983892,0.951272,0.012658,0.86007,0.003928,0.0408,0.029126,0.590347,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=1.00_plain,1800,1699,0.983774,0.951339,0.012725,0.860003,0.003861,0.043479,0.028978,0.589759,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=5.00_plain,1800,1699,0.983831,0.951397,0.012783,0.860123,0.003981,0.040952,0.029239,0.589759,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=10.00_plain,1800,1699,0.983841,0.951432,0.012818,0.860078,0.003936,0.042023,0.029227,0.589759,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.10_plain,1800,1699,0.985193,0.951575,0.012961,0.860529,0.004387,0.046455,0.027884,0.587993,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.10_plain,1800,1699,0.98481,0.951583,0.012969,0.86047,0.004328,0.04715,0.027904,0.588582,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.05_plain,1800,1699,0.985502,0.953349,0.014735,0.861321,0.005179,0.059818,0.02759,0.58917,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.05_plain,1800,1699,0.986502,0.953409,0.014795,0.861814,0.005672,0.054403,0.027549,0.587404,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.03_plain,1800,1699,0.986389,0.954723,0.016109,0.862391,0.006249,0.064171,0.027324,0.587993,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.03_plain,1800,1699,0.987349,0.955186,0.016572,0.863308,0.007166,0.058177,0.02729,0.587404,False,candidate,,,
+advanced_calibration,temperature,T=1.30,1800,1699,0.992927,0.955653,0.017039,0.866607,0.010465,0.053408,0.02046,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.80,1800,1699,1.038995,0.956235,0.017621,0.862828,0.006686,0.066118,0.028354,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.35,1800,1699,0.993565,0.96043,0.021816,0.869281,0.013139,0.059746,0.023696,0.589759,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.01_plain,1800,1699,0.991327,0.960463,0.021849,0.86791,0.011768,0.063689,0.026884,0.58917,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.01_plain,1800,1699,0.991506,0.961652,0.023038,0.869766,0.013624,0.053792,0.026928,0.58917,False,candidate,,,
+advanced_calibration,isotonic,classwise_isotonic,1800,1699,0.965774,0.962956,0.024342,0.872466,0.016324,0.036791,0.028238,0.589759,False,candidate,"calibracao por classe, renormalizada",,
+advanced_calibration,temperature,T=1.40,1800,1699,0.994093,0.965509,0.026895,0.872071,0.015929,0.069262,0.026727,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.75,1800,1699,1.053781,0.966048,0.027434,0.868301,0.012159,0.076348,0.035631,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.45,1800,1699,0.996282,0.970432,0.031818,0.874945,0.018803,0.076567,0.02957,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=1.50,1800,1699,0.999973,0.975139,0.036525,0.877876,0.021734,0.081209,0.032239,0.589759,False,candidate,,,
+advanced_calibration,temperature,T=0.70,1800,1699,1.072478,0.978542,0.039928,0.87621,0.020068,0.083418,0.043541,0.589759,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.50_balanced,1800,1699,1.032454,1.005544,0.06693,0.883362,0.02722,0.053556,0.095856,0.567981,False,candidate,,,
+advanced_calibration,vector_scaling,C=1.00_balanced,1800,1699,1.032012,1.00556,0.066946,0.883322,0.02718,0.053316,0.095986,0.567981,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.20_balanced,1800,1699,1.032998,1.005566,0.066952,0.883615,0.027473,0.052468,0.095591,0.570924,False,candidate,,,
+advanced_calibration,vector_scaling,C=2.00_balanced,1800,1699,1.032107,1.005686,0.067072,0.883317,0.027175,0.054376,0.096063,0.566804,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.20_balanced,1800,1699,1.032384,1.005866,0.067252,0.883931,0.027789,0.051925,0.095637,0.569158,False,candidate,,,
+advanced_calibration,vector_scaling,C=5.00_balanced,1800,1699,1.03216,1.005902,0.067288,0.88332,0.027178,0.056657,0.096114,0.565627,False,candidate,,,
+advanced_calibration,vector_scaling,C=10.00_balanced,1800,1699,1.032155,1.005913,0.067299,0.883322,0.02718,0.056632,0.096132,0.565627,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.50_balanced,1800,1699,1.031475,1.006038,0.067424,0.884045,0.027903,0.049485,0.096118,0.572101,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.10_balanced,1800,1699,1.033179,1.006225,0.067611,0.884193,0.028051,0.055379,0.095235,0.569158,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.10_balanced,1800,1699,1.033483,1.006409,0.067795,0.884166,0.028024,0.057542,0.095328,0.573867,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=1.00_balanced,1800,1699,1.031424,1.006447,0.067833,0.884209,0.028067,0.050683,0.096383,0.572101,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=2.00_balanced,1800,1699,1.031275,1.006774,0.06816,0.884336,0.028194,0.051898,0.096567,0.570924,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=5.00_balanced,1800,1699,1.03127,1.006806,0.068192,0.884424,0.028282,0.050736,0.096613,0.570924,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=10.00_balanced,1800,1699,1.031251,1.006992,0.068378,0.884449,0.028307,0.052503,0.096647,0.570335,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.05_balanced,1800,1699,1.034096,1.007378,0.068764,0.884973,0.028831,0.061262,0.094875,0.573867,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.03_balanced,1800,1699,1.035038,1.008297,0.069683,0.886066,0.029924,0.058674,0.094698,0.574456,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.05_balanced,1800,1699,1.034684,1.009378,0.070764,0.885334,0.029192,0.080212,0.095154,0.57681,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.03_balanced,1800,1699,1.036086,1.011869,0.073255,0.886787,0.030645,0.092134,0.095067,0.576221,False,candidate,,,
+advanced_calibration,dirichlet_logistic,C=0.01_balanced,1800,1699,1.042207,1.018055,0.079441,0.891905,0.035763,0.100924,0.094476,0.575633,False,candidate,,,
+advanced_calibration,vector_scaling,C=0.01_balanced,1800,1699,1.041302,1.019742,0.081128,0.893631,0.037489,0.095595,0.09515,0.582696,False,candidate,,,
+dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=3,37862,3499,,0.968427,,0.882801,,0.029307,0.014125,0.579594,False,not_promoted,nao entrou: ganho diagnostico insuficiente e/ou log_loss pior que o PoissonRegressor+Dixon-Coles atual,-0.003075,2.5e-05
+dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=3,37862,3499,,0.968467,,0.882629,,0.031092,0.014306,0.579023,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.003035,-0.000147
+dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=5,37862,3499,,0.968559,,0.882998,,0.027438,0.014272,0.579594,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002943,0.000222
+dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=5,37862,3499,,0.968604,,0.883097,,0.027356,0.014149,0.579594,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002898,0.000321
+dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=3,37862,3499,,0.968622,,0.882968,,0.030346,0.013977,0.579023,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.00288,0.000192
+dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=5,37862,3499,,0.968665,,0.882895,,0.029343,0.014415,0.579594,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002837,0.000119
+dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=3,37862,3499,,0.968874,,0.883278,,0.03064,0.013754,0.578451,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002628,0.000502
+dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=8,37862,3499,,0.968876,,0.883148,,0.027504,0.014611,0.578737,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002626,0.000372
+dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=5,37862,3499,,0.968891,,0.883283,,0.029568,0.013951,0.57988,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002611,0.000507
+dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=8,37862,3499,,0.968957,,0.883277,,0.028,0.014393,0.578737,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002545,0.000501
+dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=5,37862,3499,,0.968973,,0.883544,,0.028347,0.013736,0.580166,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002529,0.000768
+dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=8,37862,3499,,0.969009,,0.883394,,0.028045,0.01422,0.578737,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002493,0.000618
+dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=8,37862,3499,,0.969022,,0.883214,,0.029077,0.014496,0.578737,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.00248,0.000438
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.75,37862,3499,,0.96907,,0.882493,,0.034249,0.015456,0.578737,False,candidate,blend do Poisson atual com força ataque/defesa,-0.002432,-0.000283
+dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=3,37862,3499,,0.969212,,0.883683,,0.030724,0.013534,0.579023,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.00229,0.000907
+dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=8,37862,3499,,0.96925,,0.883562,,0.029965,0.014017,0.579023,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002252,0.000786
+dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=8,37862,3499,,0.969434,,0.883799,,0.03036,0.013799,0.579023,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002068,0.001023
+dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=5,37862,3499,,0.969493,,0.883892,,0.031424,0.013526,0.579308,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.002009,0.001116
+dixon_coles_team_strength,team_attack_defense_dc,shrink=8_half_life=none,37862,3499,,0.9696,,0.883729,,0.025281,0.015249,0.578165,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001902,0.000953
+dixon_coles_team_strength,team_attack_defense_dc,shrink=12_half_life=none,37862,3499,,0.969618,,0.883755,,0.02548,0.015192,0.577594,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001884,0.000979
+dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=3,37862,3499,,0.969639,,0.884175,,0.030602,0.013343,0.579308,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001863,0.001399
+dixon_coles_team_strength,team_attack_defense_dc,shrink=4_half_life=none,37862,3499,,0.969688,,0.883702,,0.026419,0.015308,0.578165,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001814,0.000926
+dixon_coles_team_strength,team_attack_defense_dc,shrink=32_half_life=none,37862,3499,,0.969714,,0.883866,,0.026549,0.014945,0.577022,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001788,0.00109
+dixon_coles_team_strength,team_attack_defense_dc,shrink=20_half_life=none,37862,3499,,0.969719,,0.883802,,0.026689,0.015086,0.577022,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001783,0.001026
+dixon_coles_team_strength,team_attack_defense_dc,shrink=50_half_life=none,37862,3499,,0.969726,,0.883952,,0.026553,0.014765,0.577022,False,candidate,ataque/defesa por selecao com shrinkage temporal,-0.001776,0.001176
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.50,37862,3499,,0.969737,,0.882377,,0.036853,0.016788,0.578451,False,candidate,blend do Poisson atual com força ataque/defesa,-0.001765,-0.000399
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.30,37862,3499,,0.970312,,0.88243,,0.037443,0.017854,0.578737,False,candidate,blend do Poisson atual com força ataque/defesa,-0.00119,-0.000346
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.20,37862,3499,,0.970597,,0.882508,,0.036992,0.018386,0.578451,False,candidate,blend do Poisson atual com força ataque/defesa,-0.000905,-0.000268
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.10,37862,3499,,0.97108,,0.882623,,0.038522,0.018919,0.578451,False,candidate,blend do Poisson atual com força ataque/defesa,-0.000422,-0.000153
+dixon_coles_team_strength,poisson_regressor_plus_team_strength,shrink=8_half_life=3_alpha=0.05,37862,3499,,0.9713,,0.882695,,0.038828,0.019185,0.578737,False,candidate,blend do Poisson atual com força ataque/defesa,-0.000202,-8.1e-05
+dixon_coles_team_strength,runtime,poisson_regressor_dixon_coles,37862,3499,,0.971502,,0.882776,,0.038787,0.019452,0.578737,False,candidate,referencia Poisson/DC atual do runtime,0.0,0.0

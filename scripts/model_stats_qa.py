@@ -42,6 +42,7 @@ STAGE_UNCERTAINTY_CSV = MODEL_ROOT / "reports" / "sota_stage_uncertainty_interva
 DC_CSV = MODEL_ROOT / "reports" / "sota_dixon_coles_rho_sensitivity.csv"
 FRONTIER_CSV = MODEL_ROOT / "reports" / "sota_internal_frontier_experiments.csv"
 RUNTIME_ADJUSTMENT_CSV = MODEL_ROOT / "reports" / "sota_runtime_adjustment_audit.csv"
+RUNTIME_NEUTRAL_ORDER_CSV = MODEL_ROOT / "reports" / "sota_runtime_neutral_order_audit.csv"
 MC_STABILITY_JSON = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.json"
 MC_STABILITY_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.csv"
 MC_STAGE_BRACKET_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stage_bracket_stability.csv"
@@ -672,6 +673,7 @@ def ablation_study(
 
 def draw_policy_scan(y: np.ndarray, pre_draw: np.ndarray, poisson: np.ndarray, policy: dict[str, Any]) -> dict[str, Any]:
     _best, candidates = sota.select_simulation_policy_from_arrays(y, pre_draw, poisson)
+    _current_probs, current_metrics = apply_policy(y, pre_draw, poisson, policy)
     current_key = (
         round_float(policy["classifier_weight"], 4),
         round_float(policy["draw_floor"], 4),
@@ -690,10 +692,20 @@ def draw_policy_scan(y: np.ndarray, pre_draw: np.ndarray, poisson: np.ndarray, p
         ),
         None,
     )
+    best_objective = float(candidates[0]["objective"])
+    current_objective = float(current_metrics["objective"])
     return {
         "candidate_count": int(len(candidates)),
         "current_policy_rank": int(rank or -1),
         "current_policy": current_key,
+        "current_policy_metrics": current_metrics,
+        "best_same_holdout_objective": round_float(best_objective, 6),
+        "current_policy_objective_gap_vs_same_holdout_best": round_float(current_objective - best_objective, 6),
+        "accepted_objective_gap_without_retrofit": 0.005,
+        "interpretation": (
+            "The active policy was selected by nested temporal validation, not by this later diagnostic window. "
+            "The audit rejects a material regression but does not retune the deployed policy to maximize the same holdout."
+        ),
         "top_10": candidates[:10],
         "best_by_classifier_weight": [
             min(
@@ -1063,6 +1075,7 @@ def runtime_adjustment_audit(package: dict[str, Any], policy: dict[str, Any]) ->
         draw = max(0.15, min(0.30, 0.27 - abs(elo_home - 0.5) * 0.20))
         p_elo = np.array([(1 - draw) * elo_home, draw, (1 - draw) * (1 - elo_home)])
         stack = sota.base_probability_stack(package, x, h, a, True, p_elo)
+        stack = sota.neutral_order_invariant_probability_stack(package, h, a, stack, neutral=True)
         base_probs = sum(float(weights.get(name, 0.0)) * probs for name, probs in stack.items() if name in weights)
         base_probs = normalize_probs(np.asarray([base_probs]))[0]
         pred = sota.predict_match(package, h, a, neutral=True)
@@ -1107,7 +1120,7 @@ def runtime_adjustment_audit(package: dict[str, Any], policy: dict[str, Any]) ->
     frame = pd.DataFrame(rows).sort_values("max_abs_shift_pre_draw", ascending=False)
     summary = {
         "path": str(RUNTIME_ADJUSTMENT_CSV),
-        "method": "all ordered 2026 qualified-team pairs; compare base classifier blend before squad/Transfermarkt/context proxies against pre-draw and final runtime probabilities",
+        "method": "all ordered 2026 qualified-team pairs; verify squad/Transfermarkt snapshots do not directly shift calibrated 1X2 probabilities",
         "teams": int(len(teams)),
         "pairs": int(len(frame)),
         "max_abs_shift_pre_draw": round_float(frame["max_abs_shift_pre_draw"].max() if len(frame) else 0.0, 6),
@@ -1116,10 +1129,10 @@ def runtime_adjustment_audit(package: dict[str, Any], policy: dict[str, Any]) ->
         "argmax_flip_rate_pre_draw": round_float(frame["argmax_changed_pre_draw"].mean() if len(frame) else 0.0, 6),
         "max_abs_shift_final": round_float(frame["max_abs_shift_final"].max() if len(frame) else 0.0, 6),
         "p95_abs_shift_final": round_float(frame["max_abs_shift_final"].quantile(0.95) if len(frame) else 0.0, 6),
-        "decision": "audit_only_runtime_kept",
+        "decision": "direct_1x2_adjustment_removed",
         "reason": (
-            "Ajustes de elenco/Transfermarkt/contexto usam proxies 2026 sem backtest historico limpo; entram como camada operacional auditada, "
-            "nao como novo tuning escondido. Limites de sanidade reprovam se o maximo passar de 35pp ou p95 passar de 18pp."
+            "Ajustes de elenco/Transfermarkt usam proxies 2026 sem snapshots históricos equivalentes. Eles permanecem apenas na camada de xG/Poisson, "
+            "não como deslocamento manual da probabilidade 1X2 calibrada."
         ),
         "top_10": frame.head(10).to_dict(orient="records"),
         "policy_reference": {
@@ -1128,6 +1141,99 @@ def runtime_adjustment_audit(package: dict[str, Any], policy: dict[str, Any]) ->
             "draw_floor": round_float(policy["draw_floor"], 4),
             "draw_ceiling": round_float(policy["draw_ceiling"], 4),
         },
+    }
+    return frame, summary
+
+
+def orientation_invariance_audit(training: pd.DataFrame) -> dict[str, Any]:
+    if "orientation_augmented" not in training.columns:
+        raise AssertionError("training frame is missing neutral-orientation augmentation metadata")
+    neutral = training[training["neutral"].astype(float) == 1.0].copy()
+    if neutral.empty:
+        raise AssertionError("training frame has no neutral fixtures to audit")
+    world_cup = neutral[neutral["tournament"].astype(str) == "World Cup"].copy()
+
+    def outcome_counts(frame: pd.DataFrame) -> dict[str, int]:
+        return {
+            "home_wins": int((frame["target_1x2"] == 0).sum()),
+            "draws": int((frame["target_1x2"] == 1).sum()),
+            "away_wins": int((frame["target_1x2"] == 2).sum()),
+        }
+
+    neutral_counts = outcome_counts(neutral)
+    world_cup_counts = outcome_counts(world_cup)
+    if neutral_counts["home_wins"] != neutral_counts["away_wins"]:
+        raise AssertionError(f"neutral training outcomes are not orientation-invariant: {neutral_counts}")
+    if world_cup_counts["home_wins"] != world_cup_counts["away_wins"]:
+        raise AssertionError(f"World Cup neutral outcomes are not orientation-invariant: {world_cup_counts}")
+    augmented_rows = int(training["orientation_augmented"].astype(bool).sum())
+    if augmented_rows <= 0 or augmented_rows * 2 != len(neutral):
+        raise AssertionError(
+            "neutral orientation augmentation is incomplete: "
+            f"augmented={augmented_rows} neutral_rows={len(neutral)}"
+        )
+    return {
+        "method": "every neutral historical fixture is paired with its exact swapped home/away counterpart before model fitting",
+        "neutral_rows": int(len(neutral)),
+        "world_cup_neutral_rows": int(len(world_cup)),
+        "augmented_rows": augmented_rows,
+        "neutral_outcomes": neutral_counts,
+        "world_cup_neutral_outcomes": world_cup_counts,
+        "passed": True,
+    }
+
+
+def runtime_neutral_order_invariance_audit(package: dict[str, Any]) -> tuple[pd.DataFrame, dict[str, Any]]:
+    fixtures = package["fixtures"]
+    group_fixtures = fixtures[fixtures["stage_id"] == sota.GROUP_STAGE_ID].sort_values("match_number")
+    rows: list[dict[str, Any]] = []
+    for game in group_fixtures.itertuples(index=False):
+        home = sota.canonical_team(str(game.home_team))
+        away = sota.canonical_team(str(game.away_team))
+        forward = sota.predict_match(package, home, away, neutral=True, knockout=True)
+        reverse = sota.predict_match(package, away, home, neutral=True, knockout=True)
+        rows.append(
+            {
+                "match_number": int(game.match_number),
+                "home_team": home,
+                "away_team": away,
+                "win_order_delta": abs(float(forward["p_home_win_90"]) - float(reverse["p_away_win_90"])),
+                "draw_order_delta": abs(float(forward["p_draw_90"]) - float(reverse["p_draw_90"])),
+                "loss_order_delta": abs(float(forward["p_away_win_90"]) - float(reverse["p_home_win_90"])),
+                "advance_order_delta": abs(float(forward["p_home_advances"]) - float(reverse["p_away_advances"])),
+                "advance_if_draw_complement_delta": abs(
+                    float(forward["p_home_advances_if_draw"]) + float(reverse["p_home_advances_if_draw"]) - 1.0
+                ),
+                "home_xg_order_delta": abs(float(forward["home_xg"]) - float(reverse["away_xg"])),
+                "away_xg_order_delta": abs(float(forward["away_xg"]) - float(reverse["home_xg"])),
+                "forward_probability_sum_error": abs(
+                    float(forward["p_home_win_90"]) + float(forward["p_draw_90"]) + float(forward["p_away_win_90"]) - 1.0
+                ),
+                "reverse_probability_sum_error": abs(
+                    float(reverse["p_home_win_90"]) + float(reverse["p_draw_90"]) + float(reverse["p_away_win_90"]) - 1.0
+                ),
+                "forward_order_symmetrized": bool(forward.get("neutral_order_symmetrized", False)),
+                "reverse_order_symmetrized": bool(reverse.get("neutral_order_symmetrized", False)),
+            }
+        )
+    frame = pd.DataFrame(rows)
+    delta_columns = [column for column in frame.columns if column.endswith("_delta") or column.endswith("_error")]
+    max_delta = max((float(frame[column].max()) for column in delta_columns), default=0.0)
+    summary = {
+        "path": str(RUNTIME_NEUTRAL_ORDER_CSV),
+        "method": "every official group fixture is predicted in both nominal orders with no travel/rest context, then compared after reversing outcomes",
+        "fixtures": int(len(frame)),
+        "max_delta_or_error": round_float(max_delta, 12),
+        "tolerance": 1e-10,
+        "order_symmetrization_coverage": round_float(
+            float(
+                pd.concat([frame["forward_order_symmetrized"], frame["reverse_order_symmetrized"]]).astype(bool).mean()
+            )
+            if len(frame)
+            else 0.0,
+            6,
+        ),
+        "passed": bool(max_delta <= 1e-10 and frame["forward_order_symmetrized"].all() and frame["reverse_order_symmetrized"].all()),
     }
     return frame, summary
 
@@ -1208,7 +1314,18 @@ def load_monte_carlo_stability() -> dict[str, Any]:
     }
 
 
-def public_baseline_benchmark(model_report: dict[str, Any], runtime_metrics: dict[str, float]) -> dict[str, Any]:
+def diagnostic_elo_probs(frame: pd.DataFrame) -> np.ndarray:
+    elo_home = 1.0 / (1.0 + np.power(10.0, -frame["elo_diff"].to_numpy(dtype=float) / 400.0))
+    draw = np.clip(0.27 - np.abs(elo_home - 0.5) * 0.20, 0.15, 0.30)
+    return np.column_stack([(1.0 - draw) * elo_home, draw, (1.0 - draw) * (1.0 - elo_home)])
+
+
+def public_baseline_benchmark(
+    model_report: dict[str, Any],
+    runtime_metrics: dict[str, float],
+    diagnostic: pd.DataFrame,
+    y: np.ndarray,
+) -> dict[str, Any]:
     metrics = model_report.get("metrics", {})
     elo = metrics.get("baseline_elo_1x2", {})
     fifa = metrics.get("baseline_fifa_rank_1x2", {})
@@ -1217,19 +1334,24 @@ def public_baseline_benchmark(model_report: dict[str, Any], runtime_metrics: dic
 
     runtime_accuracy = float(runtime_metrics.get("accuracy", 0.0))
     runtime_log_loss = float(runtime_metrics.get("log_loss", 99.0))
-    elo_accuracy = float(elo.get("accuracy", 0.0))
+    runtime_rps = float(runtime_metrics.get("rps", 99.0))
+    same_window_elo = metric_block(y, diagnostic_elo_probs(diagnostic))
+    elo_accuracy = float(same_window_elo.get("accuracy", 0.0))
+    elo_log_loss = float(same_window_elo.get("log_loss", 99.0))
+    elo_rps = float(same_window_elo.get("rps", 99.0))
     fifa_accuracy = float(fifa.get("accuracy", 0.0))
     xgb_log_loss = float(xgb.get("log_loss", 99.0))
     competitive_log_loss = float(competitive.get("log_loss", 99.0))
 
     return {
-        "status": "available_public_style_baselines_only",
+        "status": "same_window_calibration_baseline_available",
         "market_odds_benchmark": {
             "available": False,
             "reason": "O pacote atual nao contem odds historicas limpas de casas de aposta; nao inventamos benchmark externo sem dados auditaveis.",
         },
-        "available_baselines": {
-            "elo_accuracy": round_float(elo_accuracy, 6),
+        "same_window_elo_1x2": same_window_elo,
+        "package_holdout_context_only": {
+            "elo_accuracy": round_float(float(elo.get("accuracy", 0.0)), 6),
             "fifa_rank_accuracy": round_float(fifa_accuracy, 6),
             "xgb_calibrated_log_loss": round_float(xgb_log_loss, 6),
             "competitive_xgb_log_loss": round_float(competitive_log_loss, 6),
@@ -1237,14 +1359,16 @@ def public_baseline_benchmark(model_report: dict[str, Any], runtime_metrics: dic
         "runtime_policy": {
             "accuracy": round_float(runtime_accuracy, 6),
             "log_loss": round_float(runtime_log_loss, 6),
+            "rps": round_float(runtime_rps, 6),
             "accuracy_gain_vs_elo_pp": round_float((runtime_accuracy - elo_accuracy) * 100.0, 3),
-            "accuracy_gain_vs_fifa_pp": round_float((runtime_accuracy - fifa_accuracy) * 100.0, 3),
+            "log_loss_gain_vs_same_window_elo": round_float(elo_log_loss - runtime_log_loss, 6),
+            "rps_gain_vs_same_window_elo": round_float(elo_rps - runtime_rps, 6),
             "log_loss_gap_vs_xgb_calibrated": round_float(runtime_log_loss - xgb_log_loss, 6),
             "log_loss_gap_vs_competitive_xgb": round_float(runtime_log_loss - competitive_log_loss, 6),
         },
         "interpretation": (
-            "O runtime precisa superar baselines publicos simples de forca/ranking e ficar perto da fronteira XGBoost, "
-            "mas preservando Poisson/Dixon-Coles para placar, empate e variancia de futebol."
+            "O runtime e o ELO sao medidos no mesmo recorte 2024+ por log-loss e RPS; acuracia de classe fica apenas como diagnostico. "
+            "Isso evita comparar recortes diferentes ou premiar uma classe majoritaria."
         ),
     }
 
@@ -1265,11 +1389,13 @@ def academic_stamp(
         "nested_component_and_policy_grid": int(component_ablation.get("policy_candidate_count_per_component", 0)) >= 690,
         "draw_xgb_removed": report["policy"].get("draw_xgb") == "removed_zero_weight_model",
         "runtime_draw_gap_lte_2pp": float(policy_metrics.get("draw_gap", 1.0)) <= 0.02,
-        "runtime_log_loss_lte_0_82": float(policy_metrics.get("log_loss", 99.0)) <= 0.82,
+        "runtime_log_loss_beats_same_window_elo": float(benchmark_runtime.get("log_loss_gain_vs_same_window_elo", -99.0)) >= 0.005,
+        "runtime_rps_beats_same_window_elo": float(benchmark_runtime.get("rps_gain_vs_same_window_elo", -99.0)) >= 0.002,
         "runtime_near_ablation_frontier": float(full_objective_gap) <= 0.012,
+        "runtime_near_draw_policy_frontier_without_retrofit": float(
+            report.get("draw_specific_calibration", {}).get("current_policy_objective_gap_vs_same_holdout_best", 99.0)
+        ) <= float(report.get("draw_specific_calibration", {}).get("accepted_objective_gap_without_retrofit", 0.0)),
         "dixon_coles_near_rho_frontier": float(rho_objective_gap) <= 0.01,
-        "beats_elo_accuracy_by_5pp": float(benchmark_runtime.get("accuracy_gain_vs_elo_pp", 0.0)) >= 5.0,
-        "beats_fifa_accuracy_by_7pp": float(benchmark_runtime.get("accuracy_gain_vs_fifa_pp", 0.0)) >= 7.0,
         "monte_carlo_uncertainty_reported": bool(report.get("uncertainty_intervals", {}).get("champion_top_16")),
         "stage_uncertainty_reported": bool(report.get("uncertainty_intervals", {}).get("stage_top_32")),
         "advanced_calibration_exhausted": "advanced_calibration" in report,
@@ -1277,11 +1403,14 @@ def academic_stamp(
         "class_calibration_reported": bool(report.get("calibration", {}).get("class_summary", {}).get("rows", 0)),
         "block_bootstrap_reported": bool(report.get("uncertainty_intervals", {}).get("block_bootstrap", {}).get("rows", 0)),
         "runtime_adjustment_audit_reported": bool(report.get("runtime_adjustment_audit", {}).get("pairs", 0)),
+        "runtime_adjustment_direct_1x2_removed": report.get("runtime_adjustment_audit", {}).get("decision") == "direct_1x2_adjustment_removed",
         "runtime_adjustment_max_shift_lte_35pp": float(report.get("runtime_adjustment_audit", {}).get("max_abs_shift_pre_draw", 1.0)) <= 0.35,
         "runtime_adjustment_p95_shift_lte_18pp": float(report.get("runtime_adjustment_audit", {}).get("p95_abs_shift_pre_draw", 1.0)) <= 0.18,
+        "runtime_neutral_order_invariant": bool(report.get("runtime_neutral_order_audit", {}).get("passed")),
         "raw_data_manifest_reported": int(report.get("raw_data_manifest", {}).get("file_count", 0)) >= 1,
         "raw_data_manifest_hash_reported": bool(report.get("raw_data_manifest", {}).get("manifest_sha256")),
         "raw_data_semantic_sanity_passed": bool(report.get("raw_data_manifest", {}).get("semantic", {}).get("passed")),
+        "neutral_orientation_invariant": bool(report.get("training_orientation_audit", {}).get("passed")),
         "source_fingerprints_reported": all(
             name in report.get("source_fingerprints", {})
             for name in ["model_package", "model_report", "training_matches", "sota_pipeline", "stats_qa_script"]
@@ -1318,7 +1447,7 @@ def academic_stamp(
             },
             {
                 "item": "ajustes 2026 de elenco/Transfermarkt/contexto como modelo calibrado historicamente",
-                "reason": "foram auditados por limite de deslocamento probabilistico, mas nao promovidos a tuning academico porque faltam snapshots historicos equivalentes",
+                "reason": "permanecem apenas na camada de xG/Poisson; nao entram como deslocamento manual do 1X2 porque faltam snapshots historicos equivalentes",
             },
         ],
     }
@@ -1387,6 +1516,18 @@ def write_markdown(report: dict[str, Any], ablation: pd.DataFrame, uncertainty: 
             },
             indent=2,
         ),
+        "```",
+        "",
+        "Auditoria de orientação dos jogos neutros:",
+        "",
+        "```json",
+        json.dumps(report["training_orientation_audit"], indent=2),
+        "```",
+        "",
+        "Auditoria de inferência neutra em ordem invertida:",
+        "",
+        "```json",
+        json.dumps(report["runtime_neutral_order_audit"], indent=2),
         "```",
         "",
         "## Política ativa",
@@ -1488,7 +1629,7 @@ def write_markdown(report: dict[str, Any], ablation: pd.DataFrame, uncertainty: 
         "",
         "## Auditoria dos ajustes 2026",
         "",
-        "Os ajustes de elenco, Transfermarkt e contexto entram no runtime porque a Copa 2026 precisa refletir força atual de elenco. Como não existem snapshots históricos equivalentes no pacote, eles são auditados por limite de deslocamento probabilístico, e não usados para retunar a validação temporal.",
+        "Os proxies 2026 de elenco e Transfermarkt permanecem na camada de xG/Poisson. Como não existem snapshots históricos equivalentes no pacote, eles não deslocam manualmente a probabilidade 1X2 calibrada; a auditoria confirma essa separação.",
         "",
         "```json",
         json.dumps(report["runtime_adjustment_audit"], indent=2),
@@ -1519,6 +1660,7 @@ def write_markdown(report: dict[str, Any], ablation: pd.DataFrame, uncertainty: 
         f"- `{DC_CSV}`",
         f"- `{FRONTIER_CSV}`",
         f"- `{RUNTIME_ADJUSTMENT_CSV}`",
+        f"- `{RUNTIME_NEUTRAL_ORDER_CSV}`",
         f"- `{MC_STABILITY_JSON}`",
         f"- `{RAW_MANIFEST_JSON}`",
         f"- `{RAW_MANIFEST_CSV}`",
@@ -1533,6 +1675,8 @@ def run() -> dict[str, Any]:
     package, model_report, training = load_artifacts()
     log_step(start, "hashing complete raw data manifest")
     raw_manifest = raw_data_manifest()
+    log_step(start, "auditing neutral fixture orientation invariance")
+    orientation_audit = orientation_invariance_audit(training)
     if "draw_xgb" in package.get("models", {}):
         raise AssertionError("draw_xgb is still present; SOTA/KISS policy requires it removed")
     if package.get("version") != model_report.get("version"):
@@ -1623,6 +1767,12 @@ def run() -> dict[str, Any]:
     if float(adjustment_summary["p95_abs_shift_pre_draw"]) > 0.18:
         raise AssertionError(f"runtime adjustment p95 shift exceeded sanity bound: {adjustment_summary}")
 
+    log_step(start, "auditing neutral runtime order invariance")
+    runtime_order_audit, runtime_order_summary = runtime_neutral_order_invariance_audit(package)
+    runtime_order_audit.to_csv(RUNTIME_NEUTRAL_ORDER_CSV, index=False)
+    if not runtime_order_summary["passed"]:
+        raise AssertionError(f"runtime neutral order invariance failed: {runtime_order_summary}")
+
     mc_stability = load_monte_carlo_stability()
 
     best_ablation = ablation.iloc[0].to_dict()
@@ -1636,21 +1786,24 @@ def run() -> dict[str, Any]:
 
     full_objective_gap = float(full_ablation["objective"]) - float(best_ablation["objective"])
     rho_objective_gap = float(package_dc_row["hybrid_objective"]) - float(best_dc["hybrid_objective"])
-    if float(policy_metrics["log_loss"]) > 0.82:
-        raise AssertionError(f"runtime policy log_loss regressed: {policy_metrics}")
     if float(policy_metrics["draw_gap"]) > 0.02:
         raise AssertionError(f"runtime policy draw gap too high: {policy_metrics}")
-    if int(draw_scan["current_policy_rank"]) <= 0 or int(draw_scan["current_policy_rank"]) > 8:
-        raise AssertionError(f"current policy no longer near the draw-calibration frontier: {draw_scan['current_policy_rank']}")
+    draw_objective_gap = float(draw_scan["current_policy_objective_gap_vs_same_holdout_best"])
+    draw_gap_limit = float(draw_scan["accepted_objective_gap_without_retrofit"])
+    if draw_objective_gap > draw_gap_limit:
+        raise AssertionError(
+            "nested policy materially trails the same-holdout draw frontier: "
+            f"gap={draw_objective_gap:.6f} limit={draw_gap_limit:.6f}"
+        )
     if full_objective_gap > 0.012:
         raise AssertionError(f"full policy trails ablation frontier too much: gap={full_objective_gap:.6f}")
     if rho_objective_gap > 0.01:
         raise AssertionError(f"package Dixon-Coles rho trails sensitivity frontier too much: gap={rho_objective_gap:.6f}")
-    benchmark = public_baseline_benchmark(model_report, runtime_metrics)
-    if float(benchmark["runtime_policy"]["accuracy_gain_vs_elo_pp"]) < 5.0:
-        raise AssertionError(f"runtime policy does not beat ELO baseline enough: {benchmark}")
-    if float(benchmark["runtime_policy"]["accuracy_gain_vs_fifa_pp"]) < 7.0:
-        raise AssertionError(f"runtime policy does not beat FIFA rank baseline enough: {benchmark}")
+    benchmark = public_baseline_benchmark(model_report, runtime_metrics, diagnostic, y)
+    if float(benchmark["runtime_policy"]["log_loss_gain_vs_same_window_elo"]) < 0.005:
+        raise AssertionError(f"runtime policy does not improve same-window ELO log-loss enough: {benchmark}")
+    if float(benchmark["runtime_policy"]["rps_gain_vs_same_window_elo"]) < 0.002:
+        raise AssertionError(f"runtime policy does not improve same-window ELO RPS enough: {benchmark}")
 
     report = {
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -1685,6 +1838,7 @@ def run() -> dict[str, Any]:
             "training_rows": int(model_report.get("training_rows", len(training))),
             "diagnostic_rows": int(len(diagnostic)),
         },
+        "training_orientation_audit": orientation_audit,
         "policy": {
             "classifier_weight": round_float(policy["classifier_weight"], 4),
             "poisson_weight": round_float(policy["poisson_weight"], 4),
@@ -1741,6 +1895,7 @@ def run() -> dict[str, Any]:
             "rule": "promote only if a no-external-data candidate wins materially without hurting log_loss/draw calibration; otherwise document and keep runtime KISS",
         },
         "runtime_adjustment_audit": adjustment_summary,
+        "runtime_neutral_order_audit": runtime_order_summary,
         "monte_carlo_stability": mc_stability,
         "external_benchmark": benchmark,
         "recommendations": [],

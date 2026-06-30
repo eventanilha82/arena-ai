@@ -455,6 +455,60 @@ def validate_simulated_fair_play(model: WorldCupModel) -> None:
     require((standings["fair_play_score"] <= 0).all(), "score de fair play simulado não segue a escala de deduções FIFA")
 
 
+def validate_observed_knockout_results(model: WorldCupModel, board: bolao.GroupStageBoard) -> None:
+    observed = board.knockout_results
+    require(set(observed) == {74}, "snapshot atual deveria travar apenas o jogo 74 do mata-mata")
+    result = observed[74]
+    require(
+        (result.home, result.away, result.winner, result.resolution) == ("Germany", "Paraguay", "Paraguay", "penalties"),
+        "resultado observado de Alemanha x Paraguai não confere",
+    )
+    require(
+        (result.home_goals, result.away_goals, result.shootout_home, result.shootout_away) == (1, 1, 3, 4),
+        "placar observado de Alemanha x Paraguai não confere",
+    )
+    try:
+        bolao.build_conditioned_knockout(model, board, "Germany")
+    except ValueError as error:
+        require("eliminado" in str(error), f"eliminação observada falhou de forma inesperada: {error}")
+    else:
+        raise AssertionError("trilha condicionada ressuscitou a Alemanha após resultado observado")
+    bracket = bolao.build_conditioned_knockout(model, board, "Paraguay")
+    observed_row = bracket.loc[bracket["match_number"] == 74].iloc[0]
+    require(
+        (str(observed_row.winner), str(observed_row.resolution), int(observed_row.home_goals), int(observed_row.away_goals))
+        == ("Paraguay", "penalties", 1, 1),
+        "chave condicionada não preservou o resultado observado",
+    )
+
+
+def validate_neutral_order_invariance(model: WorldCupModel, board: bolao.GroupStageBoard) -> None:
+    teams = sorted(board.qualified_teams)
+    pairings = list(zip(teams[::2], teams[1::2]))
+    require(pairings, "não há pares classificados para auditar ordem neutra")
+    for home, away in pairings:
+        forward = bolao.form_aware_match(model, board.form, home, away, knockout=True).prediction
+        reverse = bolao.form_aware_match(model, board.form, away, home, knockout=True).prediction
+        require(bool(forward.get("neutral_order_symmetrized")), f"{home} x {away} não marcou simetrização neutra")
+        require(bool(reverse.get("neutral_order_symmetrized")), f"{away} x {home} não marcou simetrização neutra")
+        require(
+            abs(float(forward["p_home_win_90"]) - float(reverse["p_away_win_90"])) <= 1e-10
+            and abs(float(forward["p_draw_90"]) - float(reverse["p_draw_90"])) <= 1e-10
+            and abs(float(forward["p_away_win_90"]) - float(reverse["p_home_win_90"])) <= 1e-10,
+            f"1X2 neutro mudou ao inverter {home} x {away}",
+        )
+        require(
+            abs(float(forward["p_home_advances"]) - float(reverse["p_away_advances"])) <= 1e-10
+            and abs(float(forward["p_home_advances_if_draw"]) + float(reverse["p_home_advances_if_draw"]) - 1.0) <= 1e-10,
+            f"avanço de mata-mata mudou ao inverter {home} x {away}",
+        )
+        require(
+            abs(float(forward["home_xg"]) - float(reverse["away_xg"])) <= 1e-10
+            and abs(float(forward["away_xg"]) - float(reverse["home_xg"])) <= 1e-10,
+            f"xG neutro mudou ao inverter {home} x {away}",
+        )
+
+
 def validate_knockout_policy(model: WorldCupModel, board: bolao.GroupStageBoard) -> None:
     rho = sota.dixon_coles_rho_from_package(model.package)
     teams = sorted(board.qualified_teams)
@@ -591,6 +645,14 @@ def validate_monte_carlo(model: WorldCupModel, board: bolao.GroupStageBoard, run
         all(option.team in board.qualified_teams for option in first),
         "Monte Carlo escolheu campeao fora dos classificados da fase fixa",
     )
+    observed_losers = {
+        result.away if result.winner == result.home else result.home
+        for result in board.knockout_results.values()
+    }
+    require(
+        not observed_losers.intersection(option.team for option in first),
+        "Monte Carlo manteve campeão já eliminado em resultado observado",
+    )
     require(
         [option.rank for option in first] == list(range(1, len(first) + 1)),
         "ranking Monte Carlo contem posicoes invalidas",
@@ -638,12 +700,20 @@ def validate_mc_stability_audit() -> None:
         report = json.loads(output.read_text(encoding="utf-8"))
     require(report["simulation_scope"]["group_stage"] == "fixed_board", "auditoria MC não fixou a fase de grupos")
     require(report["simulation_scope"]["current_tournament_form"] == "included", "auditoria MC não incluiu a forma")
-    require(report["simulation_scope"]["knockout"] == "form_aware_hybrid_sampled", "auditoria MC não cobriu o mata-mata")
+    require(
+        report["simulation_scope"]["knockout"] == "observed_results_locked_then_form_aware_hybrid_sampled",
+        "auditoria MC não travou resultados observados antes do mata-mata simulado",
+    )
     require(
         report["simulation_scope"]["sampling"] == "nested_prefixes_one_seed_plus_independent_seeds",
         "auditoria MC não incluiu amostras de seeds independentes",
     )
     require(report["fixed_group_stage"]["is_fixed"] is True, "relatório MC não marcou grupos fixos")
+    require(
+        report["fixed_group_stage"]["locked_knockout_results"]
+        == [{"match_number": 74, "home": "Germany", "away": "Paraguay", "winner": "Paraguay", "resolution": "penalties"}],
+        "auditoria MC não registrou o resultado observado da chave",
+    )
     require(
         report["uncertainty"]["scope"] == "monte_carlo_sampling_error_only",
         "relatório MC apresentou IC como incerteza total do modelo",
@@ -661,6 +731,7 @@ def validate_mc_stability_audit() -> None:
         "runtime_cache",
         "observed_results",
         "observed_snapshot",
+        "observed_knockout_results",
         "stability_audit",
     ):
         require(name in fingerprints and fingerprints[name].get("sha256"), f"relatório MC sem fingerprint de {name}")
@@ -695,6 +766,8 @@ def main() -> int:
     validate_form_calibration(model, board)
     validate_fifa_tiebreaks()
     validate_simulated_fair_play(model)
+    validate_observed_knockout_results(model, board)
+    validate_neutral_order_invariance(model, board)
     validate_knockout_policy(model, board)
     validate_penalty_scores_include_extra_time()
     validate_monte_carlo(model, board, int(args.runs), int(args.seed))

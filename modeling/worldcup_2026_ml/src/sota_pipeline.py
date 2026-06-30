@@ -17,7 +17,7 @@ import threading
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, PoissonRegressor
-from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, mean_absolute_error
+from sklearn.metrics import accuracy_score, log_loss, mean_absolute_error
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier, XGBRegressor
@@ -179,11 +179,8 @@ LCHIKRY_FEATURES = [
 SOTA_V1_BASELINE_METRICS = {
     "baseline_elo_1x2": {"accuracy": 0.5893},
     "baseline_fifa_rank_1x2": {"accuracy": 0.5629},
-    "baseline_elo_winner_no_draw": {"accuracy": 0.7858},
-    "baseline_fifa_rank_winner_no_draw": {"accuracy": 0.7567},
     "logistic_1x2": {"accuracy": 0.5680, "top2_accuracy": 0.8411, "log_loss": 0.8842, "draw_recall": 0.2298},
     "xgb_1x2": {"accuracy": 0.6010, "top2_accuracy": 0.8361, "log_loss": 0.8650, "draw_recall": 0.0035},
-    "winner_xgb_no_draw": {"accuracy": 0.7891, "log_loss": 0.4409, "brier": 0.1439},
     "competitive_xgb_1x2": {"accuracy": 0.6100, "top2_accuracy": 0.8430, "log_loss": 0.8528},
 }
 
@@ -476,14 +473,6 @@ def label_1x2(home_score: int, away_score: int) -> int:
     return 2
 
 
-def label_winner(home_score: int, away_score: int) -> int | None:
-    if home_score > away_score:
-        return 0
-    if away_score > home_score:
-        return 1
-    return None
-
-
 def base_features(states: dict[str, RunningTeam], home: str, away: str, neutral: bool, tournament: str) -> dict[str, float]:
     h = states[home]
     a = states[away]
@@ -577,7 +566,6 @@ def build_training_frame() -> tuple[pd.DataFrame, dict[str, RunningTeam]]:
         tournament = str(row.tournament)
         feats = base_features(states, home, away, neutral, tournament)
         label = label_1x2(hs, AS)
-        winner = label_winner(hs, AS)
         if row.date.year >= 1990:
             rows.append(
                 {
@@ -588,11 +576,30 @@ def build_training_frame() -> tuple[pd.DataFrame, dict[str, RunningTeam]]:
                     "away_score": AS,
                     "tournament": tournament,
                     "target_1x2": label,
-                    "target_winner": winner,
                     "source_name": source_name,
+                    "orientation_augmented": False,
                     **feats,
                 }
             )
+            # The historical source commonly writes neutral fixtures with the winner
+            # first. Add the exact mirrored fixture so a nominal home/away ordering
+            # cannot become a proxy for the result in World Cup predictions.
+            if neutral:
+                mirrored_feats = base_features(states, away, home, neutral, tournament)
+                rows.append(
+                    {
+                        "date": row.date,
+                        "home_team": away,
+                        "away_team": home,
+                        "home_score": AS,
+                        "away_score": hs,
+                        "tournament": tournament,
+                        "target_1x2": 2 if label == 0 else 0 if label == 2 else 1,
+                        "source_name": source_name,
+                        "orientation_augmented": True,
+                        **mirrored_feats,
+                    }
+                )
         update_elo(states, home, away, label, hs - AS, tournament_weight(tournament), neutral)
         states[home].update(hs, AS)
         states[away].update(AS, hs)
@@ -600,6 +607,33 @@ def build_training_frame() -> tuple[pd.DataFrame, dict[str, RunningTeam]]:
     frame = add_ranking_features(frame, load_rankings())
     frame = add_external_elo_features(frame, load_external_elo())
     return frame, states
+
+
+def training_orientation_summary(frame: pd.DataFrame) -> dict[str, object]:
+    neutral = frame[frame["neutral"].astype(float) == 1.0]
+    world_cup = neutral[neutral["tournament"].astype(str) == "World Cup"]
+
+    def outcomes(values: pd.DataFrame) -> dict[str, int]:
+        return {
+            "home_wins": int((values["target_1x2"] == 0).sum()),
+            "draws": int((values["target_1x2"] == 1).sum()),
+            "away_wins": int((values["target_1x2"] == 2).sum()),
+        }
+
+    neutral_outcomes = outcomes(neutral)
+    world_cup_outcomes = outcomes(world_cup)
+    return {
+        "method": "neutral fixtures are paired with exact home/away mirrors before fitting",
+        "neutral_rows": int(len(neutral)),
+        "world_cup_neutral_rows": int(len(world_cup)),
+        "augmented_rows": int(frame["orientation_augmented"].astype(bool).sum()),
+        "neutral_outcomes": neutral_outcomes,
+        "world_cup_neutral_outcomes": world_cup_outcomes,
+        "orientation_invariant": bool(
+            neutral_outcomes["home_wins"] == neutral_outcomes["away_wins"]
+            and world_cup_outcomes["home_wins"] == world_cup_outcomes["away_wins"]
+        ),
+    }
 
 
 def build_squad_strength() -> pd.DataFrame:
@@ -993,7 +1027,6 @@ def train_models(training: pd.DataFrame) -> tuple[dict[str, object], dict[str, o
     y_train = train["target_1x2"]
     y_test = test["target_1x2"]
     train_weight = temporal_sample_weight(train)
-    winner_test_baseline = test.dropna(subset=["target_winner"]).copy()
 
     logistic_1x2 = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1200, class_weight="balanced", random_state=RANDOM_SEED))
     xgb_1x2 = XGBClassifier(
@@ -1009,24 +1042,6 @@ def train_models(training: pd.DataFrame) -> tuple[dict[str, object], dict[str, o
     )
     fit_pipeline_with_optional_weight(logistic_1x2, x_train, y_train, train_weight)
     xgb_1x2.fit(x_train, y_train, sample_weight=train_weight)
-
-    winner_train = train.dropna(subset=["target_winner"]).copy()
-    winner_test = test.dropna(subset=["target_winner"]).copy()
-    winner_model = XGBClassifier(
-        objective="binary:logistic",
-        n_estimators=300,
-        max_depth=4,
-        learning_rate=0.04,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        eval_metric="logloss",
-        random_state=RANDOM_SEED,
-    )
-    winner_model.fit(
-        winner_train[BASE_FEATURES],
-        winner_train["target_winner"].astype(int),
-        sample_weight=temporal_sample_weight(winner_train, train["date"].max()),
-    )
 
     competitive_train = train[train["tournament_weight"] >= 1.0].copy()
     competitive_test = test[test["tournament_weight"] >= 1.0].copy()
@@ -1138,18 +1153,6 @@ def train_models(training: pd.DataFrame) -> tuple[dict[str, object], dict[str, o
         "accuracy": round(float(accuracy_score(y_test, fifa_pred)), 4),
         "test_rows": int(len(test)),
     }
-    if not winner_test_baseline.empty:
-        y_winner_base = winner_test_baseline["target_winner"].astype(int).to_numpy()
-        elo_winner_pred = np.where(winner_test_baseline["elo_diff"].to_numpy() >= 0, 0, 1)
-        fifa_winner_pred = np.where(winner_test_baseline["fifa_rank_diff"].to_numpy() >= 0, 0, 1)
-        metrics["baseline_elo_winner_no_draw"] = {
-            "accuracy": round(float(accuracy_score(y_winner_base, elo_winner_pred)), 4),
-            "test_rows": int(len(winner_test_baseline)),
-        }
-        metrics["baseline_fifa_rank_winner_no_draw"] = {
-            "accuracy": round(float(accuracy_score(y_winner_base, fifa_winner_pred)), 4),
-            "test_rows": int(len(winner_test_baseline)),
-        }
     for name, model in {"logistic_1x2": logistic_1x2, "xgb_1x2": xgb_1x2}.items():
         probs = model.predict_proba(x_test)
         pred = probs.argmax(axis=1)
@@ -1169,15 +1172,6 @@ def train_models(training: pd.DataFrame) -> tuple[dict[str, object], dict[str, o
         "draw_recall": round(float(np.mean(xgb_calibrated_pred[y_test.to_numpy() == 1] == 1)), 4),
         "temperature": round(float(xgb_temperature), 4),
         "test_rows": int(len(test)),
-    }
-    winner_probs = winner_model.predict_proba(winner_test[BASE_FEATURES])[:, 1]
-    winner_pred = (winner_probs >= 0.5).astype(int)
-    y_winner = winner_test["target_winner"].astype(int).to_numpy()
-    metrics["winner_xgb_no_draw"] = {
-        "accuracy": round(float(accuracy_score(y_winner, winner_pred)), 4),
-        "log_loss": round(float(log_loss(y_winner, np.column_stack([1 - winner_probs, winner_probs]), labels=[0, 1])), 4),
-        "brier": round(float(brier_score_loss(y_winner, winner_probs)), 4),
-        "test_rows": int(len(winner_test)),
     }
     comp_probs = competitive_model.predict_proba(competitive_test[BASE_FEATURES])
     comp_pred = comp_probs.argmax(axis=1)
@@ -1245,7 +1239,6 @@ def train_models(training: pd.DataFrame) -> tuple[dict[str, object], dict[str, o
     return {
         "logistic_1x2": logistic_1x2,
         "xgb_1x2": xgb_1x2,
-        "winner_xgb": winner_model,
         "competitive_xgb_1x2": competitive_model,
         "home_goals_poisson": home_goals_model,
         "away_goals_poisson": away_goals_model,
@@ -1807,8 +1800,8 @@ def run_nested_temporal_policy_validation(package: dict[str, object], training: 
         )
         selected_policy = selected_component_policy
     return {
-        "version": "nested_temporal_policy_v3_component_ablation_no_leakage_no_draw_xgb",
-        "description": "Each outer year trains inner models only before the internal validation window, selects blend components plus classifier/Poisson/draw policy on that later internal window, then refits on all prior data and evaluates the outer year without retuning.",
+        "version": "nested_temporal_policy_v4_orientation_invariant_no_leakage_no_draw_xgb",
+        "description": "Each outer year trains inner models only before the internal validation window, using orientation-invariant neutral fixtures, selects blend components plus classifier/Poisson/draw policy on that later internal window, then refits on all prior data and evaluates the outer year without retuning.",
         "aggregate": aggregate,
         "rows": rows,
         "fold_winner_policy": fold_winner_policy,
@@ -2130,7 +2123,7 @@ def run_world_cup_backtest(training: pd.DataFrame) -> dict[str, object]:
                 for col in metric_cols
                 if model_df[col].notna().any()
             }
-    return {"version": "worldcup_2026_sota_v2_backtest", "folds": folds, "aggregate_weighted_by_matches": aggregate, "rows": rows}
+    return {"version": "worldcup_2026_sota_v4_orientation_invariant_backtest", "folds": folds, "aggregate_weighted_by_matches": aggregate, "rows": rows}
 
 
 def prepare_match_features(package: dict[str, object], home: str, away: str, neutral: bool = True, tournament: str = "FIFA World Cup") -> pd.DataFrame:
@@ -2254,6 +2247,36 @@ def simulation_policy_from_package(package: dict[str, object] | None = None) -> 
     }
 
 
+def elo_outcome_probs(states: dict[str, RunningTeam], home: str, away: str) -> np.ndarray:
+    """Return the three-way ELO baseline without introducing a neutral-side label."""
+    elo_home = expected_score(states[home].elo, states[away].elo)
+    draw = max(0.15, min(0.30, 0.27 - abs(elo_home - 0.5) * 0.20))
+    return np.array([(1 - draw) * elo_home, draw, (1 - draw) * (1 - elo_home)])
+
+
+def reverse_outcome_probs(probs: np.ndarray) -> np.ndarray:
+    """Express [home, draw, away] probabilities from the opposite team order."""
+    values = np.asarray(probs, dtype=float)
+    if values.shape != (3,):
+        raise ValueError(f"expected three outcome probabilities, got {values.shape}")
+    return values[[2, 1, 0]]
+
+
+def normalized_outcome_probs(probs: np.ndarray) -> np.ndarray:
+    values = np.clip(np.asarray(probs, dtype=float), 1e-12, None)
+    return values / values.sum()
+
+
+def goal_model_lambdas(package: dict[str, object], features: pd.DataFrame) -> tuple[float | None, float | None]:
+    models = package["models"]
+    if "home_goals_poisson" not in models or "away_goals_poisson" not in models:
+        return None, None
+    return (
+        float(np.clip(models["home_goals_poisson"].predict(features)[0], 0.15, 4.5)),
+        float(np.clip(models["away_goals_poisson"].predict(features)[0], 0.15, 4.5)),
+    )
+
+
 def base_probability_stack(package: dict[str, object], x: pd.DataFrame, h: str, a: str, neutral: bool, p_elo: np.ndarray) -> dict[str, np.ndarray]:
     p_xgb = package["models"]["xgb_1x2"].predict_proba(x)[0]
     if package.get("use_temperature_calibration"):
@@ -2283,6 +2306,49 @@ def base_probability_stack(package: dict[str, object], x: pd.DataFrame, h: str, 
     if package.get("use_lchikry_ensemble") and lchikry_model is not None:
         stack["lchikry"] = lchikry_model.predict_proba(lchikry_match_features(package, h, a, neutral))[0]
     return stack
+
+
+def neutral_order_invariant_probability_stack(
+    package: dict[str, object],
+    home: str,
+    away: str,
+    raw_stack: dict[str, np.ndarray],
+    *,
+    neutral: bool,
+) -> dict[str, np.ndarray]:
+    """Average both nominal orders so neutral fixtures cannot favor bracket position."""
+    if not neutral:
+        return raw_stack
+    states = ensure_states(package)
+    mirror_features = prepare_match_features(package, away, home, neutral=True)
+    mirror_stack = base_probability_stack(
+        package,
+        mirror_features,
+        away,
+        home,
+        True,
+        elo_outcome_probs(states, away, home),
+    )
+    if set(raw_stack) != set(mirror_stack):
+        raise ValueError("probability stack differs between mirrored neutral fixture orders")
+    return {
+        name: normalized_outcome_probs(0.5 * (np.asarray(probs, dtype=float) + reverse_outcome_probs(mirror_stack[name])))
+        for name, probs in raw_stack.items()
+    }
+
+
+def squad_strength_term(diffs: dict[str, float]) -> float:
+    """Unbacktested 2026 proxies are allowed only as an xG-layer signal."""
+    return float(
+        diffs["squad_top26_diff"] * 0.018
+        + diffs["attack_strength_diff"] * 0.010
+        + diffs["midfield_strength_diff"] * 0.005
+        - diffs["defense_strength_diff"] * 0.006
+        + diffs["tm_market_value_log_diff"] * 0.020
+        + diffs["tm_caps_diff"] * 0.010
+        - diffs["tm_recent_injury_days_diff"] * 0.010
+        - diffs["tm_injury_value_log_diff"] * 0.008
+    )
 
 
 def stack_feature_vector(prob_stack: dict[str, np.ndarray]) -> np.ndarray:
@@ -2327,11 +2393,14 @@ def predict_match(
         if base is None:
             x = prepare_match_features(package, h, a, neutral)
             states = ensure_states(package)
-            elo_home = expected_score(states[h].elo, states[a].elo)
-            draw = max(0.15, min(0.30, 0.27 - abs(elo_home - 0.5) * 0.20))
-            p_elo = np.array([(1 - draw) * elo_home, draw, (1 - draw) * (1 - elo_home)])
-
-            prob_stack = base_probability_stack(package, x, h, a, neutral, p_elo)
+            prob_stack = base_probability_stack(package, x, h, a, neutral, elo_outcome_probs(states, h, a))
+            prob_stack = neutral_order_invariant_probability_stack(
+                package,
+                h,
+                a,
+                prob_stack,
+                neutral=bool(neutral),
+            )
             stacking_meta = package["models"].get("stacking_meta_1x2")
             if package.get("use_stacking_ensemble") and stacking_meta is not None:
                 probs_90 = stacking_meta.predict_proba([stack_feature_vector(prob_stack)])[0]
@@ -2339,38 +2408,29 @@ def predict_match(
                 weights = package.get("manual_blend_weights", DEFAULT_MANUAL_BLEND_WEIGHTS)
                 probs_90 = sum(float(weights.get(name, 0.0)) * probs for name, probs in prob_stack.items() if name in weights)
             diffs = squad_diffs(package["squad_strength"], h, a)
-            squad_adjust = np.array([diffs["squad_top26_diff"] * 0.007, -abs(diffs["squad_top26_diff"]) * 0.0015, -diffs["squad_top26_diff"] * 0.007])
-            transfermarkt_adjust = np.array(
-                [
-                    diffs["tm_market_value_log_diff"] * 0.010 + diffs["tm_caps_diff"] * 0.004 - diffs["tm_recent_injury_days_diff"] * 0.003 - diffs["tm_injury_value_log_diff"] * 0.003,
-                    -abs(diffs["tm_market_value_log_diff"]) * 0.001,
-                    -diffs["tm_market_value_log_diff"] * 0.010 - diffs["tm_caps_diff"] * 0.004 + diffs["tm_recent_injury_days_diff"] * 0.003 + diffs["tm_injury_value_log_diff"] * 0.003,
-                ]
-            )
-            base_probs_90 = np.clip(probs_90 + squad_adjust + transfermarkt_adjust, 0.01, 0.98)
+            # The 2026 squad/Transfermarkt snapshots have no historical versions
+            # for clean backtesting. Keep them in the goal-rate layer below, but
+            # never add their hand-tuned shifts directly to calibrated 1X2 odds.
+            base_probs_90 = np.clip(probs_90, 0.01, 0.98)
             base_probs_90 = base_probs_90 / base_probs_90.sum()
-            winner_x = package["models"]["winner_xgb"].predict_proba(x)[0]
-            static_strength_term = (
-                diffs["squad_top26_diff"] * 0.018
-                + diffs["attack_strength_diff"] * 0.010
-                + diffs["midfield_strength_diff"] * 0.005
-                - diffs["defense_strength_diff"] * 0.006
-                + diffs["tm_market_value_log_diff"] * 0.020
-                + diffs["tm_caps_diff"] * 0.010
-                - diffs["tm_recent_injury_days_diff"] * 0.010
-                - diffs["tm_injury_value_log_diff"] * 0.008
-            )
-            model_home_xg = None
-            model_away_xg = None
-            if "home_goals_poisson" in package["models"] and "away_goals_poisson" in package["models"]:
-                model_home_xg = float(np.clip(package["models"]["home_goals_poisson"].predict(x)[0], 0.15, 4.5))
-                model_away_xg = float(np.clip(package["models"]["away_goals_poisson"].predict(x)[0], 0.15, 4.5))
+            static_strength_term = squad_strength_term(diffs)
+            if neutral:
+                # Make the proxy term antisymmetric too. It must never reward the
+                # team placed first in a neutral bracket independently of strength.
+                mirror_diffs = squad_diffs(package["squad_strength"], a, h)
+                static_strength_term = 0.5 * (static_strength_term - squad_strength_term(mirror_diffs))
+            model_home_xg, model_away_xg = goal_model_lambdas(package, x)
+            if neutral and model_home_xg is not None and model_away_xg is not None:
+                mirror_features = prepare_match_features(package, a, h, neutral=True)
+                mirror_home_xg, mirror_away_xg = goal_model_lambdas(package, mirror_features)
+                if mirror_home_xg is None or mirror_away_xg is None:
+                    raise ValueError("mirrored neutral fixture lost Poisson goal-model lambdas")
+                model_home_xg = 0.5 * (model_home_xg + mirror_away_xg)
+                model_away_xg = 0.5 * (model_away_xg + mirror_home_xg)
             base = {
                 "probs_90": base_probs_90,
                 "prob_stack": prob_stack,
                 "diffs": diffs,
-                "elo_home": float(elo_home),
-                "p_home_winner_model": float(winner_x[0]),
                 "home_avg_for": float(states[h].avg_for),
                 "home_avg_against": float(states[h].avg_against),
                 "away_avg_for": float(states[a].avg_for),
@@ -2383,7 +2443,6 @@ def predict_match(
 
     prob_stack = base["prob_stack"]
     diffs = base["diffs"]
-    elo_home = float(base["elo_home"])
     context_shift = logistic_context_adjustment(h, a, context)
     probs_90 = np.array(base["probs_90"], dtype=float)
     probs_90 = apply_logit_shift(probs_90, context_shift)
@@ -2395,29 +2454,42 @@ def predict_match(
         float(sim_policy["draw_ceiling"]),
     )
 
-    p_home_winner_model = float(base["p_home_winner_model"])
-    no_draw_total = probs_90[0] + probs_90[2]
-    p_home_no_draw = float(probs_90[0] / no_draw_total) if no_draw_total else 0.5
-    p_home_advances_if_draw = 0.48 * p_home_winner_model + 0.32 * p_home_no_draw + 0.20 * elo_home
-    p_home_advances = float(probs_90[0] + probs_90[1] * p_home_advances_if_draw)
-    p_away_advances = 1.0 - p_home_advances
-
     strength_term = float(base["static_strength_term"]) + context_shift * 0.18
     # xG must stay independent from the simulation policy being calibrated.
     # The calibrated policy controls 1X2 sampling; xG remains a base match signal.
+    home_goal_baseline = 1.10 if neutral else 1.12
+    away_goal_baseline = 1.10 if neutral else 1.08
     home_xg = max(
         0.15,
-        1.12 + float(base["home_avg_for"]) * 0.32 - float(base["away_avg_against"]) * 0.12 + (pre_draw_probs_90[0] - pre_draw_probs_90[2]) * 0.92 + strength_term,
+        home_goal_baseline
+        + float(base["home_avg_for"]) * 0.32
+        - float(base["away_avg_against"]) * 0.12
+        + (pre_draw_probs_90[0] - pre_draw_probs_90[2]) * 0.92
+        + strength_term,
     )
     away_xg = max(
         0.15,
-        1.08 + float(base["away_avg_for"]) * 0.32 - float(base["home_avg_against"]) * 0.12 + (pre_draw_probs_90[2] - pre_draw_probs_90[0]) * 0.92 - strength_term,
+        away_goal_baseline
+        + float(base["away_avg_for"]) * 0.32
+        - float(base["home_avg_against"]) * 0.12
+        + (pre_draw_probs_90[2] - pre_draw_probs_90[0]) * 0.92
+        - strength_term,
     )
     model_home_xg = base.get("model_home_xg")
     model_away_xg = base.get("model_away_xg")
     if model_home_xg is not None and model_away_xg is not None:
         home_xg = 0.55 * home_xg + 0.45 * model_home_xg
         away_xg = 0.55 * away_xg + 0.45 * model_away_xg
+
+    # Extra time is generated from the same goal model, while a shootout stays
+    # neutral. A generic non-draw classifier is not evidence about penalties.
+    resolution_policy = knockout_resolution_policy(
+        {"home_xg": float(home_xg), "away_xg": float(away_xg)},
+        rho=dixon_coles_rho_from_package(package),
+    )
+    p_home_advances_if_draw = float(resolution_policy.home_advances_if_draw)
+    p_home_advances = float(probs_90[0] + probs_90[1] * p_home_advances_if_draw)
+    p_away_advances = float(1.0 - p_home_advances)
 
     result = {
         "p_home_win_90": float(probs_90[0]),
@@ -2442,6 +2514,7 @@ def predict_match(
         "away_rest_days": float((context or {}).get("away_rest_days", 5.0)),
         "home_travel_km": float((context or {}).get("home_travel_km", 0.0)),
         "away_travel_km": float((context or {}).get("away_travel_km", 0.0)),
+        "neutral_order_symmetrized": bool(neutral),
         **diffs,
     }
     with cache_lock:
@@ -2638,85 +2711,19 @@ class KnockoutResolutionPolicy:
     home_advances_if_draw: float
 
 
-def home_advances_if_draw(prediction: dict[str, float]) -> float:
-    explicit = prediction.get("p_home_advances_if_draw")
-    if explicit is not None:
-        return float(np.clip(float(explicit), 0.0, 1.0))
-    draw_probability = max(1e-9, float(prediction["p_draw_90"]))
-    return float(
-        np.clip(
-            (float(prediction["p_home_advances"]) - float(prediction["p_home_win_90"])) / draw_probability,
-            0.0,
-            1.0,
-        )
-    )
-
-
-def reweight_score_matrix_outcomes(
-    matrix: np.ndarray,
-    source_outcomes: np.ndarray,
-    target_outcomes: np.ndarray,
-) -> np.ndarray:
-    """Keep each score's conditional shape while calibrating 1X2 outcome mass."""
-    adjusted = np.array(matrix, dtype=float, copy=True)
-    for home_goals in range(adjusted.shape[0]):
-        for away_goals in range(adjusted.shape[1]):
-            outcome = 0 if home_goals > away_goals else 2 if away_goals > home_goals else 1
-            source_probability = float(source_outcomes[outcome])
-            if source_probability > 1e-12:
-                adjusted[home_goals, away_goals] *= float(target_outcomes[outcome]) / source_probability
-            else:
-                adjusted[home_goals, away_goals] = 0.0
-    total = float(adjusted.sum())
-    if total <= 0.0:
-        raise ValueError("extra-time score matrix has no probability mass")
-    return adjusted / total
-
-
 def knockout_resolution_policy(
     prediction: dict[str, float],
     *,
     rho: float = DEFAULT_DIXON_COLES_RHO,
 ) -> KnockoutResolutionPolicy:
-    """Model 90-minute draws as calibrated extra time followed by penalties."""
-    raw_extra_time_matrix = score_matrix(
+    """Resolve a 90-minute draw with Poisson/DC extra time and neutral penalties."""
+    extra_time_matrix = score_matrix(
         max(0.05, float(prediction["home_xg"]) * 0.28),
         max(0.05, float(prediction["away_xg"]) * 0.28),
         rho=rho,
     )
-    raw_extra_time_outcomes = outcome_probs_from_matrix(raw_extra_time_matrix)
-    target_home_advances = home_advances_if_draw(prediction)
-    home_limit = (
-        target_home_advances / float(raw_extra_time_outcomes[0])
-        if float(raw_extra_time_outcomes[0]) > 1e-12
-        else 1.0
-    )
-    away_limit = (
-        (1.0 - target_home_advances) / float(raw_extra_time_outcomes[2])
-        if float(raw_extra_time_outcomes[2]) > 1e-12
-        else 1.0
-    )
-    decisive_scale = float(np.clip(min(1.0, home_limit, away_limit), 0.0, 1.0))
-    extra_time_outcomes = np.array(
-        [
-            float(raw_extra_time_outcomes[0]) * decisive_scale,
-            1.0 - (float(raw_extra_time_outcomes[0]) + float(raw_extra_time_outcomes[2])) * decisive_scale,
-            float(raw_extra_time_outcomes[2]) * decisive_scale,
-        ],
-        dtype=float,
-    )
-    extra_time_matrix = reweight_score_matrix_outcomes(
-        raw_extra_time_matrix,
-        raw_extra_time_outcomes,
-        extra_time_outcomes,
-    )
-    extra_time_draw = float(extra_time_outcomes[1])
-    if extra_time_draw <= 1e-9:
-        home_penalty_probability = 0.5
-    else:
-        home_penalty_probability = float(
-            np.clip((target_home_advances - float(extra_time_outcomes[0])) / extra_time_draw, 0.0, 1.0)
-        )
+    extra_time_outcomes = outcome_probs_from_matrix(extra_time_matrix)
+    home_penalty_probability = 0.5
     return KnockoutResolutionPolicy(
         extra_time_matrix=extra_time_matrix,
         extra_time_outcomes=extra_time_outcomes,
@@ -4371,6 +4378,9 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
             previous_metrics = {}
 
     training, states = build_training_frame()
+    orientation_summary = training_orientation_summary(training)
+    if not orientation_summary["orientation_invariant"]:
+        raise ValueError(f"neutral orientation augmentation failed: {orientation_summary}")
     squad = build_squad_strength()
     fixtures = load_fixtures()
     rankings = load_rankings()
@@ -4391,12 +4401,11 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
         and metrics["xgb_temperature_calibrated_1x2"]["log_loss"] <= metrics["xgb_1x2"]["log_loss"]
     )
     package = {
-        "version": "worldcup_2026_sota_v3",
+        "version": "worldcup_2026_sota_v4",
         "base_features": BASE_FEATURES,
         "squad_features": SQUAD_FEATURES,
         "lchikry_features": LCHIKRY_FEATURES,
         "label_map_1x2": {0: "home_win_90", 1: "draw_90", 2: "away_win_90"},
-        "label_map_winner": {0: "home_winner", 1: "away_winner"},
         "models": models,
         "states": dict(states),
         "squad_strength": squad,
@@ -4411,6 +4420,7 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
         "xgb_temperature": xgb_temperature,
         "use_temperature_calibration": use_temperature,
         "manual_blend_weights": dict(DEFAULT_MANUAL_BLEND_WEIGHTS),
+        "training_orientation": orientation_summary,
         "simulation_policy": {
             "name": "hybrid_classifier_poisson",
             "classifier_weight": MATCH_CLASSIFIER_WEIGHT,
@@ -4420,9 +4430,12 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
             "description": "Sample 90min outcome from classifier+Poisson blend, then sample a compatible score from the Dixon-Coles matrix.",
         },
         "prediction_cache": {},
+        "prediction_base_cache": {},
         "notes": [
-            "SOTA v3 separates 90-minute 1X2 prediction from mandatory knockout winner prediction.",
-            "SOTA v3 adds learned stacking validation, XGB count:poisson goal regressors, Dixon-Coles rho tuning, fixture rest/travel context, and injury value risk.",
+            "SOTA v4 makes neutral historical fixtures orientation-invariant before training the 90-minute 1X2 model.",
+            "SOTA v4 also symmetrizes neutral inference across both nominal bracket orders before producing 1X2 odds and xG.",
+            "SOTA v4 resolves knockout draws with the Poisson/Dixon-Coles extra-time matrix and neutral penalty shootouts.",
+            "SOTA v4 retains learned stacking validation, XGB count:poisson goal regressors, Dixon-Coles rho tuning, fixture rest/travel context, and injury value risk.",
             "Group simulation keeps draws; knockout simulation always returns a winner.",
             "Monte Carlo samples each 90-minute score with a hybrid classifier-plus-Poisson policy: XGBoost chooses tendency, Dixon-Coles keeps football variance.",
             "Monte Carlo probabilities are the primary tournament-level output.",
@@ -4480,6 +4493,9 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
     pickle_package = dict(package)
     pickle_package["states"] = {name: state_to_record(state) for name, state in package["states"].items()}
     pickle_package["prediction_cache"] = {}
+    # Derived feature predictions depend on the active inference implementation.
+    # Persisting them can retain a stale policy after a source-level correction.
+    pickle_package["prediction_base_cache"] = {}
     pickle_package.pop("_prediction_cache_lock", None)
     with (MODELS / "model_sota.pkl").open("wb") as file:
         pickle.dump(pickle_package, file)
@@ -4488,6 +4504,7 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
         "version": package["version"],
         "training_rows": int(len(training)),
         "training_source": str(training["source_name"].iloc[0]) if "source_name" in training.columns and len(training) else "unknown",
+        "training_orientation": orientation_summary,
         "train_start": str(training["date"].min().date()),
         "train_end": str(training["date"].max().date()),
         "metrics": metrics,
@@ -4510,6 +4527,7 @@ def build_sota_package(runs: int = 10000) -> dict[str, object]:
             "transfermarkt_injury_value_risk": True,
             "confederation_features": True,
             "temporal_importance_sample_weight": True,
+            "neutral_orientation_invariance": True,
         },
         "external_elo_audit": external_elo_audit,
         "world_cup_backtest_aggregate": backtest["aggregate_weighted_by_matches"],

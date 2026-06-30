@@ -31,7 +31,7 @@ O jogo consome o pacote SOTA em `modeling/worldcup_2026_ml/`:
 
 Motores usados no jogo:
 
-- `XGBoost`: motor principal de classificação para vitória, empate, derrota e vencedor obrigatório.
+- `XGBoost`: motor principal de classificação para vitória, empate e derrota em 90 minutos.
 - `Poisson/Dixon-Coles`: motor de placar, top 5 placares, over/under e ambos marcam. No confronto, sua matriz também vota no pacote do resultado, então empates e zebras continuam possíveis quando têm peso estatístico.
 - `Monte Carlo`: motor de Copa completa. Cada jogo usa o mix classificador + Poisson/Dixon-Coles: primeiro sorteia tendência estatística de vitória/empate/derrota, depois sorteia o placar dentro dessa tendência.
 - `ELO`, ranking FIFA e regressão logística (`logistic_1x2`): sinais/baselines auditados dentro do pacote, não modos isolados no jogo. A ablação nested atual zerou `ELO` no blend final, mas ele segue documentado como baseline e feature histórica.
@@ -78,11 +78,13 @@ O bolão é um utilitário Rich do projeto: não gera aplicativo, binário ou ZI
 release próprio. Quando for a hora de distribuir o produto, `make build-release`
 gera apenas os artefatos Mac e Windows do ArenaAI.
 
-O bolão lê os placares registrados em `modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv` junto com a metadata local `worldcup_2026_group_stage_snapshot.json`. A metadata declara o `as_of` com timezone, contagem e hash do CSV, proveniência manual local e `official_source: false`; o programa confere identidade do confronto, grupo, ordem cronológica e que cada jogo observado já teria terminado (kickoff + duas horas) no `as_of`. A metadata também aceita `fair_play_scores` agregado por seleção, desde que cubra as 48 equipes. Sem esse dado, qualquer empate de grupo que dependa de fair play é recusado em vez de cair para o ranking FIFA. Isso não é uma fonte FIFA nem uma validação independente dos resultados. Esses jogos entram fixos na tabela; apenas confrontos sem resultado recebem projeção determinística.
+O bolão lê os placares registrados em `modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv` junto com a metadata local `worldcup_2026_group_stage_snapshot.json`. A metadata declara o `as_of` com timezone, contagem e hash do CSV, proveniência manual local e `official_source: false`; o programa confere identidade do confronto, grupo, ordem cronológica e que cada jogo observado já teria terminado (kickoff + duas horas) no `as_of`. A metadata também aceita `fair_play_scores` agregado por seleção, desde que cubra as 48 equipes. Sem esse dado, qualquer empate de grupo que dependa de fair play é recusado em vez de cair para o ranking FIFA. Isso não é uma fonte FIFA nem uma validação independente dos resultados. Jogos eliminatórios concluídos ficam em `worldcup_2026_knockout_results.csv`, com o placar de 90 minutos, prorrogação e pênaltis quando houver; eles são travados na chave e uma seleção eliminada não pode voltar em uma trilha condicionada.
 
 Para cada seleção, os gols registrados na Copa são comparados ao xG histórico previsto antes do jogo. Nos jogos vindos do CSV, o console exibe esse xG pré-jogo/base, sem recalculá-lo depois de observar todos os 72 resultados. O ajuste candidato de forma só é avaliado depois da fotografia completa dos 72 jogos: é um posterior Gamma-Poisson por ataque e defesa, aplicado apenas às projeções futuras nos lambdas da matriz Poisson/Dixon-Coles. O prior é escolhido somente nos primeiros dois terços cronológicos do CSV e precisa superar o baseline histórico no terço final. Se não superar, o bolão preserva o híbrido histórico; ele não força um peso mínimo para a forma atual. Esse é um gate temporal local, não um selo de calibração SOTA para o bolão. O status e o delta de log-score aparecem no console.
 
-Depois, o console roda 1000 Copas Monte Carlo somente na chave que nasce dessa fase fixa para listar o top 10 de campeões. O intervalo de Wilson de 95% mostrado por seleção representa somente erro de amostragem da simulação; não mede a incerteza total do modelo, da forma ou do snapshot manual. A partir desse ranking, você escolhe um campeão e o console monta uma trilha modal condicionada para esse time ser campeão. Essa trilha é explicativa, não uma amostra de `P(chave | campeão)`.
+Depois, o console roda 1000 Copas Monte Carlo somente nos jogos ainda abertos da chave que nasce dessa fase fixa para listar o top 10 de campeões. Empates de mata-mata seguem a matriz Poisson/Dixon-Coles na prorrogação e usam pênaltis neutros, sem extrapolar uma probabilidade de 90 minutos para a disputa. O intervalo de Wilson de 95% mostrado por seleção representa somente erro de amostragem da simulação; não mede a incerteza total do modelo, da forma ou do snapshot manual. A partir desse ranking, você escolhe um campeão e o console monta uma trilha modal condicionada para esse time ser campeão. Essa trilha é explicativa, não uma amostra de `P(chave | campeão)`.
+
+Confrontos neutros também são calculados nos dois sentidos da ordem da chave e espelhados antes de produzir o 1X2, xG, prorrogação e avanço. Assim, aparecer como mandante nominal não cria vantagem estatística; descanso, viagem e sede continuam podendo entrar quando o fixture fornece esse contexto real.
 
 Ao incluir uma rodada nova, atualize CSV e metadata juntos: `match_number`, `group`, mandante/visitante oficiais do fixture e placar no CSV; `as_of`, `result_count` e `results_sha256` na metadata. O bolão recusa números duplicados, grupo incorreto, confronto que não corresponda ao calendário oficial, hash stale, uma foto que pule jogos cronologicamente anteriores ou resultado cujo término mínimo (kickoff + duas horas) seja posterior ao `as_of`.
 
@@ -102,13 +104,21 @@ make bolao-mc-stability
 
 O gate roda prefixos MC aninhados de `1k` e `2k` Copas e três repetições de `2k` com seeds independentes sobre os grupos fixos, a forma temporal e o mata-mata do bolão. Ele grava `modeling/worldcup_2026_ml/reports/bolao_monte_carlo_stability.json`, registra fingerprints do código, modelo, cache, auditoria e snapshot fixo, e falha se o delta máximo de probabilidade, a sobreposição do top ou o z-score de duas amostras configurados não passarem em qualquer um dos dois testes. Os intervalos de Wilson presentes nesse relatório também são apenas de erro de amostragem MC, não de incerteza total do modelo.
 
+Auditoria de viés do top 10:
+
+```bash
+make bolao-top10-audit
+```
+
+Esse alvo compara os dez candidatos do ranking com e sem a forma atual, verifica cada candidato contra todos os demais classificados nas duas ordens nominais e reprova diferença de 1X2, xG, avanço ou pênaltis além de erro numérico. O relatório fica em `modeling/worldcup_2026_ml/reports/bolao_top10_bias_audit.json` e os pares auditados em `bolao_top10_bias_audit.csv`. A comparação de forma é uma análise de sensibilidade; ela não trata o intervalo Monte Carlo como incerteza total do modelo.
+
 Auditoria estatística do pacote:
 
 ```bash
 make stats-qa
 ```
 
-Esse alvo gera `sota_statistical_report.json`, atualiza [docs/STATISTICAL_AUDIT.md](docs/STATISTICAL_AUDIT.md), bins de calibração, calibração detalhada por classe, bootstrap por bloco temporal/torneio, intervalos de incerteza de campeão/fase, ablação completa dos 63 subconjuntos 1X2, sensibilidade do `rho` Dixon-Coles, auditoria dos ajustes 2026 de elenco/Transfermarkt/contexto e `sota_internal_frontier_experiments.csv` com os experimentos limite sem dataset externo. Ele não retreina o pickle: valida o pacote atual e documenta se a política continua SOTA/KISS.
+Esse alvo gera `sota_statistical_report.json`, atualiza [docs/STATISTICAL_AUDIT.md](docs/STATISTICAL_AUDIT.md), bins de calibração, calibração detalhada por classe, bootstrap por bloco temporal/torneio, intervalos de incerteza de campeão/fase, ablação completa dos 63 subconjuntos 1X2, sensibilidade do `rho` Dixon-Coles, auditoria dos ajustes 2026 de elenco/Transfermarkt/contexto, auditoria de ordem neutra no runtime e `sota_internal_frontier_experiments.csv` com os experimentos limite sem dataset externo. Ele compara o runtime com ELO por log-loss e RPS no mesmo recorte temporal, em vez de usar uma meta estática de acurácia. Ele não retreina o pickle: valida o pacote atual e documenta se a política continua SOTA/KISS.
 
 Para estabilidade de relatório fora do jogo:
 
@@ -118,7 +128,7 @@ make mc-stability
 
 Esse alvo roda Monte Carlo offline em duas camadas. A primeira usa o caminho otimizado de campeão em `5k` e `10k` Copas. A segunda roda Copas completas em `1k`, `2k` e `5k` para medir estabilidade de fases, finalistas e confrontos de chave. Ele grava `sota_monte_carlo_stability.json/.csv` e `sota_monte_carlo_stage_bracket_stability.csv`, registra fingerprint do pacote e falha se os limites configurados forem violados, incluindo churn e z-score das probabilidades de confrontos top 8 em amostras aninhadas. A auditoria é de convergência: o volume maior estende a mesma amostra base, em vez de comparar seeds independentes. Ele é propositalmente separado do `validate`, porque é uma auditoria pesada e não deve atrapalhar o ciclo rápido; `20k/50k` continua possível via argumentos manuais quando quisermos auditoria archival.
 
-O carimbo **SOTA/KISS acadêmico** é uma avaliação interna do pacote histórico disponível. Ele exige nested temporal sem vazamento, ablação completa, comparação contra baselines ELO/FIFA, empate calibrado, Poisson/Dixon-Coles preservado para placar, intervalo Monte Carlo, incerteza por fase, bootstrap por bloco, auditoria dos proxies 2026, manifesto/hash completo dos dados brutos com sanidade semântica e esgotamento dos experimentos internos sem dados externos. Ele não é uma alegação de calibração de mercado, nem se estende automaticamente ao snapshot manual ou à forma atual do bolão. O `stats-qa` também grava hash do pickle, relatório do modelo, CSV de treino, `sota_pipeline.py`, scripts de QA e todos os arquivos em `data/raw`; o `validate` reprova relatório estatístico, manifesto bruto, sanidade raw ou Monte Carlo stale.
+O carimbo **SOTA/KISS acadêmico** é uma avaliação interna do pacote histórico disponível. Ele exige nested temporal sem vazamento, ablação completa, comparação ELO no mesmo recorte por log-loss/RPS, empate calibrado, Poisson/Dixon-Coles preservado para placar, simetria casa/fora no treino e no runtime de jogos neutros, intervalo Monte Carlo, incerteza por fase, bootstrap por bloco, auditoria dos proxies 2026, manifesto/hash completo dos dados brutos com sanidade semântica e esgotamento dos experimentos internos sem dados externos. Ele não é uma alegação de calibração de mercado, nem se estende automaticamente ao snapshot manual ou à forma atual do bolão. O `stats-qa` também grava hash do pickle, relatório do modelo, CSV de treino, `sota_pipeline.py`, scripts de QA e todos os arquivos em `data/raw`; o `validate` reprova relatório estatístico, manifesto bruto, sanidade raw ou Monte Carlo stale.
 
 ## Empacotamento Mac / Windows
 

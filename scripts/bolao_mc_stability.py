@@ -88,6 +88,7 @@ def runtime_fingerprints() -> dict[str, dict[str, object]]:
         "runtime_cache": SOTA_ROOT / "models" / "runtime_prediction_cache.pkl",
         "observed_results": bolao.OBSERVED_GROUP_RESULTS_PATH,
         "observed_snapshot": bolao.OBSERVED_SNAPSHOT_METADATA_PATH,
+        "observed_knockout_results": bolao.OBSERVED_KNOCKOUT_RESULTS_PATH,
         "stability_audit": Path(__file__),
     }
     return {
@@ -148,6 +149,16 @@ def fixed_group_stage_payload(board: bolao.GroupStageBoard) -> dict[str, object]
             "official_source": board.snapshot.official_source,
             "results_sha256": board.snapshot.results_sha256,
         },
+        "locked_knockout_results": [
+            {
+                "match_number": result.match_number,
+                "home": result.home,
+                "away": result.away,
+                "winner": result.winner,
+                "resolution": result.resolution,
+            }
+            for result in sorted(board.knockout_results.values(), key=lambda result: result.match_number)
+        ],
     }
     payload["fingerprint_sha256"] = payload_sha256(payload)
     return payload
@@ -382,7 +393,7 @@ def build_report(
         "simulation_scope": {
             "group_stage": "fixed_board",
             "current_tournament_form": "included",
-            "knockout": "form_aware_hybrid_sampled",
+            "knockout": "observed_results_locked_then_form_aware_hybrid_sampled",
             "sampling": "nested_prefixes_one_seed_plus_independent_seeds",
         },
         "fixed_group_stage": fixed_group_stage_payload(board),

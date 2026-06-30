@@ -316,7 +316,6 @@ def validate_model_policy_artifacts() -> None:
         "xgb_1x2",
         "competitive_xgb_1x2",
         "logistic_1x2",
-        "winner_xgb",
         "home_goals_poisson",
         "away_goals_poisson",
         "home_goals_xgb_count",
@@ -360,20 +359,34 @@ def validate_model_policy_artifacts() -> None:
         raise AssertionError(f"statistical report missing manual blend weights: {stats_policy}")
     if not stats_report.get("verdict", {}).get("sota_kiss"):
         raise AssertionError(f"statistical report did not pass SOTA/KISS verdict: {stats_report.get('verdict')}")
+    if not stats_report.get("academic_stamp", {}).get("approved"):
+        raise AssertionError(f"statistical report academic stamp is not approved: {stats_report.get('academic_stamp')}")
+    if not stats_report.get("training_orientation_audit", {}).get("passed"):
+        raise AssertionError("statistical report did not pass neutral training-orientation audit")
+    if not stats_report.get("runtime_neutral_order_audit", {}).get("passed"):
+        raise AssertionError("statistical report did not pass neutral runtime-order audit")
     stats_scope = stats_report.get("scope", {})
     if int(stats_scope.get("diagnostic_rows", 0)) < 1000:
         raise AssertionError(f"statistical diagnostic window too small: {stats_scope}")
     stats_calibration = stats_report.get("calibration", {}).get("runtime_2024_plus_metrics", {})
-    for metric_name, upper in {"log_loss": 0.82, "draw_gap": 0.02, "ece": 0.08}.items():
+    for metric_name, upper in {"draw_gap": 0.02, "ece": 0.08}.items():
         value = float(stats_calibration.get(metric_name, float("nan")))
         if not math.isfinite(value) or value > upper:
             raise AssertionError(f"statistical report metric {metric_name} failed: {value} > {upper}")
+    benchmark_runtime = stats_report.get("external_benchmark", {}).get("runtime_policy", {})
+    for metric_name, lower in {
+        "log_loss_gain_vs_same_window_elo": 0.005,
+        "rps_gain_vs_same_window_elo": 0.002,
+    }.items():
+        value = float(benchmark_runtime.get(metric_name, float("nan")))
+        if not math.isfinite(value) or value < lower:
+            raise AssertionError(f"statistical report benchmark {metric_name} failed: {value} < {lower}")
     if float(stats_report.get("ablation_study", {}).get("full_policy_objective_gap_vs_best", 1.0)) > 0.012:
         raise AssertionError("full policy trails ablation frontier too much in statistical report")
     if float(stats_report.get("dixon_coles", {}).get("package_rho_objective_gap_vs_best", 1.0)) > 0.01:
         raise AssertionError("package Dixon-Coles rho trails sensitivity frontier too much in statistical report")
     nested = policy.get("nested_temporal_validation", {})
-    if nested.get("version") != "nested_temporal_policy_v3_component_ablation_no_leakage_no_draw_xgb":
+    if nested.get("version") != "nested_temporal_policy_v4_orientation_invariant_no_leakage_no_draw_xgb":
         raise AssertionError(f"unexpected nested validation version: {nested.get('version')}")
     component_ablation = nested.get("component_ablation", {})
     if component_ablation.get("version") != "nested_component_subset_ablation_v1":

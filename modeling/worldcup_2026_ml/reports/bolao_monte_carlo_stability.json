@@ -2,50 +2,59 @@
   "comparisons": [
     {
       "baseline_top": [
-        "Germany",
-        "France",
-        "Brazil",
-        "Portugal",
         "Spain",
-        "Netherlands",
         "Argentina",
-        "Paraguay",
-        "Croatia",
-        "Japan"
+        "France",
+        "England",
+        "Brazil",
+        "Colombia",
+        "Netherlands",
+        "Portugal",
+        "Ecuador",
+        "Croatia"
       ],
       "candidate_top": [
-        "Germany",
-        "France",
-        "Brazil",
-        "Portugal",
-        "Netherlands",
         "Spain",
         "Argentina",
-        "Paraguay",
-        "Croatia",
-        "Japan"
+        "France",
+        "England",
+        "Colombia",
+        "Brazil",
+        "Netherlands",
+        "Portugal",
+        "Ecuador",
+        "Norway"
       ],
       "from_runs": 1000,
-      "max_abs_probability_delta": 0.01150000000000001,
-      "mean_abs_probability_delta": 0.000968750000000002,
+      "max_abs_probability_delta": 0.007499999999999993,
+      "mean_abs_probability_delta": 0.0019374999999999985,
       "to_runs": 2000,
       "top_n": 10,
-      "top_n_overlap": 1.0
+      "top_n_overlap": 0.9
     }
   ],
   "fixed_group_stage": {
-    "fingerprint_sha256": "ba15f6bd081d7fa9cebfd1472c2e32ba319d402f2c313a8d34cef35e0fc531e8",
+    "fingerprint_sha256": "15d60339508148ae7926bd77aac19fe6329d24d8503cdf5f9e8f70226bbc43b6",
     "form": {
       "calibration_status": "enabled_validation",
-      "historical_validation_log_likelihood": -83.16951987029692,
+      "historical_validation_log_likelihood": -70.54787658819419,
       "is_enabled": true,
-      "median_current_weight": 0.35203848076162003,
+      "median_current_weight": 0.34602428302033883,
       "observed_result_count": 72,
       "prior_goal_equivalents": 8.0,
-      "validation_log_likelihood": -82.55339278704469,
+      "validation_log_likelihood": -69.87768557415214,
       "validation_matches": 24
     },
     "is_fixed": true,
+    "locked_knockout_results": [
+      {
+        "away": "Paraguay",
+        "home": "Germany",
+        "match_number": 74,
+        "resolution": "penalties",
+        "winner": "Paraguay"
+      }
+    ],
     "manual_snapshot": {
       "as_of": "2026-06-28T06:30:00Z",
       "official_source": false,
@@ -752,12 +761,12 @@
     "independent_seeds": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.010999999999999996,
+          "actual": 0.0315,
           "limit": 0.06,
           "passed": true
         },
         "max_two_sample_z": {
-          "actual": 2.0010007506255474,
+          "actual": 2.7398614641574137,
           "limit": 4.0,
           "passed": true
         },
@@ -772,12 +781,12 @@
     "nested_prefixes": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.01150000000000001,
+          "actual": 0.007499999999999993,
           "limit": 0.04,
           "passed": true
         },
         "top_n_overlap": {
-          "actual": 1.0,
+          "actual": 0.9,
           "limit": 0.6,
           "passed": true
         }
@@ -786,77 +795,77 @@
     },
     "passed": true
   },
-  "generated_at": "2026-06-29T02:31:08.668246Z",
+  "generated_at": "2026-06-30T03:36:27.218409Z",
   "independent_seed_audit": {
     "comparisons": [
       {
         "baseline_seed": 20260628,
         "baseline_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
           "Spain",
           "Argentina",
-          "Paraguay",
-          "Croatia",
-          "Japan"
+          "France",
+          "England",
+          "Colombia",
+          "Brazil",
+          "Netherlands",
+          "Portugal",
+          "Ecuador",
+          "Norway"
         ],
         "candidate_seed": 20260629,
         "candidate_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
-          "Spain",
-          "Paraguay",
           "Argentina",
-          "Japan",
-          "South Africa"
+          "Spain",
+          "France",
+          "England",
+          "Brazil",
+          "Colombia",
+          "Netherlands",
+          "Portugal",
+          "Belgium",
+          "Croatia"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.007499999999999993,
-        "max_two_sample_z": 2.0010007506255474,
-        "max_two_sample_z_team": "Croatia",
-        "mean_abs_probability_delta": 0.0010624999999999996,
+        "max_abs_probability_delta": 0.025499999999999995,
+        "max_two_sample_z": 1.9333614841040883,
+        "max_two_sample_z_team": "Argentina",
+        "mean_abs_probability_delta": 0.003093749999999999,
         "to_runs": 2000,
         "top_n": 10,
-        "top_n_overlap": 0.9
+        "top_n_overlap": 0.8
       },
       {
         "baseline_seed": 20260628,
         "baseline_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
           "Spain",
           "Argentina",
-          "Paraguay",
-          "Croatia",
-          "Japan"
+          "France",
+          "England",
+          "Colombia",
+          "Brazil",
+          "Netherlands",
+          "Portugal",
+          "Ecuador",
+          "Norway"
         ],
         "candidate_seed": 20260630,
         "candidate_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
-          "Paraguay",
-          "Spain",
           "Argentina",
-          "South Africa",
-          "Canada"
+          "Spain",
+          "France",
+          "England",
+          "Brazil",
+          "Colombia",
+          "Netherlands",
+          "Portugal",
+          "Croatia",
+          "Belgium"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.006000000000000005,
-        "max_two_sample_z": 1.4145672484014766,
-        "max_two_sample_z_team": "Sweden",
-        "mean_abs_probability_delta": 0.0010625000000000003,
+        "max_abs_probability_delta": 0.0315,
+        "max_two_sample_z": 2.7398614641574137,
+        "max_two_sample_z_team": "France",
+        "mean_abs_probability_delta": 0.00396875,
         "to_runs": 2000,
         "top_n": 10,
         "top_n_overlap": 0.8
@@ -864,49 +873,49 @@
       {
         "baseline_seed": 20260629,
         "baseline_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
-          "Spain",
-          "Paraguay",
           "Argentina",
-          "Japan",
-          "South Africa"
+          "Spain",
+          "France",
+          "England",
+          "Brazil",
+          "Colombia",
+          "Netherlands",
+          "Portugal",
+          "Belgium",
+          "Croatia"
         ],
         "candidate_seed": 20260630,
         "candidate_top": [
-          "Germany",
-          "France",
-          "Brazil",
-          "Portugal",
-          "Netherlands",
-          "Paraguay",
-          "Spain",
           "Argentina",
-          "South Africa",
-          "Canada"
+          "Spain",
+          "France",
+          "England",
+          "Brazil",
+          "Colombia",
+          "Netherlands",
+          "Portugal",
+          "Croatia",
+          "Belgium"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.010999999999999996,
-        "max_two_sample_z": 1.7327006922046793,
-        "max_two_sample_z_team": "Croatia",
-        "mean_abs_probability_delta": 0.0015,
+        "max_abs_probability_delta": 0.018500000000000016,
+        "max_two_sample_z": 2.2724026014934355,
+        "max_two_sample_z_team": "Morocco",
+        "mean_abs_probability_delta": 0.002156250000000001,
         "to_runs": 2000,
         "top_n": 10,
-        "top_n_overlap": 0.9
+        "top_n_overlap": 1.0
       }
     ],
     "gate": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.010999999999999996,
+          "actual": 0.0315,
           "limit": 0.06,
           "passed": true
         },
         "max_two_sample_z": {
-          "actual": 2.0010007506255474,
+          "actual": 2.7398614641574137,
           "limit": 4.0,
           "passed": true
         },
@@ -922,212 +931,232 @@
     "samples": [
       {
         "probabilities": {
-          "Algeria": 0.0,
-          "Argentina": 0.009,
-          "Australia": 0.0,
-          "Austria": 0.0,
-          "Belgium": 0.0005,
+          "Algeria": 0.001,
+          "Argentina": 0.2115,
+          "Australia": 0.0005,
+          "Austria": 0.002,
+          "Belgium": 0.0115,
           "Bosnia and Herzegovina": 0.0,
-          "Brazil": 0.0605,
-          "Canada": 0.001,
+          "Brazil": 0.05,
+          "Canada": 0.003,
           "Cape Verde Islands": 0.0,
-          "Colombia": 0.0,
+          "Colombia": 0.057,
           "Congo DR": 0.0,
-          "Croatia": 0.002,
-          "Côte d'Ivoire": 0.0,
-          "Ecuador": 0.0,
-          "Egypt": 0.0,
-          "England": 0.0005,
-          "France": 0.1035,
-          "Germany": 0.7325,
+          "Croatia": 0.012,
+          "Côte d'Ivoire": 0.001,
+          "Ecuador": 0.015,
+          "Egypt": 0.0005,
+          "England": 0.0865,
+          "France": 0.1725,
+          "Germany": 0.0,
           "Ghana": 0.0,
-          "Japan": 0.002,
-          "Mexico": 0.0005,
-          "Morocco": 0.0,
-          "Netherlands": 0.014,
-          "Norway": 0.0,
-          "Paraguay": 0.008,
-          "Portugal": 0.049,
-          "Senegal": 0.0,
-          "South Africa": 0.0015,
-          "Spain": 0.014,
-          "Sweden": 0.001,
-          "Switzerland": 0.0,
-          "USA": 0.0005
+          "Japan": 0.006,
+          "Mexico": 0.0035,
+          "Morocco": 0.0075,
+          "Netherlands": 0.046,
+          "Norway": 0.0125,
+          "Paraguay": 0.006,
+          "Portugal": 0.03,
+          "Senegal": 0.0095,
+          "South Africa": 0.0,
+          "Spain": 0.237,
+          "Sweden": 0.0015,
+          "Switzerland": 0.0115,
+          "USA": 0.005
         },
         "runs": 2000,
         "seed": 20260628,
         "top_champions": [
           {
             "mc_sampling_interval_95": {
-              "lower": 0.7126675250229269,
-              "upper": 0.7514410152928348
+              "lower": 0.21887818484520236,
+              "upper": 0.2561302190126674
             },
-            "probability": 0.7325,
+            "probability": 0.237,
             "rank": 1,
-            "team": "Germany",
-            "titles": 1465
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.09090113877201708,
-              "upper": 0.11761913548518968
-            },
-            "probability": 0.1035,
-            "rank": 2,
-            "team": "France",
-            "titles": 207
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.05086982690249883,
-              "upper": 0.07181531946835204
-            },
-            "probability": 0.0605,
-            "rank": 3,
-            "team": "Brazil",
-            "titles": 121
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.040373396150675284,
-              "upper": 0.0593558439249874
-            },
-            "probability": 0.049,
-            "rank": 4,
-            "team": "Portugal",
-            "titles": 98
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.009703718394559921,
-              "upper": 0.020159719913138655
-            },
-            "probability": 0.014,
-            "rank": 5,
-            "team": "Netherlands",
-            "titles": 28
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.009703718394559921,
-              "upper": 0.020159719913138655
-            },
-            "probability": 0.014,
-            "rank": 6,
             "team": "Spain",
-            "titles": 28
+            "titles": 474
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.005700452646339954,
-              "upper": 0.014182156837363747
+              "lower": 0.19416400528936859,
+              "upper": 0.22994217156612737
             },
-            "probability": 0.009,
-            "rank": 7,
+            "probability": 0.2115,
+            "rank": 2,
             "team": "Argentina",
-            "titles": 18
+            "titles": 423
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.00493025378658916,
-              "upper": 0.012956189932315568
+              "lower": 0.15657337750644248,
+              "upper": 0.18968233452189345
             },
-            "probability": 0.008,
+            "probability": 0.1725,
+            "rank": 3,
+            "team": "France",
+            "titles": 345
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.07495924779326923,
+              "upper": 0.09962620846235495
+            },
+            "probability": 0.0865,
+            "rank": 4,
+            "team": "England",
+            "titles": 173
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.04766261190747434,
+              "upper": 0.06803595428658013
+            },
+            "probability": 0.057,
+            "rank": 5,
+            "team": "Colombia",
+            "titles": 114
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.04128108811097559,
+              "upper": 0.06044431772948606
+            },
+            "probability": 0.05,
+            "rank": 6,
+            "team": "Brazil",
+            "titles": 100
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.03765688480093504,
+              "upper": 0.056083857980330706
+            },
+            "probability": 0.046,
+            "rank": 7,
+            "team": "Netherlands",
+            "titles": 92
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.023377747806531353,
+              "upper": 0.038424342737950805
+            },
+            "probability": 0.03,
             "rank": 8,
-            "team": "Paraguay",
-            "titles": 16
+            "team": "Portugal",
+            "titles": 60
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.0007780147254709095,
-              "upper": 0.005131434404639974
+              "lower": 0.01052703012044565,
+              "upper": 0.0213325739520519
             },
-            "probability": 0.002,
+            "probability": 0.015,
             "rank": 9,
-            "team": "Croatia",
-            "titles": 4
+            "team": "Ecuador",
+            "titles": 30
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.0007780147254709095,
-              "upper": 0.005131434404639974
+              "lower": 0.008481021586816417,
+              "upper": 0.018388168073683698
             },
-            "probability": 0.002,
+            "probability": 0.0125,
             "rank": 10,
-            "team": "Japan",
-            "titles": 4
+            "team": "Norway",
+            "titles": 25
           }
         ],
         "total_titles": 2000
       },
       {
         "probabilities": {
-          "Algeria": 0.0,
-          "Argentina": 0.0105,
-          "Australia": 0.0,
-          "Austria": 0.0,
-          "Belgium": 0.001,
+          "Algeria": 0.0005,
+          "Argentina": 0.237,
+          "Australia": 0.001,
+          "Austria": 0.0035,
+          "Belgium": 0.017,
           "Bosnia and Herzegovina": 0.0,
-          "Brazil": 0.0545,
-          "Canada": 0.0015,
+          "Brazil": 0.052,
+          "Canada": 0.0025,
           "Cape Verde Islands": 0.0,
-          "Colombia": 0.0,
+          "Colombia": 0.0515,
           "Congo DR": 0.0,
-          "Croatia": 0.0,
-          "Côte d'Ivoire": 0.0,
-          "Ecuador": 0.0,
-          "Egypt": 0.0,
-          "England": 0.002,
-          "France": 0.096,
-          "Germany": 0.7345,
+          "Croatia": 0.014,
+          "Côte d'Ivoire": 0.0005,
+          "Ecuador": 0.012,
+          "Egypt": 0.0005,
+          "England": 0.093,
+          "France": 0.1595,
+          "Germany": 0.0,
           "Ghana": 0.0,
-          "Japan": 0.0025,
-          "Mexico": 0.0,
-          "Morocco": 0.0,
-          "Netherlands": 0.0165,
-          "Norway": 0.0,
-          "Paraguay": 0.0115,
-          "Portugal": 0.0515,
-          "Senegal": 0.0,
-          "South Africa": 0.0025,
-          "Spain": 0.0145,
-          "Sweden": 0.0,
-          "Switzerland": 0.0,
-          "USA": 0.001
+          "Japan": 0.0095,
+          "Mexico": 0.003,
+          "Morocco": 0.005,
+          "Netherlands": 0.044,
+          "Norway": 0.0105,
+          "Paraguay": 0.0075,
+          "Portugal": 0.0305,
+          "Senegal": 0.007,
+          "South Africa": 0.0005,
+          "Spain": 0.2245,
+          "Sweden": 0.001,
+          "Switzerland": 0.0105,
+          "USA": 0.002
         },
         "runs": 2000,
         "seed": 20260629,
         "top_champions": [
           {
             "mc_sampling_interval_95": {
-              "lower": 0.7147098379004819,
-              "upper": 0.7533910339448777
+              "lower": 0.21887818484520236,
+              "upper": 0.2561302190126674
             },
-            "probability": 0.7345,
+            "probability": 0.237,
             "rank": 1,
-            "team": "Germany",
-            "titles": 1469
+            "team": "Argentina",
+            "titles": 474
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.08385263452837072,
-              "upper": 0.10969639649284374
+              "lower": 0.2067511679455928,
+              "upper": 0.24330516385228987
             },
-            "probability": 0.096,
+            "probability": 0.2245,
             "rank": 2,
-            "team": "France",
-            "titles": 192
+            "team": "Spain",
+            "titles": 449
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.04537820318220411,
-              "upper": 0.06532994859985292
+              "lower": 0.1441080153452353,
+              "upper": 0.17619754174071403
             },
-            "probability": 0.0545,
+            "probability": 0.1595,
             "rank": 3,
+            "team": "France",
+            "titles": 319
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.08103979579287922,
+              "upper": 0.1065207379339383
+            },
+            "probability": 0.093,
+            "rank": 4,
+            "team": "England",
+            "titles": 186
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.04309957134080411,
+              "upper": 0.06261816602925548
+            },
+            "probability": 0.052,
+            "rank": 5,
             "team": "Brazil",
-            "titles": 109
+            "titles": 104
           },
           {
             "mc_sampling_interval_95": {
@@ -1135,140 +1164,9 @@
               "upper": 0.06207508247257665
             },
             "probability": 0.0515,
-            "rank": 4,
-            "team": "Portugal",
-            "titles": 103
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.01177275112217586,
-              "upper": 0.02308110159752015
-            },
-            "probability": 0.0165,
-            "rank": 5,
-            "team": "Netherlands",
-            "titles": 33
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.010114610999973125,
-              "upper": 0.020746910190124937
-            },
-            "probability": 0.0145,
             "rank": 6,
-            "team": "Spain",
-            "titles": 29
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.0076751709359403975,
-              "upper": 0.017197852959760743
-            },
-            "probability": 0.0115,
-            "rank": 7,
-            "team": "Paraguay",
-            "titles": 23
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.00687783461945913,
-              "upper": 0.01599902351144304
-            },
-            "probability": 0.0105,
-            "rank": 8,
-            "team": "Argentina",
-            "titles": 21
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.001068292969105719,
-              "upper": 0.005839239043404651
-            },
-            "probability": 0.0025,
-            "rank": 9,
-            "team": "Japan",
-            "titles": 5
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.001068292969105719,
-              "upper": 0.005839239043404651
-            },
-            "probability": 0.0025,
-            "rank": 10,
-            "team": "South Africa",
-            "titles": 5
-          }
-        ],
-        "total_titles": 2000
-      },
-      {
-        "probabilities": {
-          "Algeria": 0.0,
-          "Argentina": 0.0095,
-          "Australia": 0.0,
-          "Austria": 0.0,
-          "Belgium": 0.0005,
-          "Bosnia and Herzegovina": 0.0,
-          "Brazil": 0.062,
-          "Canada": 0.002,
-          "Cape Verde Islands": 0.0,
-          "Colombia": 0.0,
-          "Congo DR": 0.0,
-          "Croatia": 0.0015,
-          "Côte d'Ivoire": 0.0,
-          "Ecuador": 0.0,
-          "Egypt": 0.0,
-          "England": 0.0015,
-          "France": 0.107,
-          "Germany": 0.7265,
-          "Ghana": 0.0,
-          "Japan": 0.0015,
-          "Mexico": 0.001,
-          "Morocco": 0.0,
-          "Netherlands": 0.018,
-          "Norway": 0.0,
-          "Paraguay": 0.011,
-          "Portugal": 0.044,
-          "Senegal": 0.0,
-          "South Africa": 0.0035,
-          "Spain": 0.01,
-          "Sweden": 0.0,
-          "Switzerland": 0.0,
-          "USA": 0.0005
-        },
-        "runs": 2000,
-        "seed": 20260630,
-        "top_champions": [
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.706543592992542,
-              "upper": 0.7455879527344257
-            },
-            "probability": 0.7265,
-            "rank": 1,
-            "team": "Germany",
-            "titles": 1453
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.09419797973571457,
-              "upper": 0.12130887469828859
-            },
-            "probability": 0.107,
-            "rank": 2,
-            "team": "France",
-            "titles": 214
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.052247389777369,
-              "upper": 0.07343200524068033
-            },
-            "probability": 0.062,
-            "rank": 3,
-            "team": "Brazil",
-            "titles": 124
+            "team": "Colombia",
+            "titles": 103
           },
           {
             "mc_sampling_interval_95": {
@@ -1276,69 +1174,180 @@
               "upper": 0.0538967257961752
             },
             "probability": 0.044,
-            "rank": 4,
-            "team": "Portugal",
+            "rank": 7,
+            "team": "Netherlands",
             "titles": 88
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.013029914582859979,
-              "upper": 0.02481818678403449
+              "lower": 0.02381728747704533,
+              "upper": 0.038982885949836316
             },
-            "probability": 0.018,
-            "rank": 5,
-            "team": "Netherlands",
-            "titles": 36
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.00727537083731509,
-              "upper": 0.01659957017598656
-            },
-            "probability": 0.011,
-            "rank": 6,
-            "team": "Paraguay",
-            "titles": 22
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.006482716966274172,
-              "upper": 0.015396058282228505
-            },
-            "probability": 0.01,
-            "rank": 7,
-            "team": "Spain",
-            "titles": 20
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.006090191210478056,
-              "upper": 0.014790501155625132
-            },
-            "probability": 0.0095,
+            "probability": 0.0305,
             "rank": 8,
-            "team": "Argentina",
-            "titles": 19
+            "team": "Portugal",
+            "titles": 61
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.0016964100455623197,
-              "upper": 0.007207287731747024
+              "lower": 0.012190606557782523,
+              "upper": 0.02366132904431298
             },
-            "probability": 0.0035,
+            "probability": 0.017,
             "rank": 9,
-            "team": "South Africa",
-            "titles": 7
+            "team": "Belgium",
+            "titles": 34
           },
           {
             "mc_sampling_interval_95": {
-              "lower": 0.0007780147254709095,
-              "upper": 0.005131434404639974
+              "lower": 0.009703718394559921,
+              "upper": 0.020159719913138655
             },
-            "probability": 0.002,
+            "probability": 0.014,
             "rank": 10,
-            "team": "Canada",
-            "titles": 4
+            "team": "Croatia",
+            "titles": 28
+          }
+        ],
+        "total_titles": 2000
+      },
+      {
+        "probabilities": {
+          "Algeria": 0.0015,
+          "Argentina": 0.235,
+          "Australia": 0.003,
+          "Austria": 0.004,
+          "Belgium": 0.0125,
+          "Bosnia and Herzegovina": 0.0,
+          "Brazil": 0.055,
+          "Canada": 0.0025,
+          "Cape Verde Islands": 0.0,
+          "Colombia": 0.052,
+          "Congo DR": 0.0,
+          "Croatia": 0.0185,
+          "Côte d'Ivoire": 0.0,
+          "Ecuador": 0.011,
+          "Egypt": 0.0005,
+          "England": 0.095,
+          "France": 0.141,
+          "Germany": 0.0,
+          "Ghana": 0.0,
+          "Japan": 0.0045,
+          "Mexico": 0.0055,
+          "Morocco": 0.0115,
+          "Netherlands": 0.043,
+          "Norway": 0.0105,
+          "Paraguay": 0.0105,
+          "Portugal": 0.033,
+          "Senegal": 0.0065,
+          "South Africa": 0.0,
+          "Spain": 0.2295,
+          "Sweden": 0.0005,
+          "Switzerland": 0.012,
+          "USA": 0.0015
+        },
+        "runs": 2000,
+        "seed": 20260630,
+        "top_champions": [
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.21693633948945695,
+              "upper": 0.2540797328388149
+            },
+            "probability": 0.235,
+            "rank": 1,
+            "team": "Argentina",
+            "titles": 470
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.2115992331032282,
+              "upper": 0.24843792751864935
+            },
+            "probability": 0.2295,
+            "rank": 2,
+            "team": "Spain",
+            "titles": 459
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.12643462112011397,
+              "upper": 0.1569418693170543
+            },
+            "probability": 0.141,
+            "rank": 3,
+            "team": "France",
+            "titles": 282
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.08291458854074325,
+              "upper": 0.10863827671567224
+            },
+            "probability": 0.095,
+            "rank": 4,
+            "team": "England",
+            "titles": 190
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.04583463458935706,
+              "upper": 0.06587160007509946
+            },
+            "probability": 0.055,
+            "rank": 5,
+            "team": "Brazil",
+            "titles": 110
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.04309957134080411,
+              "upper": 0.06261816602925548
+            },
+            "probability": 0.052,
+            "rank": 6,
+            "team": "Colombia",
+            "titles": 104
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.03495093941533012,
+              "upper": 0.0528013060715387
+            },
+            "probability": 0.043,
+            "rank": 7,
+            "team": "Netherlands",
+            "titles": 86
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.026022639287604506,
+              "upper": 0.04176794855127458
+            },
+            "probability": 0.033,
+            "rank": 8,
+            "team": "Portugal",
+            "titles": 66
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.013451271532792347,
+              "upper": 0.025394912716501614
+            },
+            "probability": 0.0185,
+            "rank": 9,
+            "team": "Croatia",
+            "titles": 37
+          },
+          {
+            "mc_sampling_interval_95": {
+              "lower": 0.008481021586816417,
+              "upper": 0.018388168073683698
+            },
+            "probability": 0.0125,
+            "rank": 10,
+            "team": "Belgium",
+            "titles": 25
           }
         ],
         "total_titles": 2000
@@ -1358,11 +1367,15 @@
   "runtime_fingerprints": {
     "bolao": {
       "path": "src/arena_ai/bolao.py",
-      "sha256": "2fe0f652e46be8b78f38b8cf2978888c90b9b7bfd7f5261460d784af3c19735a"
+      "sha256": "c78889a98e892c3c358c097d057c46a1fedd653eda49dac150ee84677fa1322d"
     },
     "model_package": {
       "path": "modeling/worldcup_2026_ml/models/model_sota.pkl",
-      "sha256": "8fa8a4f06ff1bfc69cf12be7c2751f96bd4f7ecb1e0943cd3b977fcec51104a7"
+      "sha256": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a"
+    },
+    "observed_knockout_results": {
+      "path": "modeling/worldcup_2026_ml/data/observed/worldcup_2026_knockout_results.csv",
+      "sha256": "9c86b3fbcf54e9d851d0f2a4c333797073b5139490143f01b62a54d00935c47e"
     },
     "observed_results": {
       "path": "modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv",
@@ -1374,15 +1387,15 @@
     },
     "runtime_cache": {
       "path": "modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl",
-      "sha256": "cdf5e19a28cdc57d4ec1c92093c37bd563b292f7c6b6b3167d8391846fc9608b"
+      "sha256": "9d8cebb8af950a90595a9fd1305a5590593b089f20d1aa4cfa051681a6385ea7"
     },
     "sota_pipeline": {
       "path": "modeling/worldcup_2026_ml/src/sota_pipeline.py",
-      "sha256": "1d3a91807fc1a6a6b41ad6eba6e2b819821b9452761af224ea13950b61f0bce6"
+      "sha256": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770"
     },
     "stability_audit": {
       "path": "scripts/bolao_mc_stability.py",
-      "sha256": "73887efe713c04fc16726de043613dc4db65912d61fbca999408275e01945d52"
+      "sha256": "334340c1441f376adf63f571843971092c920649f94867159bf9f4fc3b10b23f"
     },
     "worldcup_model": {
       "path": "src/arena_ai/worldcup_model.py",
@@ -1393,66 +1406,86 @@
   "simulation_scope": {
     "current_tournament_form": "included",
     "group_stage": "fixed_board",
-    "knockout": "form_aware_hybrid_sampled",
+    "knockout": "observed_results_locked_then_form_aware_hybrid_sampled",
     "sampling": "nested_prefixes_one_seed_plus_independent_seeds"
   },
   "snapshots": [
     {
       "probabilities": {
         "Algeria": 0.0,
-        "Argentina": 0.011,
+        "Argentina": 0.205,
         "Australia": 0.0,
-        "Austria": 0.0,
-        "Belgium": 0.0,
+        "Austria": 0.002,
+        "Belgium": 0.007,
         "Bosnia and Herzegovina": 0.0,
         "Brazil": 0.057,
-        "Canada": 0.0,
+        "Canada": 0.006,
         "Cape Verde Islands": 0.0,
-        "Colombia": 0.0,
+        "Colombia": 0.056,
         "Congo DR": 0.0,
-        "Croatia": 0.002,
-        "Côte d'Ivoire": 0.0,
-        "Ecuador": 0.0,
-        "Egypt": 0.0,
-        "England": 0.0,
-        "France": 0.115,
-        "Germany": 0.727,
+        "Croatia": 0.014,
+        "Côte d'Ivoire": 0.002,
+        "Ecuador": 0.018,
+        "Egypt": 0.001,
+        "England": 0.079,
+        "France": 0.171,
+        "Germany": 0.0,
         "Ghana": 0.0,
-        "Japan": 0.002,
-        "Mexico": 0.0,
-        "Morocco": 0.0,
-        "Netherlands": 0.012,
-        "Norway": 0.0,
-        "Paraguay": 0.008,
-        "Portugal": 0.049,
-        "Senegal": 0.0,
+        "Japan": 0.005,
+        "Mexico": 0.002,
+        "Morocco": 0.011,
+        "Netherlands": 0.05,
+        "Norway": 0.011,
+        "Paraguay": 0.006,
+        "Portugal": 0.029,
+        "Senegal": 0.013,
         "South Africa": 0.0,
-        "Spain": 0.016,
-        "Sweden": 0.001,
-        "Switzerland": 0.0,
-        "USA": 0.0
+        "Spain": 0.234,
+        "Sweden": 0.002,
+        "Switzerland": 0.011,
+        "USA": 0.008
       },
       "runs": 1000,
       "top_champions": [
         {
           "mc_sampling_interval_95": {
-            "lower": 0.6985580635351872,
-            "upper": 0.7537045245065915
+            "lower": 0.20880755932590186,
+            "upper": 0.26122835072205797
           },
-          "probability": 0.727,
+          "probability": 0.234,
           "rank": 1,
-          "team": "Germany",
-          "titles": 727
+          "team": "Spain",
+          "titles": 234
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.0966831214598715,
-            "upper": 0.13626359045164926
+            "lower": 0.18112966926299381,
+            "upper": 0.23112820090297662
           },
-          "probability": 0.115,
+          "probability": 0.205,
           "rank": 2,
+          "team": "Argentina",
+          "titles": 205
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.1489334730570256,
+            "upper": 0.1955846262128194
+          },
+          "probability": 0.171,
+          "rank": 3,
           "team": "France",
-          "titles": 115
+          "titles": 171
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.06384696504253541,
+            "upper": 0.09737528356720541
+          },
+          "probability": 0.079,
+          "rank": 4,
+          "team": "England",
+          "titles": 79
         },
         {
           "mc_sampling_interval_95": {
@@ -1460,219 +1493,199 @@
             "upper": 0.07313739772798773
           },
           "probability": 0.057,
-          "rank": 3,
+          "rank": 5,
           "team": "Brazil",
           "titles": 57
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.03726084730617148,
-            "upper": 0.06419101521875278
+            "lower": 0.04337460969160231,
+            "upper": 0.07202367625311248
           },
-          "probability": 0.049,
-          "rank": 4,
-          "team": "Portugal",
-          "titles": 49
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.009872155867426248,
-            "upper": 0.02583228196419978
-          },
-          "probability": 0.016,
-          "rank": 5,
-          "team": "Spain",
-          "titles": 16
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.006877579092159561,
-            "upper": 0.020857473928157594
-          },
-          "probability": 0.012,
+          "probability": 0.056,
           "rank": 6,
-          "team": "Netherlands",
-          "titles": 12
+          "team": "Colombia",
+          "titles": 56
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.006153110089114165,
-            "upper": 0.01958959672837577
+            "lower": 0.03813007264328189,
+            "upper": 0.0653141360844696
           },
-          "probability": 0.011,
+          "probability": 0.05,
           "rank": 7,
-          "team": "Argentina",
-          "titles": 11
+          "team": "Netherlands",
+          "titles": 50
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.004059147003819634,
-            "upper": 0.01570652120518864
+            "lower": 0.02026631563648779,
+            "upper": 0.04133862283189209
           },
-          "probability": 0.008,
+          "probability": 0.029,
           "rank": 8,
-          "team": "Paraguay",
-          "titles": 8
+          "team": "Portugal",
+          "titles": 29
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.000548632102457155,
-            "upper": 0.007262958889587807
+            "lower": 0.011415645858738454,
+            "upper": 0.02827348437854201
           },
-          "probability": 0.002,
+          "probability": 0.018,
           "rank": 9,
-          "team": "Croatia",
-          "titles": 2
+          "team": "Ecuador",
+          "titles": 18
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.000548632102457155,
-            "upper": 0.007262958889587807
+            "lower": 0.008357497449441328,
+            "upper": 0.023362247976530262
           },
-          "probability": 0.002,
+          "probability": 0.014,
           "rank": 10,
-          "team": "Japan",
-          "titles": 2
+          "team": "Croatia",
+          "titles": 14
         }
       ],
       "total_titles": 1000
     },
     {
       "probabilities": {
-        "Algeria": 0.0,
-        "Argentina": 0.009,
-        "Australia": 0.0,
-        "Austria": 0.0,
-        "Belgium": 0.0005,
+        "Algeria": 0.001,
+        "Argentina": 0.2115,
+        "Australia": 0.0005,
+        "Austria": 0.002,
+        "Belgium": 0.0115,
         "Bosnia and Herzegovina": 0.0,
-        "Brazil": 0.0605,
-        "Canada": 0.001,
+        "Brazil": 0.05,
+        "Canada": 0.003,
         "Cape Verde Islands": 0.0,
-        "Colombia": 0.0,
+        "Colombia": 0.057,
         "Congo DR": 0.0,
-        "Croatia": 0.002,
-        "Côte d'Ivoire": 0.0,
-        "Ecuador": 0.0,
-        "Egypt": 0.0,
-        "England": 0.0005,
-        "France": 0.1035,
-        "Germany": 0.7325,
+        "Croatia": 0.012,
+        "Côte d'Ivoire": 0.001,
+        "Ecuador": 0.015,
+        "Egypt": 0.0005,
+        "England": 0.0865,
+        "France": 0.1725,
+        "Germany": 0.0,
         "Ghana": 0.0,
-        "Japan": 0.002,
-        "Mexico": 0.0005,
-        "Morocco": 0.0,
-        "Netherlands": 0.014,
-        "Norway": 0.0,
-        "Paraguay": 0.008,
-        "Portugal": 0.049,
-        "Senegal": 0.0,
-        "South Africa": 0.0015,
-        "Spain": 0.014,
-        "Sweden": 0.001,
-        "Switzerland": 0.0,
-        "USA": 0.0005
+        "Japan": 0.006,
+        "Mexico": 0.0035,
+        "Morocco": 0.0075,
+        "Netherlands": 0.046,
+        "Norway": 0.0125,
+        "Paraguay": 0.006,
+        "Portugal": 0.03,
+        "Senegal": 0.0095,
+        "South Africa": 0.0,
+        "Spain": 0.237,
+        "Sweden": 0.0015,
+        "Switzerland": 0.0115,
+        "USA": 0.005
       },
       "runs": 2000,
       "top_champions": [
         {
           "mc_sampling_interval_95": {
-            "lower": 0.7126675250229269,
-            "upper": 0.7514410152928348
+            "lower": 0.21887818484520236,
+            "upper": 0.2561302190126674
           },
-          "probability": 0.7325,
+          "probability": 0.237,
           "rank": 1,
-          "team": "Germany",
-          "titles": 1465
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.09090113877201708,
-            "upper": 0.11761913548518968
-          },
-          "probability": 0.1035,
-          "rank": 2,
-          "team": "France",
-          "titles": 207
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.05086982690249883,
-            "upper": 0.07181531946835204
-          },
-          "probability": 0.0605,
-          "rank": 3,
-          "team": "Brazil",
-          "titles": 121
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.040373396150675284,
-            "upper": 0.0593558439249874
-          },
-          "probability": 0.049,
-          "rank": 4,
-          "team": "Portugal",
-          "titles": 98
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.009703718394559921,
-            "upper": 0.020159719913138655
-          },
-          "probability": 0.014,
-          "rank": 5,
-          "team": "Netherlands",
-          "titles": 28
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.009703718394559921,
-            "upper": 0.020159719913138655
-          },
-          "probability": 0.014,
-          "rank": 6,
           "team": "Spain",
-          "titles": 28
+          "titles": 474
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.005700452646339954,
-            "upper": 0.014182156837363747
+            "lower": 0.19416400528936859,
+            "upper": 0.22994217156612737
           },
-          "probability": 0.009,
-          "rank": 7,
+          "probability": 0.2115,
+          "rank": 2,
           "team": "Argentina",
-          "titles": 18
+          "titles": 423
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.00493025378658916,
-            "upper": 0.012956189932315568
+            "lower": 0.15657337750644248,
+            "upper": 0.18968233452189345
           },
-          "probability": 0.008,
+          "probability": 0.1725,
+          "rank": 3,
+          "team": "France",
+          "titles": 345
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.07495924779326923,
+            "upper": 0.09962620846235495
+          },
+          "probability": 0.0865,
+          "rank": 4,
+          "team": "England",
+          "titles": 173
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.04766261190747434,
+            "upper": 0.06803595428658013
+          },
+          "probability": 0.057,
+          "rank": 5,
+          "team": "Colombia",
+          "titles": 114
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.04128108811097559,
+            "upper": 0.06044431772948606
+          },
+          "probability": 0.05,
+          "rank": 6,
+          "team": "Brazil",
+          "titles": 100
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.03765688480093504,
+            "upper": 0.056083857980330706
+          },
+          "probability": 0.046,
+          "rank": 7,
+          "team": "Netherlands",
+          "titles": 92
+        },
+        {
+          "mc_sampling_interval_95": {
+            "lower": 0.023377747806531353,
+            "upper": 0.038424342737950805
+          },
+          "probability": 0.03,
           "rank": 8,
-          "team": "Paraguay",
-          "titles": 16
+          "team": "Portugal",
+          "titles": 60
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.0007780147254709095,
-            "upper": 0.005131434404639974
+            "lower": 0.01052703012044565,
+            "upper": 0.0213325739520519
           },
-          "probability": 0.002,
+          "probability": 0.015,
           "rank": 9,
-          "team": "Croatia",
-          "titles": 4
+          "team": "Ecuador",
+          "titles": 30
         },
         {
           "mc_sampling_interval_95": {
-            "lower": 0.0007780147254709095,
-            "upper": 0.005131434404639974
+            "lower": 0.008481021586816417,
+            "upper": 0.018388168073683698
           },
-          "probability": 0.002,
+          "probability": 0.0125,
           "rank": 10,
-          "team": "Japan",
-          "titles": 4
+          "team": "Norway",
+          "titles": 25
         }
       ],
       "total_titles": 2000
