@@ -240,6 +240,9 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
             "validation_matches": int(board.form.validation_matches),
             "validation_log_likelihood": float(board.form.validation_log_likelihood),
             "historical_validation_log_likelihood": float(board.form.historical_validation_log_likelihood),
+            "knockout_observed_matches": int(board.form.knockout_observed_matches),
+            "knockout_form_matches": int(board.form.knockout_form_matches),
+            "knockout_form_policy": board.form.knockout_form_policy,
         },
         "observed_knockout_results": [
             {

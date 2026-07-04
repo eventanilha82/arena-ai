@@ -141,6 +141,9 @@ def fixed_group_stage_payload(board: bolao.GroupStageBoard) -> dict[str, object]
             "validation_matches": form.validation_matches,
             "validation_log_likelihood": form.validation_log_likelihood,
             "historical_validation_log_likelihood": form.historical_validation_log_likelihood,
+            "knockout_observed_matches": form.knockout_observed_matches,
+            "knockout_form_matches": form.knockout_form_matches,
+            "knockout_form_policy": form.knockout_form_policy,
         },
         "manual_snapshot": {
             "snapshot_kind": board.snapshot.snapshot_kind,

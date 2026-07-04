@@ -1,2 +1,17 @@
 match_number,round,home_team,away_team,home_goals_90,away_goals_90,extra_time_home_goals,extra_time_away_goals,winner,resolution,shootout_home,shootout_away,source
-74,Round of 32,Germany,Paraguay,1,1,0,0,Paraguay,penalties,3,4,user_reported_and_web_verified_2026-06-29
+73,Round of 32,South Africa,Canada,0,1,0,0,Canada,90min,,,user_reported_and_web_verified_2026-07-04
+74,Round of 32,Germany,Paraguay,1,1,0,0,Paraguay,penalties,3,4,user_reported_and_web_verified_2026-07-04
+75,Round of 32,Netherlands,Morocco,1,1,0,0,Morocco,penalties,2,3,user_reported_and_web_verified_2026-07-04
+76,Round of 32,Brazil,Japan,2,1,0,0,Brazil,90min,,,user_reported_and_web_verified_2026-07-04
+77,Round of 32,France,Sweden,3,0,0,0,France,90min,,,user_reported_and_web_verified_2026-07-04
+78,Round of 32,Côte d'Ivoire,Norway,1,2,0,0,Norway,90min,,,user_reported_and_web_verified_2026-07-04
+79,Round of 32,Mexico,Ecuador,2,0,0,0,Mexico,90min,,,user_reported_and_web_verified_2026-07-04
+80,Round of 32,England,Congo DR,2,1,0,0,England,90min,,,user_reported_and_web_verified_2026-07-04
+81,Round of 32,USA,Bosnia and Herzegovina,2,0,0,0,USA,90min,,,user_reported_and_web_verified_2026-07-04
+82,Round of 32,Belgium,Senegal,2,2,1,0,Belgium,extra_time,,,user_reported_and_web_verified_2026-07-04
+83,Round of 32,Portugal,Croatia,2,1,0,0,Portugal,90min,,,user_reported_and_web_verified_2026-07-04
+84,Round of 32,Spain,Austria,3,0,0,0,Spain,90min,,,user_reported_and_web_verified_2026-07-04
+85,Round of 32,Switzerland,Algeria,2,0,0,0,Switzerland,90min,,,user_reported_and_web_verified_2026-07-04
+86,Round of 32,Argentina,Cape Verde Islands,1,1,2,1,Argentina,extra_time,,,user_reported_and_web_verified_2026-07-04
+87,Round of 32,Colombia,Ghana,1,0,0,0,Colombia,90min,,,user_reported_and_web_verified_2026-07-04
+88,Round of 32,Australia,Egypt,1,1,0,0,Egypt,penalties,2,4,user_reported_and_web_verified_2026-07-04

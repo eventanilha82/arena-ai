@@ -39,6 +39,7 @@ CURRENT_FORM_MIN_OBSERVED_MATCHES = 72
 CURRENT_FORM_VALIDATION_FRACTION = 1.0 / 3.0
 CURRENT_FORM_REQUIRED_LOG_SCORE_GAIN_PER_MATCH = 0.01
 HISTORICAL_FORM_PRIOR_GOALS = 1_000_000.0
+KNOCKOUT_FORM_POLICY = "regulation_90_only_frozen_group_prior"
 
 TEAM_DISPLAY_NAMES_PT = {
     "ALG": "Argélia",
@@ -224,6 +225,9 @@ class TournamentForm:
     validation_matches: int
     validation_log_likelihood: float
     historical_validation_log_likelihood: float
+    knockout_observed_matches: int = 0
+    knockout_form_matches: int = 0
+    knockout_form_policy: str = "none"
 
 
 @dataclass(frozen=True)
@@ -894,6 +898,88 @@ def build_team_forms(stats: defaultdict[str, dict[str, float]], prior_goals: flo
     return forms
 
 
+def form_stats_from_team_forms(teams: dict[str, TeamForm]) -> defaultdict[str, dict[str, float]]:
+    stats = empty_form_stats()
+    for team, form in teams.items():
+        stats[team].update(
+            {
+                "matches": float(form.observed_matches),
+                "gf": float(form.goals_for),
+                "ga": float(form.goals_against),
+                "xgf": float(form.expected_goals_for),
+                "xga": float(form.expected_goals_against),
+            }
+        )
+    return stats
+
+
+def update_tournament_form_with_knockout_results(
+    model: WorldCupModel,
+    form: TournamentForm,
+    team_context: dict[str, dict[str, object]],
+    observed_results: dict[int, ObservedKnockoutResult],
+) -> TournamentForm:
+    """Append completed regulation-time evidence without retuning the group-stage prior.
+
+    The current-form posterior predicts 90-minute scoring rates. Extra-time goals
+    and shootout kicks resolve the bracket, but belong to different processes and
+    therefore do not update those rates.
+    """
+    observed_count = len(observed_results)
+    if not observed_results:
+        return replace(
+            form,
+            knockout_observed_matches=0,
+            knockout_form_matches=0,
+            knockout_form_policy="none",
+        )
+    if not form.is_enabled:
+        return replace(
+            form,
+            knockout_observed_matches=observed_count,
+            knockout_form_matches=0,
+            knockout_form_policy="disabled_historical_fallback",
+        )
+
+    stats = form_stats_from_team_forms(form.teams)
+    context_state = {team: dict(context) for team, context in team_context.items()}
+    fixtures = model.fixtures[model.fixtures["stage_id"] > sota.GROUP_STAGE_ID]
+    fixtures = fixtures[fixtures["match_number"].isin(observed_results)].sort_values(
+        ["kickoff_at", "match_number"]
+    )
+    for game in fixtures.itertuples(index=False):
+        observed = observed_results[int(game.match_number)]
+        context = sota.fixture_context(game, context_state, observed.home, observed.away)
+        prediction = sota.predict_match(
+            model.package,
+            observed.home,
+            observed.away,
+            knockout=True,
+            context=context,
+        )
+        update_form_stats(
+            stats,
+            observed.home,
+            observed.away,
+            observed.home_goals_90,
+            observed.away_goals_90,
+            float(prediction["home_xg"]),
+            float(prediction["away_xg"]),
+        )
+        sota.update_team_context(context_state, observed.home, observed.away, game)
+
+    if len(fixtures) != observed_count:
+        raise ValueError("resultados observados do mata-mata não correspondem ao fixture carregado")
+    return replace(
+        form,
+        teams=build_team_forms(stats, form.prior_goal_equivalents),
+        median_current_weight=form_weight_median(stats, form.prior_goal_equivalents),
+        knockout_observed_matches=observed_count,
+        knockout_form_matches=observed_count,
+        knockout_form_policy=KNOCKOUT_FORM_POLICY,
+    )
+
+
 def neutral_team_form() -> TeamForm:
     return TeamForm(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0)
 
@@ -1132,7 +1218,14 @@ def build_group_stage_board(model: WorldCupModel) -> GroupStageBoard:
         snapshot=snapshot,
         knockout_results={},
     )
-    return replace(board, knockout_results=load_observed_knockout_results(model, board))
+    knockout_results = load_observed_knockout_results(model, board)
+    form = update_tournament_form_with_knockout_results(
+        model,
+        board.form,
+        board.team_context,
+        knockout_results,
+    )
+    return replace(board, form=form, knockout_results=knockout_results)
 
 
 def choose_group_score(
@@ -1579,10 +1672,16 @@ def render_intro(console: Console, board: GroupStageBoard) -> None:
     snapshot = board.snapshot
     form = board.form
     if form.is_enabled:
+        knockout_form_line = (
+            f"; {form.knockout_form_matches} jogo(s) eliminatório(s) incorporado(s) só pelos 90 min"
+            if form.knockout_form_matches
+            else ""
+        )
         form_line = (
             f"[yellow]Foto atual validada:[/yellow] peso mediano {pct(form.median_current_weight)} "
             f"na forma da Copa (prior histórico: {form.prior_goal_equivalents:.2f} gols equivalentes; "
-            f"holdout: {form.validation_log_likelihood - form.historical_validation_log_likelihood:+.3f} log-score)"
+            f"holdout: {form.validation_log_likelihood - form.historical_validation_log_likelihood:+.3f} log-score"
+            f"{knockout_form_line})"
         )
     elif form.calibration_status == "fallback_history_validation":
         form_line = (
@@ -1930,7 +2029,7 @@ def signed_int(value: int) -> str:
 
 def stage_name(stage: object) -> str:
     return {
-        "Round of 32": "32 avos",
+        "Round of 32": "16 avos",
         "Round of 16": "Oitavas",
         "Quarterfinals": "Quartas",
         "Semifinals": "Semis",
