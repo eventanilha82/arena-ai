@@ -119,6 +119,16 @@ EXPECTED_ROUND32_RESULTS = {
     87: ("Colombia", "Ghana", 1, 0, 0, 0, "Colombia", "90min", None, None),
     88: ("Australia", "Egypt", 1, 1, 0, 0, "Egypt", "penalties", 2, 4),
 }
+EXPECTED_ROUND16_RESULTS = {
+    89: ("Paraguay", "France", 0, 1, 0, 0, "France", "90min", None, None),
+    90: ("Canada", "Morocco", 0, 3, 0, 0, "Morocco", "90min", None, None),
+    91: ("Brazil", "Norway", 1, 2, 0, 0, "Norway", "90min", None, None),
+    92: ("Mexico", "England", 2, 3, 0, 0, "England", "90min", None, None),
+    93: ("Portugal", "Spain", 0, 1, 0, 0, "Spain", "90min", None, None),
+    94: ("USA", "Belgium", 1, 4, 0, 0, "Belgium", "90min", None, None),
+    95: ("Argentina", "Egypt", 3, 2, 0, 0, "Argentina", "90min", None, None),
+    96: ("Switzerland", "Colombia", 0, 0, 0, 0, "Switzerland", "penalties", 4, 3),
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -376,8 +386,8 @@ def validate_form_calibration(model: WorldCupModel, board: bolao.GroupStageBoard
         )
 
     group_form = bolao.build_tournament_form(model, form.observed_results)
-    require(form.knockout_observed_matches == 16, "forma não registrou os 16 jogos observados do mata-mata")
-    require(form.knockout_form_matches == 16, "forma não incorporou os 16 placares regulamentares")
+    require(form.knockout_observed_matches == 24, "forma não registrou os 24 jogos observados do mata-mata")
+    require(form.knockout_form_matches == 24, "forma não incorporou os 24 placares regulamentares")
     require(
         form.knockout_form_policy == bolao.KNOCKOUT_FORM_POLICY,
         f"política de atualização eliminatória inesperada: {form.knockout_form_policy}",
@@ -386,22 +396,26 @@ def validate_form_calibration(model: WorldCupModel, board: bolao.GroupStageBoard
         form.prior_goal_equivalents == group_form.prior_goal_equivalents,
         "mata-mata retunou o prior escolhido antes dos 16 avos",
     )
+    match_counts: Counter[str] = Counter()
+    goals_for: Counter[str] = Counter()
+    goals_against: Counter[str] = Counter()
     for observed in board.knockout_results.values():
-        before_home = group_form.teams[observed.home]
-        before_away = group_form.teams[observed.away]
-        after_home = form.teams[observed.home]
-        after_away = form.teams[observed.away]
+        match_counts.update((observed.home, observed.away))
+        goals_for[observed.home] += observed.home_goals_90
+        goals_against[observed.home] += observed.away_goals_90
+        goals_for[observed.away] += observed.away_goals_90
+        goals_against[observed.away] += observed.home_goals_90
+    for team, observed_matches in match_counts.items():
+        before = group_form.teams[team]
+        after = form.teams[team]
         require(
-            after_home.observed_matches == before_home.observed_matches + 1
-            and after_away.observed_matches == before_away.observed_matches + 1,
-            f"jogo {observed.match_number} não adicionou exatamente uma observação por seleção",
+            after.observed_matches == before.observed_matches + observed_matches,
+            f"forma não adicionou {observed_matches} observação(ões) para {team}",
         )
         require(
-            after_home.goals_for - before_home.goals_for == observed.home_goals_90
-            and after_home.goals_against - before_home.goals_against == observed.away_goals_90
-            and after_away.goals_for - before_away.goals_for == observed.away_goals_90
-            and after_away.goals_against - before_away.goals_against == observed.home_goals_90,
-            f"jogo {observed.match_number} misturou prorrogação ou pênaltis na forma de 90 minutos",
+            after.goals_for - before.goals_for == goals_for[team]
+            and after.goals_against - before.goals_against == goals_against[team],
+            f"forma de {team} misturou prorrogação ou pênaltis na taxa de 90 minutos",
         )
 
     home, away = sorted(board.qualified_teams)[:2]
@@ -505,8 +519,9 @@ def validate_simulated_fair_play(model: WorldCupModel) -> None:
 def validate_observed_knockout_results(model: WorldCupModel, board: bolao.GroupStageBoard) -> None:
     require(bolao.stage_name("Round of 32") == "16 avos", "rótulo em português dos 16 avos está incorreto")
     observed = board.knockout_results
-    require(set(observed) == set(EXPECTED_ROUND32_RESULTS), "snapshot não cobre os 16 jogos dos 16 avos")
-    for match_number, expected in EXPECTED_ROUND32_RESULTS.items():
+    expected_results = {**EXPECTED_ROUND32_RESULTS, **EXPECTED_ROUND16_RESULTS}
+    require(set(observed) == set(expected_results), "snapshot não cobre os 24 jogos eliminatórios encerrados")
+    for match_number, expected in expected_results.items():
         result = observed[match_number]
         actual = (
             result.home,
@@ -521,13 +536,14 @@ def validate_observed_knockout_results(model: WorldCupModel, board: bolao.GroupS
             result.shootout_away,
         )
         require(actual == expected, f"resultado observado do jogo {match_number} não confere: {actual!r}")
-    try:
-        bolao.build_conditioned_knockout(model, board, "Germany")
-    except ValueError as error:
-        require("eliminado" in str(error), f"eliminação observada falhou de forma inesperada: {error}")
-    else:
-        raise AssertionError("trilha condicionada ressuscitou a Alemanha após resultado observado")
-    bracket = bolao.build_conditioned_knockout(model, board, "Paraguay")
+    for eliminated_team in ("Germany", "Brazil", "Colombia"):
+        try:
+            bolao.build_conditioned_knockout(model, board, eliminated_team)
+        except ValueError as error:
+            require("eliminado" in str(error), f"eliminação observada falhou de forma inesperada: {error}")
+        else:
+            raise AssertionError(f"trilha condicionada ressuscitou {eliminated_team} após resultado observado")
+    bracket = bolao.build_conditioned_knockout(model, board, "France")
     observed_row = bracket.loc[bracket["match_number"] == 74].iloc[0]
     require(
         (str(observed_row.winner), str(observed_row.resolution), int(observed_row.home_goals), int(observed_row.away_goals))
@@ -547,6 +563,15 @@ def validate_observed_knockout_results(model: WorldCupModel, board: bolao.GroupS
     for match_number, expected in expected_round16.items():
         row = bracket.loc[bracket["match_number"] == match_number].iloc[0]
         require((str(row.home), str(row.away)) == expected, f"oitavas incorretas no jogo {match_number}")
+    expected_quarterfinals = {
+        97: ("France", "Morocco"),
+        98: ("Spain", "Belgium"),
+        99: ("Norway", "England"),
+        100: ("Argentina", "Switzerland"),
+    }
+    for match_number, expected in expected_quarterfinals.items():
+        row = bracket.loc[bracket["match_number"] == match_number].iloc[0]
+        require((str(row.home), str(row.away)) == expected, f"quartas incorretas no jogo {match_number}")
 
 
 def validate_neutral_order_invariance(model: WorldCupModel, board: bolao.GroupStageBoard) -> None:
@@ -786,6 +811,69 @@ def validate_knockout_calibration_audit() -> None:
     )
 
 
+def validate_round16_calibration_audit() -> None:
+    artifacts = ROOT / "artifacts"
+    artifacts.mkdir(exist_ok=True)
+    with TemporaryDirectory(prefix="bolao_round16_qa_", dir=artifacts) as temporary_dir:
+        base = Path(temporary_dir)
+        output = base / "calibration.json"
+        audit_csv = base / "round16.csv"
+        quarterfinal_csv = base / "quarterfinals.csv"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "bolao_round16_calibration.py"),
+                "--out",
+                str(output),
+                "--audit-csv",
+                str(audit_csv),
+                "--quarterfinal-csv",
+                str(quarterfinal_csv),
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        terminal_output = result.stdout + result.stderr
+        require(result.returncode == 0, f"auditoria das oitavas falhou:\n{terminal_output}")
+        require(
+            output.is_file() and audit_csv.is_file() and quarterfinal_csv.is_file(),
+            "auditoria das oitavas não gerou os artefatos",
+        )
+        report = json.loads(output.read_text(encoding="utf-8"))
+        audit_rows = pd.read_csv(audit_csv)
+        quarterfinal_rows = pd.read_csv(quarterfinal_csv)
+    require(report["approved"] is True, "gate de calibração das oitavas não passou")
+    require(len(audit_rows) == 8, "auditoria não cobriu os oito jogos das oitavas")
+    require(len(quarterfinal_rows) == 4, "auditoria não resolveu os quatro confrontos das quartas")
+    require(
+        report["pre_round16_form"]["log_loss_1x2"] > report["historical_baseline"]["log_loss_1x2"],
+        "relatório não registrou a leve piora externa da forma nas oitavas",
+    )
+    require(
+        report["operational_margin"]["all_metrics_within_margin"] is True,
+        "forma ultrapassou a margem operacional nas oitavas",
+    )
+    require(
+        report["decision"]["retune_xgboost_or_global_hybrid_weights"] is False,
+        "amostra de oito jogos retunou pesos globais do híbrido",
+    )
+    require(
+        report["current_form_update"]["extra_time_goals_appended"] == 0
+        and report["current_form_update"]["shootout_kicks_appended"] == 0,
+        "auditoria das oitavas incluiu prorrogação ou cobranças na taxa regulamentar",
+    )
+    require(
+        report["current_form_update"]["max_abs_quarterfinal_advance_probability_delta"] <= 0.05,
+        "uma única rodada deslocou excessivamente a chance de avanço nas quartas",
+    )
+    require(
+        report["hard_gates"]["switzerland_colombia_correction_verified"] is True,
+        "auditoria não preservou a vitória suíça por 4-3 nos pênaltis",
+    )
+
+
 def validate_mc_stability_audit(board: bolao.GroupStageBoard) -> None:
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
@@ -838,7 +926,7 @@ def validate_mc_stability_audit(board: bolao.GroupStageBoard) -> None:
     require(report["fixed_group_stage"]["is_fixed"] is True, "relatório MC não marcou grupos fixos")
     require(
         report["fixed_group_stage"]["form"]["knockout_form_policy"] == bolao.KNOCKOUT_FORM_POLICY
-        and report["fixed_group_stage"]["form"]["knockout_form_matches"] == 16,
+        and report["fixed_group_stage"]["form"]["knockout_form_matches"] == 24,
         "relatório MC não registrou a atualização regulamentar do mata-mata",
     )
     expected_locked_results = [
@@ -853,7 +941,7 @@ def validate_mc_stability_audit(board: bolao.GroupStageBoard) -> None:
     ]
     require(
         report["fixed_group_stage"]["locked_knockout_results"] == expected_locked_results,
-        "auditoria MC não registrou os 16 resultados observados da chave",
+        "auditoria MC não registrou os 24 resultados observados da chave",
     )
     require(
         report["uncertainty"]["scope"] == "monte_carlo_sampling_error_only",
@@ -909,6 +997,7 @@ def main() -> int:
     validate_simulated_fair_play(model)
     validate_observed_knockout_results(model, board)
     validate_knockout_calibration_audit()
+    validate_round16_calibration_audit()
     validate_neutral_order_invariance(model, board)
     validate_knockout_policy(model, board)
     validate_penalty_scores_include_extra_time()

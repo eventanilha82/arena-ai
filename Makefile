@@ -1,4 +1,4 @@
-.PHONY: help sync run console bolao bolao-grupos bolao-qa bolao-knockout-audit bolao-mc-stability bolao-top10-audit smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
+.PHONY: help sync run console bolao bolao-grupos bolao-qa bolao-knockout-audit bolao-round16-audit bolao-mc-stability bolao-top10-audit smoke validate stats-qa mc-stability runtime-cache runtime-cache-check aaa-qa visual-qa audio-smoke audio-qa benchmark-mc-workers build-assets-qa release-qa build build-current build-mac build-windows build-windows-local build-windows-remote windows-artifact-check build-release release-artifacts release-stage release-github release-clean clean-build
 
 APP_NAME := ArenaAI
 PYTHON ?= .venv/bin/python
@@ -45,6 +45,7 @@ help:
 	@printf "make bolao-grupos  lista placares e classificacao fixa dos grupos\n"
 	@printf "make bolao-qa      valida CSV, grupos e Monte Carlo curto sem interacao\n"
 	@printf "make bolao-knockout-audit audita os 16 avos e gera a foto probabilistica das oitavas\n"
+	@printf "make bolao-round16-audit audita as oitavas e gera a foto probabilistica das quartas\n"
 	@printf "make bolao-mc-stability audita grupos fixos + forma + mata-mata em 1k/2k e seeds independentes\n"
 	@printf "make bolao-top10-audit audita os favoritos por simetria, forma e pênaltis neutros\n"
 	@printf "make smoke         compila, importa modelo e roda 1 predicao\n"
@@ -94,6 +95,11 @@ bolao-knockout-audit:
 	@printf "[make] bolao Round-of-32 calibration audit\n"
 	$(PYTHON) -m compileall -q src/arena_ai/bolao.py scripts/bolao_knockout_calibration.py
 	$(PYTHON) scripts/bolao_knockout_calibration.py
+
+bolao-round16-audit:
+	@printf "[make] bolao Round-of-16 calibration audit\n"
+	$(PYTHON) -m compileall -q src/arena_ai/bolao.py scripts/bolao_knockout_calibration.py scripts/bolao_round16_calibration.py
+	$(PYTHON) scripts/bolao_round16_calibration.py
 
 bolao-mc-stability:
 	@printf "[make] compile bolao Monte Carlo stability\n"

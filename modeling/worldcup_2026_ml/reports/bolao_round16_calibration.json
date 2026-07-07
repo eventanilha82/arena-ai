@@ -1,0 +1,198 @@
+{
+  "report_type": "arena_bolao_round16_calibration",
+  "generated_at": "2026-07-07T23:13:16.823644+00:00",
+  "scope": {
+    "observed_round": "Round of 16",
+    "observed_matches": 8,
+    "evaluation_target": "90-minute 1X2, exact regulation score, and eventual advancement",
+    "comparison": "historical hybrid versus the form snapshot frozen after the Round of 32",
+    "look_ahead": "none; the candidate form was fixed before the Round of 16 outcomes"
+  },
+  "observed_resolution": {
+    "regulation": 7,
+    "extra_time": 0,
+    "penalties": 1
+  },
+  "historical_baseline": {
+    "matches": 8,
+    "log_loss_1x2": 0.7766009968650247,
+    "brier_1x2": 0.43829211256539374,
+    "accuracy_1x2": 0.75,
+    "exact_score_log_loss": 3.005075402009804,
+    "advance_log_loss": 0.5027557103309417,
+    "advance_brier": 0.16496647369649126,
+    "advance_accuracy": 0.75,
+    "observed_draws": 1,
+    "expected_draws": 2.091615067492603,
+    "draw_standardized_residual": -0.8846002808296924
+  },
+  "group_only_form": {
+    "matches": 8,
+    "log_loss_1x2": 0.7820600323261706,
+    "brier_1x2": 0.4422254422851285,
+    "accuracy_1x2": 0.75,
+    "exact_score_log_loss": 3.0308795610997863,
+    "advance_log_loss": 0.5110903402623905,
+    "advance_brier": 0.16884869191719906,
+    "advance_accuracy": 0.75,
+    "observed_draws": 1,
+    "expected_draws": 2.0925707288881585,
+    "draw_standardized_residual": -0.8851839274012734
+  },
+  "pre_round16_form": {
+    "matches": 8,
+    "log_loss_1x2": 0.7833812800778857,
+    "brier_1x2": 0.4429787696408831,
+    "accuracy_1x2": 0.75,
+    "exact_score_log_loss": 3.009149942918388,
+    "advance_log_loss": 0.5114222754551474,
+    "advance_brier": 0.16879131384125773,
+    "advance_accuracy": 0.75,
+    "observed_draws": 1,
+    "expected_draws": 2.099347510505086,
+    "draw_standardized_residual": -0.889593095250445
+  },
+  "loss_gap_pre_round16_form_minus_historical": {
+    "log_loss_1x2": 0.006780283212860949,
+    "brier_1x2": 0.0046866570754893755,
+    "exact_score_log_loss": 0.004074540908584279,
+    "advance_log_loss": 0.008666565124205716,
+    "advance_brier": 0.0038248401447664726
+  },
+  "operational_margin": {
+    "maximum_allowed_loss_gap_per_metric": 0.01,
+    "all_metrics_within_margin": true,
+    "interpretation": "reuses the existing per-match materiality threshold as an operational guardrail; it is not a formal statistical non-inferiority claim"
+  },
+  "current_form_update": {
+    "policy": "regulation_90_only_frozen_group_prior",
+    "prior_goal_equivalents_frozen": 8.0,
+    "median_weight_before_round16": 0.3998405658200644,
+    "median_weight_after_round16": 0.4192448174204783,
+    "matches_appended_in_round16": 8,
+    "total_knockout_matches_appended": 24,
+    "extra_time_goals_appended": 0,
+    "shootout_kicks_appended": 0,
+    "max_abs_quarterfinal_advance_probability_delta": 0.006176844112003255
+  },
+  "data_corrections": [
+    {
+      "match_number": 96,
+      "reported": "Colombia advanced",
+      "verified": "Switzerland advanced 4-3 on penalties after 0-0 in 120 minutes"
+    }
+  ],
+  "decision": {
+    "retain_frozen_current_form_policy": true,
+    "append_round16_regulation_evidence": true,
+    "retune_xgboost_or_global_hybrid_weights": false,
+    "recalibrate_draw_probability": false,
+    "recalibrate_penalty_probability": false,
+    "reason": "The eight-match round slightly favors the historical baseline, but every paired aggregate loss gap remains below the 0.01 operational margin. The sample is too small for a global retune."
+  },
+  "quarterfinal_predictions": [
+    {
+      "match_number": 97,
+      "kickoff_at": "2026-07-09T20:00:00+00:00",
+      "home": "France",
+      "away": "Morocco",
+      "home_xg": 1.9701004589147093,
+      "away_xg": 0.8782133271879946,
+      "p_home_win_90": 0.5692343616948584,
+      "p_draw_90": 0.25119519241012367,
+      "p_away_win_90": 0.17957044589501794,
+      "p_home_advances": 0.7222767441254223,
+      "p_away_advances": 0.2777232558745777,
+      "pre_round16_p_home_advances": 0.7284535882374256,
+      "round16_update_p_home_advances_delta": -0.006176844112003255,
+      "most_likely_to_advance": "France",
+      "modal_score_90": "2-0",
+      "form_weight": 0.45775788582958254
+    },
+    {
+      "match_number": 98,
+      "kickoff_at": "2026-07-10T22:00:00+00:00",
+      "home": "Spain",
+      "away": "Belgium",
+      "home_xg": 1.8870417951725664,
+      "away_xg": 0.7712777189843105,
+      "p_home_win_90": 0.6693030746465994,
+      "p_draw_90": 0.21976367259940527,
+      "p_away_win_90": 0.11093325275399539,
+      "p_home_advances": 0.8041630284100691,
+      "p_away_advances": 0.19583697158993085,
+      "pre_round16_p_home_advances": 0.8059698178187401,
+      "round16_update_p_home_advances_delta": -0.0018067894086709613,
+      "most_likely_to_advance": "Spain",
+      "modal_score_90": "2-0",
+      "form_weight": 0.45369722570175747
+    },
+    {
+      "match_number": 99,
+      "kickoff_at": "2026-07-11T21:00:00+00:00",
+      "home": "Norway",
+      "away": "England",
+      "home_xg": 1.1894192946429927,
+      "away_xg": 1.8982552051509656,
+      "p_home_win_90": 0.22819594823234535,
+      "p_draw_90": 0.28606768720001197,
+      "p_away_win_90": 0.48573636456764274,
+      "p_home_advances": 0.35131466477322315,
+      "p_away_advances": 0.6486853352267768,
+      "pre_round16_p_home_advances": 0.3475274354900242,
+      "round16_update_p_home_advances_delta": 0.0037872292831989673,
+      "most_likely_to_advance": "England",
+      "modal_score_90": "1-2",
+      "form_weight": 0.46238188909725614
+    },
+    {
+      "match_number": 100,
+      "kickoff_at": "2026-07-12T02:00:00+00:00",
+      "home": "Argentina",
+      "away": "Switzerland",
+      "home_xg": 1.8016729346651683,
+      "away_xg": 0.8896559203307647,
+      "p_home_win_90": 0.6157276167045063,
+      "p_draw_90": 0.2419209450400815,
+      "p_away_win_90": 0.14235143825541233,
+      "p_home_advances": 0.7591415899994018,
+      "p_away_advances": 0.24085841000059816,
+      "pre_round16_p_home_advances": 0.7640460045796729,
+      "round16_update_p_home_advances_delta": -0.0049044145802710215,
+      "most_likely_to_advance": "Argentina",
+      "modal_score_90": "1-0",
+      "form_weight": 0.4470306969786705
+    }
+  ],
+  "limitations": [
+    "Eight matches from one round cannot identify a stable global recalibration.",
+    "The operational margin is a guardrail, not a confidence-bound non-inferiority test.",
+    "The audit has final scores but no event-level xG, lineups, injuries, or betting-market closing odds.",
+    "One shootout adds no credible evidence for team-specific penalty skill; shootouts remain 50/50.",
+    "Monte Carlo intervals remain sampling-error intervals, not total predictive uncertainty."
+  ],
+  "artifacts": {
+    "round16_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_round16_calibration.csv",
+    "quarterfinal_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_quarterfinal_predictions.csv"
+  },
+  "source_fingerprints": {
+    "model_package": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a",
+    "sota_pipeline": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770",
+    "bolao": "96153417432545805cc629ebb43822176399a52a18f7a857f62ef3d91a3b2fdb",
+    "round16_calibration_audit": "fdf22dba91ac86b66bf71187f2e5628f6b05c3c0c1cd02cdfb8931dd1ee83563",
+    "round32_calibration_audit": "60374008f71867eab178f3fce82f54175619462812286aed458cc124d9a27013",
+    "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
+    "observed_knockout_results": "995fc1e1bd9c7e87eafb1e35638a17fb003242f14f19fd95d96d597c22325d16"
+  },
+  "hard_gates": {
+    "complete_round16_snapshot": true,
+    "candidate_was_frozen_before_round16": true,
+    "all_loss_gaps_within_operational_margin": true,
+    "draw_count_within_two_standard_deviations": true,
+    "round16_update_uses_regulation_only": true,
+    "switzerland_colombia_correction_verified": true,
+    "quarterfinal_bracket_complete": true,
+    "single_round_form_update_below_five_percentage_points": true
+  },
+  "approved": true
+}

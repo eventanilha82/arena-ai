@@ -1,6 +1,6 @@
 {
   "report_type": "arena_bolao_round32_calibration",
-  "generated_at": "2026-07-04T04:18:56.647447+00:00",
+  "generated_at": "2026-07-07T23:09:29.328068+00:00",
   "scope": {
     "observed_round": "Round of 32",
     "observed_matches": 16,
@@ -230,7 +230,7 @@
     "bolao": "96153417432545805cc629ebb43822176399a52a18f7a857f62ef3d91a3b2fdb",
     "calibration_audit": "60374008f71867eab178f3fce82f54175619462812286aed458cc124d9a27013",
     "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
-    "observed_knockout_results": "6dca13a562267c211c1fa7fe4dbc99111ca3b9f5fea19152df26f9f95111fd29"
+    "observed_knockout_results": "995fc1e1bd9c7e87eafb1e35638a17fb003242f14f19fd95d96d597c22325d16"
   },
   "hard_gates": {
     "complete_round32_snapshot": true,

@@ -15,3 +15,11 @@ match_number,round,home_team,away_team,home_goals_90,away_goals_90,extra_time_ho
 86,Round of 32,Argentina,Cape Verde Islands,1,1,2,1,Argentina,extra_time,,,user_reported_and_web_verified_2026-07-04
 87,Round of 32,Colombia,Ghana,1,0,0,0,Colombia,90min,,,user_reported_and_web_verified_2026-07-04
 88,Round of 32,Australia,Egypt,1,1,0,0,Egypt,penalties,2,4,user_reported_and_web_verified_2026-07-04
+89,Round of 16,Paraguay,France,0,1,0,0,France,90min,,,user_reported_and_web_verified_2026-07-07
+90,Round of 16,Canada,Morocco,0,3,0,0,Morocco,90min,,,user_reported_and_web_verified_2026-07-07
+91,Round of 16,Brazil,Norway,1,2,0,0,Norway,90min,,,user_reported_and_web_verified_2026-07-07
+92,Round of 16,Mexico,England,2,3,0,0,England,90min,,,user_reported_and_web_verified_2026-07-07
+93,Round of 16,Portugal,Spain,0,1,0,0,Spain,90min,,,user_reported_and_web_verified_2026-07-07
+94,Round of 16,USA,Belgium,1,4,0,0,Belgium,90min,,,user_reported_and_web_verified_2026-07-07
+95,Round of 16,Argentina,Egypt,3,2,0,0,Argentina,90min,,,user_reported_and_web_verified_2026-07-07
+96,Round of 16,Switzerland,Colombia,0,0,0,0,Switzerland,penalties,4,3,web_verified_correction_2026-07-07
