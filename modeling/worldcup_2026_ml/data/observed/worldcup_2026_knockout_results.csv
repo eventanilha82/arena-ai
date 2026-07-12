@@ -23,3 +23,7 @@ match_number,round,home_team,away_team,home_goals_90,away_goals_90,extra_time_ho
 94,Round of 16,USA,Belgium,1,4,0,0,Belgium,90min,,,user_reported_and_web_verified_2026-07-07
 95,Round of 16,Argentina,Egypt,3,2,0,0,Argentina,90min,,,user_reported_and_web_verified_2026-07-07
 96,Round of 16,Switzerland,Colombia,0,0,0,0,Switzerland,penalties,4,3,web_verified_correction_2026-07-07
+97,Quarterfinals,France,Morocco,2,0,0,0,France,90min,,,user_reported_and_web_verified_2026-07-12
+98,Quarterfinals,Spain,Belgium,2,1,0,0,Spain,90min,,,user_reported_and_web_verified_2026-07-12
+99,Quarterfinals,Norway,England,1,1,0,1,England,extra_time,,,user_reported_and_web_verified_2026-07-12
+100,Quarterfinals,Argentina,Switzerland,1,1,2,0,Argentina,extra_time,,,user_reported_and_web_verified_2026-07-12

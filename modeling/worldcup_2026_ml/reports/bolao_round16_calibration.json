@@ -1,6 +1,6 @@
 {
   "report_type": "arena_bolao_round16_calibration",
-  "generated_at": "2026-07-07T23:13:16.823644+00:00",
+  "generated_at": "2026-07-12T05:20:53.572763+00:00",
   "scope": {
     "observed_round": "Round of 16",
     "observed_matches": 8,
@@ -182,7 +182,7 @@
     "round16_calibration_audit": "fdf22dba91ac86b66bf71187f2e5628f6b05c3c0c1cd02cdfb8931dd1ee83563",
     "round32_calibration_audit": "60374008f71867eab178f3fce82f54175619462812286aed458cc124d9a27013",
     "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
-    "observed_knockout_results": "995fc1e1bd9c7e87eafb1e35638a17fb003242f14f19fd95d96d597c22325d16"
+    "observed_knockout_results": "6fd00a10cc4e6b9d12285ecd6d4dd9f1cad2fa0a2b75cff116ac619432eb7f2d"
   },
   "hard_gates": {
     "complete_round16_snapshot": true,

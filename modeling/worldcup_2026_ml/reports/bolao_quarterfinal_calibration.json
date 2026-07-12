@@ -1,0 +1,171 @@
+{
+  "report_type": "arena_bolao_quarterfinal_calibration",
+  "generated_at": "2026-07-12T05:21:03.556565+00:00",
+  "scope": {
+    "observed_round": "Quarterfinals",
+    "observed_matches": 4,
+    "evaluation_target": "90-minute 1X2, exact regulation score, and eventual advancement",
+    "comparison": "historical hybrid versus the form snapshot frozen after the Round of 16",
+    "look_ahead": "none; the candidate form was fixed before the quarterfinal outcomes"
+  },
+  "observed_resolution": {
+    "regulation": 2,
+    "extra_time": 2,
+    "penalties": 0
+  },
+  "historical_baseline": {
+    "matches": 4,
+    "log_loss_1x2": 0.9099076934584855,
+    "brier_1x2": 0.5576223229374324,
+    "accuracy_1x2": 0.5,
+    "exact_score_log_loss": 2.1852287994560604,
+    "advance_log_loss": 0.305649810035862,
+    "advance_brier": 0.07136971824050914,
+    "advance_accuracy": 1.0,
+    "observed_draws": 2,
+    "expected_draws": 0.9944983729688983,
+    "draw_standardized_residual": 1.165154391403948
+  },
+  "group_only_form": {
+    "matches": 4,
+    "log_loss_1x2": 0.913375721553777,
+    "brier_1x2": 0.5601489209377281,
+    "accuracy_1x2": 0.5,
+    "exact_score_log_loss": 2.2064863857248533,
+    "advance_log_loss": 0.3048589554984117,
+    "advance_brier": 0.0709772387194964,
+    "advance_accuracy": 1.0,
+    "observed_draws": 2,
+    "expected_draws": 0.9932682485632118,
+    "draw_standardized_residual": 1.1668424001180016
+  },
+  "pre_quarterfinal_form": {
+    "matches": 4,
+    "log_loss_1x2": 0.9089131121157088,
+    "brier_1x2": 0.555661789275098,
+    "accuracy_1x2": 0.5,
+    "exact_score_log_loss": 2.1858146445651263,
+    "advance_log_loss": 0.31291866660973616,
+    "advance_brier": 0.07422927341195748,
+    "advance_accuracy": 1.0,
+    "observed_draws": 2,
+    "expected_draws": 0.9989474972496224,
+    "draw_standardized_residual": 1.1580858835672008
+  },
+  "loss_gap_pre_quarterfinal_form_minus_historical": {
+    "log_loss_1x2": -0.0009945813427767458,
+    "brier_1x2": -0.001960533662334396,
+    "exact_score_log_loss": 0.0005858451090658967,
+    "advance_log_loss": 0.007268856573874161,
+    "advance_brier": 0.0028595551714483414
+  },
+  "performance_signal": {
+    "metrics_favoring_pre_quarterfinal_form": [
+      "log_loss_1x2",
+      "brier_1x2"
+    ],
+    "metrics_within_operational_margin": [
+      "log_loss_1x2",
+      "brier_1x2",
+      "exact_score_log_loss",
+      "advance_log_loss",
+      "advance_brier"
+    ],
+    "all_loss_gaps_within_operational_margin": true,
+    "advancement_losses_not_worse_than_historical": false,
+    "operational_margin_per_metric": 0.01,
+    "interpretation": "The four-match sample is descriptive only. The existing margin is reported for continuity, not used as a formal non-inferiority test or as a new hyperparameter-selection window."
+  },
+  "current_form_update": {
+    "policy": "regulation_90_only_frozen_group_prior",
+    "prior_goal_equivalents_frozen": 8.0,
+    "median_weight_before_quarterfinals": 0.4192448174204783,
+    "median_weight_after_quarterfinals": 0.4228161497876227,
+    "matches_appended_in_quarterfinals": 4,
+    "total_knockout_matches_appended": 28,
+    "extra_time_goals_observed": 3,
+    "extra_time_goals_appended": 0,
+    "shootout_kicks_appended": 0,
+    "max_abs_semifinal_advance_probability_delta": 0.0032260298165654455
+  },
+  "decision": {
+    "retain_frozen_current_form_policy": true,
+    "append_quarterfinal_regulation_evidence": true,
+    "retune_xgboost_or_global_hybrid_weights": false,
+    "recalibrate_draw_probability": false,
+    "recalibrate_extra_time_probability": false,
+    "recalibrate_penalty_probability": false,
+    "reason": "The frozen pre-quarterfinal snapshot identified all four eventual semifinalists and slightly improved aggregate 1X2 losses. Exact-score and advancement losses were slightly worse, but every gap stayed inside the existing 0.01 operational guardrail. Four dependent matches remain far too few for a global retune, so only regulation-time evidence is appended to the frozen prior."
+  },
+  "semifinal_predictions": [
+    {
+      "match_number": 101,
+      "kickoff_at": "2026-07-14T20:00:00+00:00",
+      "home": "France",
+      "away": "Spain",
+      "home_xg": 1.1629316764702384,
+      "away_xg": 1.2812862986897824,
+      "p_home_win_90": 0.2748281952257928,
+      "p_draw_90": 0.29925364509941366,
+      "p_away_win_90": 0.42591815967479346,
+      "p_home_advances": 0.42074571392733046,
+      "p_away_advances": 0.5792542860726695,
+      "pre_quarterfinal_p_home_advances": 0.417519684110765,
+      "quarterfinal_update_p_home_advances_delta": 0.0032260298165654455,
+      "most_likely_to_advance": "Spain",
+      "modal_score_90": "0-1",
+      "form_weight": 0.4883685897704415
+    },
+    {
+      "match_number": 102,
+      "kickoff_at": "2026-07-15T19:00:00+00:00",
+      "home": "England",
+      "away": "Argentina",
+      "home_xg": 1.4049971957707732,
+      "away_xg": 1.5835426300837971,
+      "p_home_win_90": 0.280724963224748,
+      "p_draw_90": 0.29199747255649866,
+      "p_away_win_90": 0.4272775642187534,
+      "p_home_advances": 0.4215435791564273,
+      "p_away_advances": 0.5784564208435727,
+      "pre_quarterfinal_p_home_advances": 0.4206127163308372,
+      "quarterfinal_update_p_home_advances_delta": 0.0009308628255901286,
+      "most_likely_to_advance": "Argentina",
+      "modal_score_90": "1-2",
+      "form_weight": 0.4911618763774196
+    }
+  ],
+  "limitations": [
+    "Four matches from one round cannot identify a stable global recalibration.",
+    "The operational margin is descriptive here, not a confidence-bound non-inferiority test.",
+    "The audit has final scores but no event-level xG, lineups, injuries, red-card state, or closing odds.",
+    "Extra-time goals resolve the bracket but are excluded from the 90-minute scoring posterior.",
+    "Two extra-time matches do not identify a separate team-specific extra-time skill.",
+    "Monte Carlo intervals remain sampling-error intervals, not total predictive uncertainty."
+  ],
+  "artifacts": {
+    "quarterfinal_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_quarterfinal_calibration.csv",
+    "semifinal_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_semifinal_predictions.csv"
+  },
+  "source_fingerprints": {
+    "model_package": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a",
+    "sota_pipeline": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770",
+    "bolao": "96153417432545805cc629ebb43822176399a52a18f7a857f62ef3d91a3b2fdb",
+    "quarterfinal_calibration_audit": "3483cbaf373b2c9585d30b75796c35d96699c38956b5c2ac2b234d7e90bc70fb",
+    "round16_calibration_audit": "fdf22dba91ac86b66bf71187f2e5628f6b05c3c0c1cd02cdfb8931dd1ee83563",
+    "round32_calibration_audit": "60374008f71867eab178f3fce82f54175619462812286aed458cc124d9a27013",
+    "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
+    "observed_knockout_results": "6fd00a10cc4e6b9d12285ecd6d4dd9f1cad2fa0a2b75cff116ac619432eb7f2d"
+  },
+  "hard_gates": {
+    "complete_quarterfinal_snapshot": true,
+    "candidate_was_frozen_before_quarterfinals": true,
+    "draw_count_within_two_standard_deviations": true,
+    "quarterfinal_update_uses_regulation_only": true,
+    "all_loss_gaps_within_operational_margin": true,
+    "all_four_advancers_identified": true,
+    "semifinal_bracket_complete": true,
+    "single_round_form_update_below_five_percentage_points": true
+  },
+  "approved": true
+}
