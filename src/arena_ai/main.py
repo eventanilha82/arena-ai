@@ -6,6 +6,7 @@ import queue
 import random
 import sys
 import threading
+from bisect import bisect_left
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,12 +48,13 @@ CINEMATIC_POSE_SIZE = 192
 CINEMATIC_PLAYER_SCALE = 1.06
 CINEMATIC_NEUTRAL_PLAYER_SCALE = 1.00
 CINEMATIC_KEEPER_SCALE = 0.84
-CINEMATIC_BALL_SIZE = 50
-CINEMATIC_SHOT_BALL_SIZE = 48
-CINEMATIC_TURF_SPEED = 116.0
-SHOT_KICK_AT = 0.56
-SHOT_WHOOSH_AT = 0.62
-SHOT_NET_AT = 0.96
+CINEMATIC_BALL_SIZE = 38
+CINEMATIC_SHOT_BALL_SIZE = 32
+CINEMATIC_NET_BALL_SIZE = 30
+CINEMATIC_TURF_SPEED = 92.0
+SHOT_KICK_AT = 0.72
+SHOT_WHOOSH_AT = 0.79
+SHOT_NET_AT = 0.955
 SHOT_NET_VISUAL_CONTACT_AT = 0.982
 SHOT_BASS_AT = SHOT_NET_VISUAL_CONTACT_AT
 SHOT_CHEER_AT = SHOT_NET_VISUAL_CONTACT_AT
@@ -64,17 +66,18 @@ SHOT_BASS_AUDIO_AT = SHOT_NET_AUDIO_AT
 SHOT_CHEER_AUDIO_AT = SHOT_NET_AUDIO_AT
 CHANCE_CONTACT_VISUAL_AT = SHOT_NET_AT
 CHANCE_CONTACT_AUDIO_AT = CHANCE_CONTACT_VISUAL_AT - 0.008
-SHOT_PLANT_AT = 0.46
-SHOT_CONTACT_FREEZE_END = 0.60
-SHOT_RELEASE_END = 0.70
-SHOT_RECOVERY_AT = 0.98
-SHOT_FOLLOW_THROUGH_HOLD_END = 0.74
-SHOT_GOAL_REVEAL_AT = 0.30
-SHOT_GOAL_FULL_AT = 0.54
-SHOT_KEEPER_REVEAL_AT = 0.34
-SHOT_KEEPER_FULL_AT = 0.64
-SHOT_KEEPER_READ_AT = 0.38
-SHOT_KEEPER_DIVE_AT = 0.58
+SHOT_PLANT_AT = 0.64
+SHOT_CONTACT_FREEZE_END = 0.75
+SHOT_RELEASE_END = 0.81
+SHOT_RECOVERY_AT = 0.99
+SHOT_FOLLOW_THROUGH_HOLD_END = 0.86
+SHOT_GOAL_REVEAL_AT = 0.06
+SHOT_GOAL_FULL_AT = 0.20
+SHOT_KEEPER_REVEAL_AT = 0.14
+SHOT_KEEPER_FULL_AT = 0.32
+SHOT_KEEPER_READ_AT = 0.50
+SHOT_KEEPER_DIVE_AT = 0.74
+SHOT_NET_SETTLE_PROGRESS = 0.38
 DRAW_NEUTRAL_START_PROGRESS = 0.958
 DRAW_NEUTRAL_RAMP = 0.036
 SHOT_PHASE_APPROACH = "approach"
@@ -224,6 +227,59 @@ def smoothstep(value: float) -> float:
     return value * value * (3 - 2 * value)
 
 
+def cubic_bezier(
+    a: tuple[float, float],
+    b: tuple[float, float],
+    c: tuple[float, float],
+    d: tuple[float, float],
+    value: float,
+) -> tuple[float, float]:
+    value = clamp(value)
+    inverse = 1.0 - value
+    return (
+        inverse**3 * a[0]
+        + 3.0 * inverse * inverse * value * b[0]
+        + 3.0 * inverse * value * value * c[0]
+        + value**3 * d[0],
+        inverse**3 * a[1]
+        + 3.0 * inverse * inverse * value * b[1]
+        + 3.0 * inverse * value * value * c[1]
+        + value**3 * d[1],
+    )
+
+
+def cubic_bezier_arc_table(
+    a: tuple[float, float],
+    b: tuple[float, float],
+    c: tuple[float, float],
+    d: tuple[float, float],
+    steps: int = 96,
+) -> tuple[tuple[tuple[float, float], ...], tuple[float, ...], float]:
+    points = tuple(cubic_bezier(a, b, c, d, index / steps) for index in range(steps + 1))
+    cumulative = [0.0]
+    for previous, current in zip(points, points[1:]):
+        cumulative.append(cumulative[-1] + math.dist(previous, current))
+    return points, tuple(cumulative), cumulative[-1]
+
+
+def cubic_bezier_arc_sample(
+    table: tuple[tuple[tuple[float, float], ...], tuple[float, ...], float],
+    distance_fraction: float,
+) -> tuple[float, float]:
+    points, cumulative, path_length = table
+    if path_length <= 1e-6:
+        return points[-1]
+
+    target_distance = clamp(distance_fraction) * path_length
+    index = min(len(cumulative) - 1, max(1, bisect_left(cumulative, target_distance)))
+    segment_length = max(1e-9, cumulative[index] - cumulative[index - 1])
+    segment_progress = (target_distance - cumulative[index - 1]) / segment_length
+    return (
+        lerp(points[index - 1][0], points[index][0], segment_progress),
+        lerp(points[index - 1][1], points[index][1], segment_progress),
+    )
+
+
 def ease_out_cubic(value: float) -> float:
     value = clamp(value)
     return 1 - (1 - value) ** 3
@@ -274,6 +330,17 @@ class ShotProfile:
     dip: float
     speed: float
     spin: float
+
+
+@dataclass(frozen=True)
+class BallKinematics:
+    position: tuple[float, float]
+    ground_position: tuple[float, float]
+    phase: str
+    scale: int
+    squash: tuple[float, float]
+    rotation_degrees: float
+    depth: float
 
 
 class AssetFactory:
@@ -638,6 +705,15 @@ class App:
         self.gradient_tile_cache: dict[tuple[int, int, int, int, int], pygame.Surface] = {}
         self.goal_orientation_cache: dict[tuple[int, str], pygame.Surface] = {}
         self.surface_bbox_cache: dict[int, pygame.Rect] = {}
+        self.surface_toe_anchor_cache: dict[tuple[int, int], tuple[float, float]] = {}
+        self.ball_net_path_cache: dict[
+            tuple[float, ...],
+            tuple[tuple[tuple[float, float], ...], tuple[float, ...], float],
+        ] = {}
+        self.cinematic_ball_history_cache: dict[
+            tuple[object, ...],
+            tuple[CinematicAttackEvent | None, tuple[float, float]],
+        ] = {}
         self.scaled_surface_cache = self.surface_cache.scaled
         self.flipped_surface_cache = self.surface_cache.flipped
         self.roto_surface_cache = self.surface_cache.roto
@@ -1532,7 +1608,7 @@ class App:
             goal_rect.left + CINEMATIC_SHOT_BALL_SIZE * 0.66,
             goal_rect.right - CINEMATIC_SHOT_BALL_SIZE * 0.66,
         )
-        mouth_x = goal_rect.left - CINEMATIC_SHOT_BALL_SIZE * 0.62 if direction > 0 else goal_rect.right + CINEMATIC_SHOT_BALL_SIZE * 0.62
+        mouth_x = goal_rect.left + 2.0 if direction > 0 else goal_rect.right - 2.0
         mouth_y = target_y - rng.uniform(0.0, 5.0)
         entry = (mouth_x, mouth_y)
         mouth = (mouth_x, mouth_y)
@@ -1552,6 +1628,22 @@ class App:
     def cinematic_shot_target(self, goal_rect: pygame.Rect, direction: int, goal_minute: int) -> tuple[float, float]:
         return self.cinematic_shot_profile(goal_rect, direction, goal_minute).target
 
+    def cinematic_net_path_table(
+        self,
+        entry: tuple[float, float],
+        control: tuple[float, float],
+        target: tuple[float, float],
+    ) -> tuple[tuple[tuple[float, float], ...], tuple[float, ...], float]:
+        cache_key = tuple(round(value, 3) for point in (entry, control, target) for value in point)
+        cached = self.ball_net_path_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        if len(self.ball_net_path_cache) >= 128:
+            self.ball_net_path_cache.clear()
+        table = cubic_bezier_arc_table(entry, control, target, target)
+        self.ball_net_path_cache[cache_key] = table
+        return table
+
     def cinematic_ball_for_progress(
         self,
         foot: tuple[float, float],
@@ -1562,14 +1654,23 @@ class App:
         goal_minute: int,
         is_goal: bool = True,
         shot_profile: ShotProfile | None = None,
-    ) -> tuple[tuple[float, float], str, int, tuple[float, float], float]:
-        release = (foot[0] + direction * 12, foot[1] - 2)
+        ground_y: float | None = None,
+        attack_kind: str = "goal",
+    ) -> BallKinematics:
+        ground_y = float(ground_y if ground_y is not None else foot[1] + 52.0)
+        contact_radius = CINEMATIC_BALL_SIZE * 0.46
+        release = (foot[0] + direction * (contact_radius + 0.6), foot[1] - 1.0)
+        event_window = GOAL_EVENT_WINDOW_MINUTES if is_goal else CHANCE_EVENT_WINDOW_MINUTES
+        kick_time_value = (
+            goal_minute - event_window + SHOT_KICK_AT * event_window
+        ) / 90.0 * SIMULATION_SECONDS
+        kick_rotation = direction * (kick_time_value * 12.0 + goal_minute * 0.31) * 18.0
         if shot_profile is None:
             shot_profile = ShotProfile(
                 zone="legado",
                 target=target,
-                entry=(target[0] - direction * 146, target[1]),
-                mouth=(target[0] - direction * 126, target[1]),
+                entry=target,
+                mouth=target,
                 bend=direction * math.sin(self.match_seed * 0.013 + goal_minute) * 20.0,
                 loft=1.0,
                 dip=13.0,
@@ -1577,95 +1678,127 @@ class App:
                 spin=34.0,
             )
         if shot_progress <= SHOT_KICK_AT:
-            settle = smoothstep((shot_progress - 0.40) / max(0.001, SHOT_KICK_AT - 0.40))
+            settle = smoothstep((shot_progress - (SHOT_PLANT_AT - 0.12)) / max(0.001, SHOT_KICK_AT - (SHOT_PLANT_AT - 0.12)))
             dribble = 1.0 - settle
             roll_phase = time_value * 12.0 + goal_minute * 0.31
             roll = math.sin(roll_phase)
             contact = abs(roll)
-            lead = 13.5 + 4.5 * contact + 2.5 * dribble
+            lead = contact_radius + 0.6 + 0.7 * contact + 0.25 * dribble
             dribble_pos = (
                 foot[0] + direction * lead,
-                foot[1] + 1.8 - 2.6 * contact + math.sin(roll_phase * 0.5) * 0.8 * dribble,
+                foot[1] + 1.0 - 2.0 * contact + math.sin(roll_phase * 0.5) * 0.6 * dribble,
             )
-            return (
-                (
+            position = (
                     lerp(dribble_pos[0], release[0], settle),
                     lerp(dribble_pos[1], release[1], settle),
-                ),
-                "drible",
-                CINEMATIC_BALL_SIZE,
-                (1.0, 1.0),
-                8.0 + 9.0 * contact * dribble,
+            )
+            return BallKinematics(
+                position=position,
+                ground_position=(position[0], ground_y - 2.0),
+                phase="drible",
+                scale=CINEMATIC_BALL_SIZE,
+                squash=(1.0, 1.0),
+                rotation_degrees=direction * (roll_phase * 18.0),
+                depth=0.0,
             )
 
-        flight = clamp((shot_progress - SHOT_KICK_AT) / (SHOT_NET_AT - SHOT_KICK_AT))
-        if flight < 1.0:
-            if is_goal:
-                entry = shot_profile.entry
-                drive = 1.0 - (1.0 - flight) ** shot_profile.speed
-                lift = math.sin(math.pi * flight)
-                arc_height = clamp(abs(entry[0] - release[0]) * 0.12 * shot_profile.loft, 18.0, 40.0)
-                late_dip = smoothstep((flight - 0.70) / 0.30) * shot_profile.dip
-                curve = shot_profile.bend * lift * (0.40 + 0.28 * flight)
-                x = lerp(release[0], entry[0], drive) + curve
-                y = lerp(release[1], entry[1], smoothstep(flight)) - arc_height * lift + late_dip
-            else:
-                curve_seed = math.sin(self.match_seed * 0.013 + goal_minute)
-                x_ease = 1.0 - (1.0 - flight) ** 1.65
-                y_ease = smoothstep(flight)
-                arc_height = clamp(abs(target[0] - release[0]) * 0.28, 52.0, 82.0)
-                curve = direction * curve_seed * 16.0 * math.sin(math.pi * flight)
-                x = lerp(release[0], target[0], x_ease) + curve
-                y = (
-                    lerp(release[1], target[1], y_ease)
-                    - arc_height * (math.sin(math.pi * flight) ** 0.9)
-                    + curve_seed * 6.0 * math.sin(math.tau * flight)
-                )
-            x = min(x, target[0]) if direction > 0 else max(x, target[0])
-            ball_size = int(lerp(CINEMATIC_BALL_SIZE, CINEMATIC_BALL_SIZE - 2, smoothstep(max(0.0, flight - 0.74) / 0.26)))
-            return (
-                (x, y),
-                "chute",
-                ball_size,
-                (1.0, 1.0),
-                shot_profile.spin - 7.0 * smoothstep(flight),
+        contact_progress = SHOT_NET_VISUAL_CONTACT_AT if is_goal else CHANCE_CONTACT_VISUAL_AT
+        flight_duration = max(0.001, contact_progress - SHOT_KICK_AT)
+        flight = clamp((shot_progress - SHOT_KICK_AT) / flight_duration)
+        entry = shot_profile.entry if is_goal else target
+        delta_x = entry[0] - release[0]
+        arc_height = clamp(
+            shot_profile.loft + abs(delta_x) * (0.040 if is_goal else 0.052),
+            20.0,
+            58.0,
+        )
+        control_a = (
+            release[0] + delta_x * 0.28,
+            release[1] - arc_height,
+        )
+        control_b = (
+            entry[0] - delta_x * 0.52 + shot_profile.bend,
+            entry[1] - arc_height * 0.34 - shot_profile.dip,
+        )
+        if shot_progress < contact_progress:
+            position = cubic_bezier(release, control_a, control_b, entry, flight)
+            distance = math.dist(release, position)
+            scale = int(round(lerp(CINEMATIC_BALL_SIZE, CINEMATIC_SHOT_BALL_SIZE, smoothstep(flight))))
+            visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
+            rotation = kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0
+            return BallKinematics(
+                position=position,
+                ground_position=(position[0] - 7.0, ground_y - 2.0),
+                phase="chute",
+                scale=scale,
+                squash=(1.0, 1.0),
+                rotation_degrees=rotation,
+                depth=smoothstep(flight),
             )
 
         if not is_goal:
-            settle_t = clamp((shot_progress - SHOT_NET_AT) / 0.18)
-            damp = 1.0 - smoothstep(settle_t)
-            bounce = abs(math.sin(settle_t * math.tau * 1.15)) * 7.0 * damp
-            return (
-                (
-                    target[0] - direction * 10.0 * damp,
-                    target[1] + bounce,
-                ),
-                "chute" if settle_t < 0.75 else "neutro",
-                int(lerp(CINEMATIC_BALL_SIZE - 6, CINEMATIC_BALL_SIZE - 9, smoothstep(settle_t))),
-                (1.0, 1.0),
-                20.0 * damp,
+            elapsed = max(0.0, shot_progress - contact_progress)
+            settle = clamp(elapsed / 0.16)
+            if attack_kind == "wide":
+                tangent = (entry[0] - control_b[0], entry[1] - control_b[1])
+                continuation = min(0.82, elapsed / flight_duration)
+                position = (
+                    entry[0] + 3.0 * tangent[0] * continuation,
+                    entry[1] + 3.0 * tangent[1] * continuation + 20.0 * continuation * continuation,
+                )
+                phase = "chute"
+                depth = 1.0
+            else:
+                recoil = math.sin(math.pi * settle) * (1.0 - 0.34 * settle) * 34.0
+                position = (entry[0] - direction * recoil, entry[1] - recoil * 0.16)
+                phase = "chute" if settle < 0.76 else "neutro"
+                depth = 0.84
+            distance = math.dist(release, position)
+            scale = int(round(lerp(CINEMATIC_SHOT_BALL_SIZE, CINEMATIC_NET_BALL_SIZE, smoothstep(settle))))
+            visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
+            return BallKinematics(
+                position=position,
+                ground_position=(position[0] - 7.0, ground_y - 2.0),
+                phase=phase,
+                scale=scale,
+                squash=(1.0, 1.0),
+                rotation_degrees=kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0,
+                depth=depth,
             )
 
-        entry = shot_profile.entry
-        contact_t = clamp((shot_progress - SHOT_NET_AT) / 0.064)
-        after_contact = clamp((shot_progress - SHOT_NET_VISUAL_CONTACT_AT) / 0.12)
-        settle = smoothstep(contact_t)
-        net_settle = smoothstep(after_contact)
-        depth_push = direction * math.sin(after_contact * math.pi) * 2.4 * (1.0 - net_settle)
-        ball_size = int(lerp(CINEMATIC_BALL_SIZE - 2, CINEMATIC_BALL_SIZE - 4, net_settle))
-        impact_point = (
-            lerp(entry[0], target[0], settle),
-            lerp(entry[1], target[1], settle),
+        entry_tangent = (entry[0] - control_b[0], entry[1] - control_b[1])
+        entry_tangent_length = max(1e-6, math.hypot(*entry_tangent))
+        target_distance = max(1e-6, math.dist(entry, target))
+        handle_length = min(target_distance * 0.44, 46.0)
+        net_control_a = (
+            entry[0] + entry_tangent[0] / entry_tangent_length * handle_length,
+            entry[1] + entry_tangent[1] / entry_tangent_length * handle_length,
         )
-        return (
-            (
-                lerp(impact_point[0], target[0], net_settle) + depth_push,
-                lerp(impact_point[1], target[1], net_settle) + math.sin(after_contact * math.pi) * 1.0 * (1.0 - net_settle),
-            ),
-            "rede",
-            ball_size,
-            (1.0, 1.0),
-            12.0 * (1.0 - net_settle),
+        net_path_table = self.cinematic_net_path_table(entry, net_control_a, target)
+        net_path_length = net_path_table[2]
+        entry_speed_progress = 3.0 * entry_tangent_length / flight_duration
+        net_duration = clamp(
+            2.0 * net_path_length / max(1e-6, entry_speed_progress),
+            0.08,
+            SHOT_NET_SETTLE_PROGRESS,
+        )
+        net_progress = clamp((shot_progress - contact_progress) / net_duration)
+        distance_fraction = 1.0 - (1.0 - net_progress) ** 2
+        position = cubic_bezier_arc_sample(net_path_table, distance_fraction)
+        settled_after = max(0.0, shot_progress - (contact_progress + net_duration))
+        if settled_after > 0.0:
+            position = target
+        distance = math.dist(release, entry) + net_path_length * distance_fraction
+        scale = int(round(lerp(CINEMATIC_SHOT_BALL_SIZE, CINEMATIC_NET_BALL_SIZE, smoothstep(net_progress))))
+        visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
+        return BallKinematics(
+            position=position,
+            ground_position=(position[0] - 7.0, ground_y - 2.0),
+            phase="rede",
+            scale=scale,
+            squash=(1.0, 1.0),
+            rotation_degrees=kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0,
+            depth=1.0,
         )
 
     def cinematic_save_variant(self, chance_minute: int, side: str) -> str:
@@ -1686,10 +1819,15 @@ class App:
         if kind == "save" and save_variant == "stand":
             return goal_rect.centerx + direction * 28, goal_rect.centery + 18
         if kind == "save":
-            return goal_rect.centerx + direction * 24, goal_rect.centery + 2
+            return goal_rect.centerx + direction * 94, goal_rect.centery + 2
         return goal_rect.centerx + direction * 34, goal_rect.centery + (28 if base[1] >= goal_rect.centery else -30)
 
-    def cinematic_scene_state(self, field: pygame.Rect, pred: Prediction) -> dict[str, object]:
+    def cinematic_scene_state(
+        self,
+        field: pygame.Rect,
+        pred: Prediction,
+        _include_previous_frame: bool = True,
+    ) -> dict[str, object]:
         possession = self.cinematic_possession_side(pred)
         neutral = possession == "neutral"
         minute = self.match_minute_float()
@@ -1749,10 +1887,13 @@ class App:
                 "neutral_progress": neutral_progress,
                 "neutral_reveal": neutral_reveal,
                 "ball_prev_pos": (ball_pos[0] - 1, ball_pos[1]),
+                "ball_velocity_px_s": (0.0, 0.0),
+                "ball_ground_pos": (ball_pos[0] - 7.0, ground_y - 2.0),
+                "ball_depth": 0.0,
+                "ball_rotation_degrees": self.t * 90.0 * approach,
                 "ball_phase": "neutro",
                 "ball_scale": CINEMATIC_BALL_SIZE,
                 "ball_squash": (1.0, 1.0),
-                "ball_spin_rate": 10.0 * approach if neutral_progress < 0.95 else 0.0,
                 "keeper_phase": 0.0,
                 "net_progress": 0.0,
                 "goal_impact_pos": ball_pos,
@@ -1793,6 +1934,7 @@ class App:
         keeper_base_y = goal_rect.centery + 24 + math.sin(self.t * 1.8) * 2
         keeper_x, keeper_y = keeper_base_x, keeper_base_y
         keeper_phase = 0.0
+        keeper_flip = direction < 0
         shot_profile = self.cinematic_shot_profile(goal_rect, direction, goal_minute)
         target = shot_profile.target
         save_variant = ""
@@ -1806,6 +1948,7 @@ class App:
             target_y_bias = clamp((target[1] - goal_rect.centery) / 80.0, -1.0, 1.0)
             target_dx = target[0] - goal_rect.centerx
             target_side = 1 if target_dx >= 0 else -1
+            keeper_flip = target_side < 0
             lateral_intensity = clamp(abs(target_dx) / 54.0)
             if active_attack.kind == "save" and save_variant == "stand":
                 catch = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.20)
@@ -1814,7 +1957,7 @@ class App:
                 keeper_y = keeper_base_y + target_y_bias * 14 * read - 8 * math.sin(catch * math.pi)
                 keeper_phase = max(read * 0.62, catch * 0.48)
             elif active_attack.kind == "save" and save_variant == "dive":
-                keeper_target_x = goal_rect.centerx - target_side * 46.0
+                keeper_target_x = goal_rect.centerx + target_side * 46.0
                 keeper_target_y = target[1] + 7.0
                 keeper_x = lerp(keeper_base_x, keeper_target_x, clamp(0.22 * read + 0.78 * dive))
                 keeper_y = lerp(keeper_base_y, keeper_target_y, clamp(0.30 * read + 0.70 * dive))
@@ -1826,7 +1969,8 @@ class App:
                 keeper_target_x = goal_rect.centerx + target_side * keeper_reach_x
                 keeper_x = lerp(keeper_base_x, keeper_target_x, clamp(0.22 * read + 0.78 * dive))
                 leap_height = lerp(16.0, 52.0, lateral_intensity)
-                keeper_y = keeper_base_y + target_y_bias * 28 * read - leap_height * leap + 18 * smoothstep((shot_progress - 0.82) / 0.16)
+                recovery = smoothstep((raw_shot_progress - (SHOT_NET_VISUAL_CONTACT_AT + 0.02)) / 0.18)
+                keeper_y = keeper_base_y + target_y_bias * 28 * read - leap_height * leap + 18 * recovery
                 keeper_phase = max(read * 0.5, dive * (0.55 + 0.45 * lateral_intensity))
         keeper_margin = 146
         keeper_x = clamp(keeper_x, field.x + keeper_margin, field.right - keeper_margin)
@@ -1842,20 +1986,22 @@ class App:
         anchor_target = self.cinematic_actor_target_size(anchor_frame, CINEMATIC_PLAYER_SCALE)
         kick_frame = pose_frames_for_side[3]
         kick_target = self.cinematic_actor_target_size(kick_frame, CINEMATIC_PLAYER_SCALE)
+        kick_anchor = self.cinematic_toe_anchor(kick_frame, direction)
         kick_contact_foot = self.cinematic_actor_anchor_screen(
             (shot_actor_x, field.bottom - 54),
             kick_target,
-            KICK_FOOT_ANCHOR,
-            flip_actor,
+            kick_anchor,
+            False,
             kick_frame,
         )
         effective_run_speed = 0.0 if settled else float(motion["run_speed"])
         planted_x = self.cinematic_planted_x(actor_pos[0], stride, kick_window, direction, effective_run_speed)
+        visual_anchor = self.cinematic_toe_anchor(anchor_frame, direction) if kick_window else RUNNER_FOOT_ANCHORS[stride]
         visual_foot = self.cinematic_actor_anchor_screen(
             (planted_x, actor_pos[1]),
             anchor_target,
-            KICK_FOOT_ANCHOR if kick_window else RUNNER_FOOT_ANCHORS[stride],
-            flip_actor,
+            visual_anchor,
+            flip_actor if not kick_window else False,
             anchor_frame,
         )
         foot = visual_foot
@@ -1873,27 +2019,46 @@ class App:
         elif active_attack:
             foot = kick_contact_foot
         if active_attack:
-            ball_pos, ball_phase, ball_scale, ball_squash, ball_spin_rate = self.cinematic_ball_for_progress(
+            event_window = GOAL_EVENT_WINDOW_MINUTES if active_attack.is_goal else CHANCE_EVENT_WINDOW_MINUTES
+            event_seconds = event_window / 90.0 * SIMULATION_SECONDS
+            trajectory_progress = raw_shot_progress
+            kinematics = self.cinematic_ball_for_progress(
                 foot,
                 target,
                 direction,
-                shot_progress,
+                trajectory_progress,
                 self.t,
                 goal_minute,
                 is_goal=active_attack.is_goal,
                 shot_profile=shot_profile if active_attack.is_goal else None,
+                ground_y=actor_pos[1],
+                attack_kind=active_attack.kind,
             )
-            previous_progress = max(0.0, shot_progress - 0.035)
-            ball_prev_pos = self.cinematic_ball_for_progress(
+            sample_progress = 1.0 / max(1.0, event_seconds * FPS)
+            previous_kinematics = self.cinematic_ball_for_progress(
                 foot,
                 target,
                 direction,
-                previous_progress,
-                max(0.0, self.t - 0.035),
+                trajectory_progress - sample_progress,
+                max(0.0, self.t - 1.0 / FPS),
                 goal_minute,
                 is_goal=active_attack.is_goal,
                 shot_profile=shot_profile if active_attack.is_goal else None,
-            )[0]
+                ground_y=actor_pos[1],
+                attack_kind=active_attack.kind,
+            )
+            ball_pos = kinematics.position
+            ball_prev_pos = previous_kinematics.position
+            ball_velocity = (
+                (ball_pos[0] - ball_prev_pos[0]) * FPS,
+                (ball_pos[1] - ball_prev_pos[1]) * FPS,
+            )
+            ball_ground_pos = kinematics.ground_position
+            ball_phase = kinematics.phase
+            ball_scale = kinematics.scale
+            ball_squash = kinematics.squash
+            ball_rotation = kinematics.rotation_degrees
+            ball_depth = kinematics.depth
         else:
             ball_pos = (
                 foot[0] + math.sin(self.t * 7.5) * 7,
@@ -1903,12 +2068,16 @@ class App:
             ball_phase = "drible"
             ball_scale = CINEMATIC_BALL_SIZE
             ball_squash = (1.0, 1.0)
-            ball_spin_rate = 11.0
+            ball_velocity = ((ball_pos[0] - ball_prev_pos[0]) * FPS, (ball_pos[1] - ball_prev_pos[1]) * FPS)
+            ball_ground_pos = (ball_pos[0] - 7.0, actor_pos[1] - 2.0)
+            ball_rotation = direction * (abs(self.ground_scroll) * 0.42 + self.t * 52.0)
+            ball_depth = 0.0
             if settled:
                 ball_pos = (foot[0] + direction * 14, foot[1] + 2)
                 ball_prev_pos = ball_pos
                 ball_phase = "neutro"
-                ball_spin_rate = 0.0
+                ball_velocity = (0.0, 0.0)
+                ball_rotation = 0.0
         net_progress = 0.0
         net_decay = 0.0
         net_ripple_start = SHOT_NET_VISUAL_CONTACT_AT - 0.004
@@ -1931,7 +2100,7 @@ class App:
             post_x = goal_rect.right if direction > 0 else goal_rect.left
             chance_near_post_pos = (float(post_x), float(target[1]))
 
-        return {
+        state: dict[str, object] = {
             "neutral": False,
             "possession": possession,
             "goal_side": goal_side,
@@ -1946,11 +2115,15 @@ class App:
             "stride_phase": 0.0 if settled else motion["stride_phase"],
             "run_speed": 0.0 if settled else motion["run_speed"],
             "ball_prev_pos": ball_prev_pos,
+            "ball_velocity_px_s": ball_velocity,
+            "ball_ground_pos": ball_ground_pos,
+            "ball_depth": ball_depth,
+            "ball_rotation_degrees": ball_rotation,
             "ball_phase": ball_phase,
             "ball_scale": ball_scale,
             "ball_squash": ball_squash,
-            "ball_spin_rate": ball_spin_rate,
             "keeper_phase": keeper_phase,
+            "keeper_flip": keeper_flip,
             "net_progress": net_progress,
             "net_decay": net_decay,
             "net_ripple_decay": net_decay,
@@ -1966,6 +2139,52 @@ class App:
             "keeper_action": f"{save_variant}_save" if save_variant else "",
             "settled": settled,
         }
+        history_context: tuple[object, ...] = (
+            pred,
+            field.x,
+            field.y,
+            field.w,
+            field.h,
+            self.match_seed,
+            self.home.code,
+            self.away.code,
+        )
+        history_key = (*history_context, round(self.t, 6))
+        if active_attack and raw_shot_progress <= SHOT_KICK_AT and _include_previous_frame:
+            previous_time = max(0.0, self.t - 1.0 / FPS)
+            previous_key = (*history_context, round(previous_time, 6))
+            previous_sample = self.cinematic_ball_history_cache.get(previous_key)
+            exact_previous = None
+            if previous_sample is not None and previous_sample[0] == active_attack:
+                exact_previous = previous_sample[1]
+            else:
+                current_time = self.t
+                try:
+                    self.t = previous_time
+                    previous_state = self.cinematic_scene_state(
+                        field,
+                        pred,
+                        _include_previous_frame=False,
+                    )
+                finally:
+                    self.t = current_time
+                if previous_state.get("active_attack") == active_attack:
+                    candidate = previous_state["ball_pos"]
+                    if isinstance(candidate, tuple):
+                        exact_previous = (float(candidate[0]), float(candidate[1]))
+            if exact_previous is not None:
+                state["ball_prev_pos"] = exact_previous
+                state["ball_velocity_px_s"] = (
+                    (float(ball_pos[0]) - exact_previous[0]) * FPS,
+                    (float(ball_pos[1]) - exact_previous[1]) * FPS,
+                )
+        self.cinematic_ball_history_cache[history_key] = (
+            active_attack,
+            (float(ball_pos[0]), float(ball_pos[1])),
+        )
+        while len(self.cinematic_ball_history_cache) > 32:
+            self.cinematic_ball_history_cache.pop(next(iter(self.cinematic_ball_history_cache)))
+        return state
 
     def quadratic_bezier(
         self,
@@ -2126,7 +2345,10 @@ class App:
         return int(round(255 * reveal))
 
     def cinematic_keeper_alpha(self, shot_progress: float) -> int:
-        reveal = smoothstep((shot_progress - SHOT_KEEPER_REVEAL_AT) / max(0.001, SHOT_KICK_AT - SHOT_KEEPER_REVEAL_AT))
+        reveal = smoothstep(
+            (shot_progress - SHOT_KEEPER_REVEAL_AT)
+            / max(0.001, SHOT_KEEPER_FULL_AT - SHOT_KEEPER_REVEAL_AT)
+        )
         alpha = int(round(255 * reveal))
         if shot_progress >= SHOT_PLANT_AT:
             alpha = max(alpha, 236)
@@ -2169,28 +2391,32 @@ class App:
         aspect = frame.get_width() / max(1, frame.get_height())
         direction = -1 if side == "left" else 1
         wave = math.sin(clamp(ripple) * math.pi)
-        scale_pulse = wave * (0.005 if not as_front else 0.0)
+        scale_pulse = wave * (0.034 if not as_front else 0.006)
         target_h = int(round((goal.h * (1.22 + scale_pulse)) / 2) * 2)
         target_w = int(target_h * aspect)
         target = pygame.Rect(0, 0, target_w, target_h)
         target.midbottom = goal.midbottom
         target.move_ip(-18 if side == "right" else 18, -4)
         if ripple > 0.02 and not as_front:
-            target.move_ip(int(direction * wave * 1.5), 0)
+            target.move_ip(int(direction * wave * 7.0), int(wave * 2.6))
 
         if not as_front:
             shadow = pygame.Rect(0, 0, int(target.w * 0.82), 18)
             shadow.center = (target.centerx, target.bottom - 6)
-            pygame.draw.ellipse(self.screen, (0, 0, 0, 62), shadow)
+            self.draw_soft_shadow(shadow, 58)
         base_alpha = int((245 if as_front else 168) * clamp(alpha / 255.0))
         layer = self.cached_smoothscale(frame, target.size)
         if frame_blend > 0.01 and next_index != frame_index:
-            layer = self.cached_alpha(layer, int(base_alpha * (1.0 - frame_blend)))
+            layer = self.cached_alpha(layer, int(base_alpha * (1.0 - frame_blend)), step=16)
         elif base_alpha < 255:
-            layer = self.cached_alpha(layer, base_alpha)
+            layer = self.cached_alpha(layer, base_alpha, step=16)
         self.screen.blit(layer, target)
         if frame_blend > 0.01 and next_index != frame_index:
-            next_layer = self.cached_alpha(self.cached_smoothscale(next_frame, target.size), int(base_alpha * frame_blend))
+            next_layer = self.cached_alpha(
+                self.cached_smoothscale(next_frame, target.size),
+                int(base_alpha * frame_blend),
+                step=16,
+            )
             self.screen.blit(next_layer, target)
 
     def draw_cinematic_goal_front(
@@ -2249,7 +2475,7 @@ class App:
         frame_index = min(len(self.assets.goal_impact_frames) - 1, int(math.floor(frame_float)))
         frame = self.orient_cinematic_goal_frame(self.assets.goal_impact_frames[frame_index], side)
         pulse = math.sin(clamp(ripple) * math.pi)
-        target_w = int(goal.w * (0.22 + 0.012 * pulse))
+        target_w = int(goal.w * (0.26 + 0.018 * pulse))
         target_h = int(target_w * frame.get_height() / max(1, frame.get_width()))
         impact_x, impact_y = impact_pos  # type: ignore[misc]
         rect = pygame.Rect(0, 0, target_w, target_h)
@@ -2259,10 +2485,12 @@ class App:
         )
         layer = self.cached_smoothscale(frame, rect.size)
         reveal = smoothstep((ripple - 0.03) / 0.22)
-        layer = self.cached_alpha(layer, int(30 * reveal * (0.72 + 0.28 * pulse) * clamp(alpha / 255.0)))
+        layer = self.cached_alpha(
+            layer,
+            int(92 * reveal * (0.72 + 0.28 * pulse) * clamp(alpha / 255.0)),
+            step=12,
+        )
         self.screen.blit(layer, rect)
-        burst = self.cached_goal_impact_burst(side, ripple, int(255 * clamp(alpha / 255.0)))
-        self.screen.blit(burst, burst.get_rect(center=rect.center))
 
     def cached_goal_impact_burst(self, side: str, ripple: float, alpha: int) -> pygame.Surface:
         ripple_key = int(round(clamp(ripple) * 28))
@@ -2338,6 +2566,7 @@ class App:
         keeper_team = self.away if possession == "home" else self.home
         direction = 1 if possession == "home" else -1
         shot_progress = float(state["shot_progress"])
+        raw_shot_progress = float(state.get("raw_shot_progress", shot_progress))
         active_attack = bool(state.get("active_attack"))
         self.draw_cinematic_runner(
             team,
@@ -2355,14 +2584,52 @@ class App:
         goal_side = str(state["goal_side"])
         goal_alpha = self.cinematic_goal_alpha(shot_progress) if active_attack and isinstance(goal, pygame.Rect) else 0
         show_goal_front = active_attack and isinstance(goal, pygame.Rect) and goal_alpha > 0
+
+        ball_squash = state.get("ball_squash", (1.0, 1.0))
+        if not isinstance(ball_squash, tuple):
+            ball_squash = (1.0, 1.0)
+
+        def render_ball() -> None:
+            self.draw_cinematic_ball(
+                state["ball_pos"],
+                active_goal=scoring_attack,
+                shot_progress=shot_progress,
+                scale=int(state.get("ball_scale", CINEMATIC_SHOT_BALL_SIZE if scoring_attack and shot_progress > SHOT_KICK_AT else CINEMATIC_BALL_SIZE)),
+                direction=direction,
+                prev_pos=state.get("ball_prev_pos"),
+                ground_pos=state.get("ball_ground_pos"),
+                velocity=state.get("ball_velocity_px_s"),
+                rotation_degrees=float(state.get("ball_rotation_degrees", 0.0)),
+                squash=(float(ball_squash[0]), float(ball_squash[1])),
+                phase=str(state.get("ball_phase", "drible")),
+            )
+
+        ball_behind_keeper = active_attack and (
+            (
+                str(state.get("attack_kind", "")) == "save"
+                and CHANCE_CONTACT_VISUAL_AT - 0.05 <= raw_shot_progress <= CHANCE_CONTACT_VISUAL_AT + 0.055
+            )
+            or (scoring_attack and float(state.get("ball_depth", 0.0)) >= 0.78)
+        )
+        if ball_behind_keeper:
+            render_ball()
+
         if show_goal_front:
+            self.draw_cinematic_goal_impact(
+                goal,
+                goal_side,
+                float(state.get("net_progress", 0.0)),
+                state.get("goal_impact_pos"),
+                goal_alpha,
+            )
             self.draw_cinematic_goal_front_posts(
                 goal,
                 goal_side,
                 float(state.get("net_progress", 0.0)),
                 alpha=goal_alpha,
             )
-        if active_attack and shot_progress >= SHOT_GOAL_REVEAL_AT:
+
+        if active_attack and shot_progress >= SHOT_KEEPER_REVEAL_AT:
             keeper_alpha = self.cinematic_keeper_alpha(shot_progress)
             if keeper_alpha > 0:
                 keeper_action = str(state.get("keeper_action", ""))
@@ -2370,36 +2637,15 @@ class App:
                 self.draw_cinematic_keeper(
                     keeper_team,
                     state["keeper_pos"],
-                    flip=direction < 0,
+                    flip=bool(state.get("keeper_flip", direction < 0)),
                     active_goal=keeper_dive,
-                    shot_progress=shot_progress,
+                    shot_progress=raw_shot_progress,
                     alpha=keeper_alpha,
                     keeper_action=keeper_action,
                 )
-        ball_squash = state.get("ball_squash", (1.0, 1.0))
-        if not isinstance(ball_squash, tuple):
-            ball_squash = (1.0, 1.0)
-        self.draw_cinematic_ball(
-            state["ball_pos"],
-            active_goal=scoring_attack,
-            shot_progress=shot_progress,
-            scale=int(state.get("ball_scale", CINEMATIC_SHOT_BALL_SIZE if scoring_attack and shot_progress > 0.54 else CINEMATIC_BALL_SIZE)),
-            direction=direction,
-            prev_pos=state.get("ball_prev_pos"),
-            squash=(float(ball_squash[0]), float(ball_squash[1])),
-            phase=str(state.get("ball_phase", "drible")),
-            spin_rate=float(state.get("ball_spin_rate", 14.0)),
-        )
-        if show_goal_front:
-            if str(state.get("ball_phase", "")) == "rede":
-                self.draw_cinematic_goal_ball_occlusion(
-                    goal,
-                    goal_side,
-                    float(state.get("net_progress", 0.0)),
-                    state.get("ball_pos"),
-                    goal_alpha,
-                )
-            self.draw_cinematic_goal_impact(goal, goal_side, float(state.get("net_progress", 0.0)), state.get("goal_impact_pos"), goal_alpha)
+
+        if not ball_behind_keeper:
+            render_ball()
         if active_attack and shot_progress >= SHOT_GOAL_REVEAL_AT:
             if not scoring_attack:
                 self.draw_cinematic_chance_payoff(state, direction)
@@ -2433,9 +2679,12 @@ class App:
             shot_progress=0.0,
             scale=CINEMATIC_BALL_SIZE,
             direction=0,
+            prev_pos=state.get("ball_prev_pos"),
+            ground_pos=state.get("ball_ground_pos"),
+            velocity=state.get("ball_velocity_px_s"),
+            rotation_degrees=float(state.get("ball_rotation_degrees", 0.0)),
             squash=(float(ball_squash[0]), float(ball_squash[1])),
             phase=str(state.get("ball_phase", "neutro")),
-            spin_rate=float(state.get("ball_spin_rate", 5.0)),
             alpha=255,
         )
         if neutral_alpha > 0:
@@ -2476,11 +2725,21 @@ class App:
         return False, 3
 
     def draw_soft_shadow(self, rect: pygame.Rect, alpha: int) -> None:
-        for layer, factor in enumerate((1.28, 1.10, 0.94, 0.78)):
-            shade = int(alpha * (0.18 + layer * 0.19))
-            shadow = pygame.Rect(0, 0, max(2, int(rect.w * factor)), max(2, int(rect.h * factor)))
-            shadow.center = rect.center
-            pygame.draw.ellipse(self.screen, (0, 0, 0, shade), shadow)
+        alpha_key = max(0, min(255, int(round(alpha / 4.0) * 4)))
+        width = max(2, int(rect.w * 1.28))
+        height = max(2, int(rect.h * 1.28))
+        cache_key = ("soft_shadow", width, height, alpha_key)
+        surface = self.cinematic_overlay_cache.get(cache_key)
+        if surface is None:
+            surface = pygame.Surface((width, height), pygame.SRCALPHA)
+            center = surface.get_rect().center
+            for layer, factor in enumerate((1.0, 0.86, 0.72, 0.58)):
+                shade = int(alpha_key * (0.28 + layer * 0.24))
+                shadow = pygame.Rect(0, 0, max(2, int(width * factor)), max(2, int(height * factor)))
+                shadow.center = center
+                pygame.draw.ellipse(surface, (0, 0, 0, shade), shadow)
+            self.cinematic_overlay_cache[cache_key] = surface
+        self.screen.blit(surface, surface.get_rect(center=rect.center))
 
     def cinematic_planted_x(
         self,
@@ -2516,6 +2775,34 @@ class App:
         left = midbottom[0] - width / 2
         top = midbottom[1] - height
         return left + anchor_x * width, top + anchor[1] * height
+
+    def cinematic_toe_anchor(self, frame: pygame.Surface, direction: int) -> tuple[float, float]:
+        cache_key = (id(frame), 1 if direction >= 0 else -1)
+        cached = self.surface_toe_anchor_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        bbox = self.visible_bbox(frame)
+        if bbox.w <= 0 or bbox.h <= 0:
+            return KICK_FOOT_ANCHOR
+        mask = pygame.mask.from_surface(frame, 64)
+        y_start = max(bbox.top, int(round(bbox.top + bbox.h * 0.45)))
+        y_end = min(bbox.bottom, int(round(bbox.top + bbox.h * 0.86)))
+        pixels = [
+            (x, y)
+            for y in range(y_start, y_end)
+            for x in range(bbox.left, bbox.right)
+            if mask.get_at((x, y))
+        ]
+        if not pixels:
+            return KICK_FOOT_ANCHOR
+        extreme_x = max(x for x, _y in pixels) if direction >= 0 else min(x for x, _y in pixels)
+        edge_pixels = [(x, y) for x, y in pixels if abs(x - extreme_x) <= 4]
+        toe_x = sum(x for x, _y in edge_pixels) / len(edge_pixels)
+        toe_y = sum(y for _x, y in edge_pixels) / len(edge_pixels)
+        anchor = (toe_x / frame.get_width(), toe_y / frame.get_height())
+        self.surface_toe_anchor_cache[cache_key] = anchor
+        return anchor
 
     def cinematic_visible_midbottom_rect(self, frame: pygame.Surface, midbottom: tuple[float, float]) -> pygame.Rect:
         bbox = self.visible_bbox(frame)
@@ -2567,9 +2854,9 @@ class App:
         shadow_h = int((13 + (1 if stride in (0, 2) else -1)) * CINEMATIC_PLAYER_SCALE)
         shadow = pygame.Rect(0, 0, shadow_w, shadow_h)
         shadow.center = (int(planted_x), int(ground_y - 1))
-        self.draw_soft_shadow(shadow, int(64 * clamp(alpha / 255.0)))
+        self.draw_soft_shadow(shadow, int(160 * clamp(alpha / 255.0)))
         if alpha < 255:
-            frame = self.cached_alpha(frame, alpha)
+            frame = self.cached_alpha(frame, alpha, step=8)
         self.screen.blit(frame, rect)
 
     def neutral_frame_for_phase(
@@ -2617,7 +2904,7 @@ class App:
         rect = self.cinematic_visible_midbottom_rect(frame, (x, ground_y))
         shadow = pygame.Rect(0, 0, max(72, int(visible_w * 0.76)), int(13 * CINEMATIC_NEUTRAL_PLAYER_SCALE))
         shadow.center = (int(x), int(ground_y - 1))
-        self.draw_soft_shadow(shadow, int(68 * clamp(alpha / 255.0)))
+        self.draw_soft_shadow(shadow, int(150 * clamp(alpha / 255.0)))
         if alpha < 255:
             frame = self.cached_alpha(frame, alpha)
         self.screen.blit(frame, rect)
@@ -2630,42 +2917,42 @@ class App:
         return max(1, int(frame.get_width() * scale)), max(1, int(frame.get_height() * scale))
 
     def draw_cinematic_kick_impact(self, pos: object, direction: int, shot_progress: float) -> None:
-        if not SHOT_KICK_AT <= shot_progress <= 0.68:
+        impact_end = SHOT_KICK_AT + 0.09
+        if not SHOT_KICK_AT <= shot_progress <= impact_end:
             return
         x, y = pos  # type: ignore[misc]
-        strength = smoothstep((shot_progress - SHOT_KICK_AT) / 0.04) * (1 - smoothstep((shot_progress - 0.63) / 0.05))
+        strength = smoothstep((shot_progress - SHOT_KICK_AT) / 0.012) * (
+            1.0 - smoothstep((shot_progress - (SHOT_KICK_AT + 0.018)) / 0.072)
+        )
         if strength <= 0.02:
             return
-        center = (int(x + direction * 8), int(y - 4))
+        center = (int(x + direction * 5), int(y + 3))
         effect = self.cached_kick_impact_effect(direction, strength, self.t)
         self.screen.blit(effect, effect.get_rect(center=center))
 
     def cached_kick_impact_effect(self, direction: int, strength: float, time_value: float) -> pygame.Surface:
         strength_key = int(round(clamp(strength) * 24))
-        phase_key = int(time_value * 10) % 8
+        phase_key = int(time_value * 12) % 6
         cache_key = ("kick_impact", direction, strength_key, phase_key)
         cached = self.cinematic_overlay_cache.get(cache_key)
         if cached is not None:
             return cached
-        effect = pygame.Surface((96, 76), pygame.SRCALPHA)
-        local = (48, 38)
+        effect = pygame.Surface((76, 52), pygame.SRCALPHA)
+        local = (38, 27)
         strength = strength_key / 24.0
-        for index in range(7):
-            angle = -0.72 + index * 0.24
-            start = (
-                local[0] - direction * int(8 + index * 2),
-                local[1] + int(math.sin(angle) * 6),
-            )
-            end = (
-                local[0] - direction * int(28 + 18 * strength + index * 4),
-                local[1] + int(math.sin(angle) * (10 + 6 * strength)),
-            )
-            color = (255, 244, 192, int((88 - index * 5) * strength))
-            pygame.draw.line(effect, color, start, end, max(1, int(2 * strength)))
-        for index in range(5):
-            px = local[0] - direction * int(14 + index * 7)
-            py = local[1] + 12 + int(math.sin(index + phase_key) * 3)
-            pygame.draw.circle(effect, (186, 226, 116, int(72 * strength)), (px, py), max(1, int(2 * strength)))
+        pygame.draw.arc(
+            effect,
+            (244, 247, 232, int(48 * strength)),
+            pygame.Rect(local[0] - 10, local[1] - 10, 20, 20),
+            -1.15 if direction > 0 else 2.0,
+            0.55 if direction > 0 else 3.70,
+            1,
+        )
+        for index in range(6):
+            px = local[0] - direction * int(5 + index * 5 + strength * 4)
+            py = local[1] + 9 + int(math.sin(index * 1.7 + phase_key) * 3)
+            radius = 1 if index < 4 else 2
+            pygame.draw.circle(effect, (183, 218, 157, int((54 - index * 5) * strength)), (px, py), radius)
         self.cinematic_overlay_cache[cache_key] = effect
         return effect
 
@@ -2686,7 +2973,7 @@ class App:
             frame = self.cached_rotozoom(frame, math.sin(self.t * 8.5) * 1.8, 1.0 + math.sin(self.t * 17.0) * 0.012)
         shadow = pygame.Rect(0, 0, int(116 * scale), int(18 * scale))
         shadow.center = (int(x), int(y + 82 * scale))
-        self.draw_soft_shadow(shadow, 92)
+        self.draw_soft_shadow(shadow, 142)
         self.screen.blit(frame, frame.get_rect(center=(x, y)))
 
     def cinematic_keeper_animation_state(
@@ -2706,7 +2993,7 @@ class App:
         elif keeper_action == "stand_save":
             if shot_progress > SHOT_KEEPER_READ_AT and frame_count > 1:
                 index = 1
-        elif active_goal and shot_progress > 0.80 and frame_count > 3:
+        elif active_goal and shot_progress > SHOT_NET_VISUAL_CONTACT_AT + 0.035 and frame_count > 3:
             index = 3
         elif active_goal and shot_progress > SHOT_KEEPER_DIVE_AT and frame_count > 2:
             index = 2
@@ -2755,21 +3042,23 @@ class App:
         if flip:
             frame = self.cached_flip(frame)
         frame = self.cached_rotozoom(frame, angle, scale)
-        glow_key = ("keeper_glow", 220, 190)
-        glow = self.cinematic_overlay_cache.get(glow_key)
-        if glow is None:
-            glow = pygame.Surface((220, 190), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (255, 255, 255, 22), (110, 92), 58)
-            self.cinematic_overlay_cache[glow_key] = glow
         reveal = clamp(alpha / 255.0)
-        glow_layer = self.cached_alpha(glow, alpha)
-        self.screen.blit(glow_layer, glow_layer.get_rect(center=(x, y + 12)))
         keeper_shadow = pygame.Rect(0, 0, 130, 18)
         keeper_shadow.center = (int(x), int(y + 84))
-        self.draw_soft_shadow(keeper_shadow, int(78 * reveal))
+        self.draw_soft_shadow(keeper_shadow, int(150 * reveal))
+        bbox = self.visible_bbox(frame)
+        if bbox.w > 0 and bbox.h > 0:
+            frame_rect = pygame.Rect(
+                int(round(x - bbox.centerx)),
+                int(round(y - bbox.centery)),
+                frame.get_width(),
+                frame.get_height(),
+            )
+        else:
+            frame_rect = frame.get_rect(center=(x, y))
         if alpha < 255:
-            frame = self.cached_alpha(frame, alpha)
-        self.screen.blit(frame, frame.get_rect(center=(x, y)))
+            frame = self.cached_alpha(frame, alpha, step=8)
+        self.screen.blit(frame, frame_rect)
 
     def draw_cinematic_chance_payoff(self, state: dict[str, object], direction: int) -> None:
         shot_progress = float(state.get("shot_progress", 0.0))
@@ -2784,51 +3073,42 @@ class App:
 
     def cached_chance_payoff_effect(self, kind: str, direction: int, strength: float, time_value: float) -> pygame.Surface:
         strength_key = int(round(clamp(strength) * 24))
-        phase_key = int(time_value * 8) % 12
-        cache_key = ("chance_payoff", kind, direction, strength_key, phase_key)
+        cache_key = ("chance_payoff", kind, direction, strength_key)
         cached = self.cinematic_overlay_cache.get(cache_key)
         if cached is not None:
             return cached
-        effect = pygame.Surface((176, 136), pygame.SRCALPHA)
-        local = (88, 68)
+        effect = pygame.Surface((104, 76), pygame.SRCALPHA)
+        local = (52, 38)
         strength = strength_key / 24.0
         if kind == "wide":
-            pygame.draw.ellipse(effect, (2, 8, 10, int(135 * strength)), (local[0] - 58, local[1] + 18, 116, 22))
-            pygame.draw.line(
-                effect,
-                (3, 10, 12, int(170 * strength)),
-                (local[0] - direction * 8, local[1] + 30),
-                (local[0] - direction * 94, local[1] + 50),
-                max(3, int(8 * strength)),
-            )
-            pygame.draw.circle(effect, (255, 247, 198, int(150 * strength)), local, int(16 + 8 * strength))
-            pygame.draw.circle(effect, (250, 195, 67, int(170 * strength)), local, int(30 + 10 * strength), 3)
             for index in range(5):
-                offset = index * 16
-                alpha = int((150 - index * 18) * strength)
-                start = (local[0] - direction * (20 + offset), local[1] + index * 4 - 8)
-                end = (local[0] - direction * (70 + offset), local[1] + index * 11 - 22)
-                pygame.draw.line(effect, (255, 244, 192, alpha), start, end, max(2, 4 - index // 2))
-            for index in range(7):
-                angle = -0.95 + index * 0.28
-                spark = (
-                    local[0] - direction * int(math.cos(angle) * 58 * strength),
-                    local[1] + int(math.sin(angle) * 38 * strength),
+                offset = 8 + index * 7
+                py = local[1] + 16 + (index % 2) * 3
+                pygame.draw.line(
+                    effect,
+                    (196, 225, 184, int((44 - index * 5) * strength)),
+                    (local[0] - direction * offset, py),
+                    (local[0] - direction * (offset + 8), py + 3),
+                    1,
                 )
-                pygame.draw.circle(effect, (255, 255, 230, int(128 * strength)), spark, max(2, int(4 * strength)))
-            pygame.draw.arc(effect, (250, 195, 67, int(178 * strength)), (local[0] - 40, local[1] - 36, 80, 72), -0.8, 1.1, 4)
         else:
-            core_alpha = int(255 * clamp(strength * 1.8))
-            ring_alpha = int(230 * clamp(strength * 1.45))
-            pygame.draw.circle(effect, (255, 255, 244, core_alpha), local, int(18 + 7 * strength))
-            pygame.draw.circle(effect, (255, 255, 255, ring_alpha), local, int(30 + 9 * strength), 4)
-            pygame.draw.circle(effect, (82, 226, 255, int(220 * clamp(strength * 1.35))), local, int(42 + 10 * strength), 4)
-            for radius in (22, 36, 52):
-                pygame.draw.circle(effect, (82, 226, 255, int((220 - radius) * clamp(strength * 1.25))), local, radius, 3)
-            for index in range(12):
-                angle = index * math.tau / 12.0 + phase_key * 0.18
-                end = (local[0] + int(math.cos(angle) * 76 * strength), local[1] + int(math.sin(angle) * 54 * strength))
-                pygame.draw.line(effect, (255, 255, 245, ring_alpha), local, end, 4)
+            contact_alpha = int(72 * strength)
+            radius = int(12 + 5 * strength)
+            pygame.draw.ellipse(
+                effect,
+                (244, 247, 240, contact_alpha),
+                pygame.Rect(local[0] - radius, local[1] - int(radius * 0.62), radius * 2, int(radius * 1.24)),
+                1,
+            )
+            for index in range(3):
+                offset = 7 + index * 5
+                pygame.draw.line(
+                    effect,
+                    (238, 244, 235, int((48 - index * 9) * strength)),
+                    (local[0] - direction * offset, local[1] - 8 + index * 7),
+                    (local[0] - direction * (offset + 9), local[1] - 9 + index * 7),
+                    1,
+                )
         self.cinematic_overlay_cache[cache_key] = effect
         return effect
 
@@ -2840,100 +3120,86 @@ class App:
         scale: int = 46,
         direction: int = 1,
         prev_pos: object | None = None,
+        ground_pos: object | None = None,
+        velocity: object | None = None,
+        rotation_degrees: float = 0.0,
         squash: tuple[float, float] = (1.0, 1.0),
         phase: str = "drible",
-        spin_rate: float = 14.0,
         alpha: int = 255,
     ) -> None:
         x, y = pos  # type: ignore[misc]
-        if active_goal and phase == "chute" and shot_progress < SHOT_NET_AT and prev_pos is not None:
-            px, py = prev_pos  # type: ignore[misc]
-            vx = x - px
-            vy = y - py
-            distance = max(0.001, math.hypot(vx, vy))
-            ux, uy = vx / distance, vy / distance
-            trail = self.cached_ball_trail(ux, uy, int(alpha * 0.20))
-            cx, cy = 110, 70
-            self.screen.blit(trail, (int(x - cx), int(y - cy)))
-        if phase == "chute":
-            flight = clamp((shot_progress - SHOT_KICK_AT) / max(0.001, SHOT_NET_AT - SHOT_KICK_AT))
-            lift = math.sin(flight * math.pi)
-            shadow_w = max(18, int(scale * (0.92 - 0.34 * lift)))
-            shadow_h = max(5, int(scale * (0.18 - 0.06 * lift)))
-            shadow = pygame.Rect(0, 0, shadow_w, shadow_h)
-            shadow.center = (int(x - direction * (8 + 4 * lift)), int(y + scale * 0.64 + 42 * lift))
-            pygame.draw.ellipse(self.screen, (0, 0, 0, int((42 - 20 * lift) * clamp(alpha / 255.0))), shadow)
-        elif phase != "rede":
-            shadow = pygame.Rect(0, 0, max(26, int(scale * 0.94)), max(8, int(scale * 0.22)))
-            shadow_y_offset = scale * 0.46
-            shadow.center = (int(x), int(y + shadow_y_offset))
-            pygame.draw.ellipse(self.screen, (0, 0, 0, int(66 * clamp(alpha / 255.0))), shadow)
-        if phase in {"drible", "neutro"}:
-            spin_phase = abs(self.ground_scroll) * 0.058 + self.t * max(0.0, spin_rate) * 0.18
+        size = max(22, int(scale))
+        frame = self.cached_cinematic_ball_material(size, rotation_degrees)
+
+        if isinstance(ground_pos, tuple) and len(ground_pos) == 2:
+            shadow_x, shadow_y = float(ground_pos[0]), float(ground_pos[1])
         else:
-            spin_phase = self.t * spin_rate
-        if prev_pos is not None:
-            px, py = prev_pos  # type: ignore[misc]
-            distance = math.hypot(x - px, y - py)
-            spin_phase += distance * (0.18 if phase == "rede" else 0.42)
-        frame = self.assets.balls[int(spin_phase) % len(self.assets.balls)]
-        size = int(scale)
-        # The ball itself stays circular. Impact energy is expressed by trail, shadow,
-        # glint and net deformation; anisotropic scaling made the rotated sprite read
-        # as an oval ball.
-        size_x = size_y = max(22, size)
-        frame = self.cached_smoothscale(frame, (size_x, size_y))
-        if phase in {"drible", "neutro", "chute"}:
-            spin_direction = -1 if direction < 0 else 1
-            rotation_gain = 18.0 if phase in {"drible", "neutro"} else 12.0
-            angle = (spin_direction * spin_phase * rotation_gain) % 360.0
-            angle = round(angle / 3.0) * 3.0
-            frame = self.cached_rotozoom(frame, angle, 1.0)
+            shadow_x, shadow_y = float(x) - 7.0, float(y) + size * 0.44
+        altitude = max(0.0, shadow_y - (float(y) + size * 0.43))
+        shadow_factor = clamp(1.0 - altitude / 150.0, 0.52, 1.0)
+        shadow = pygame.Rect(
+            0,
+            0,
+            max(14, int(size * (0.90 * shadow_factor))),
+            max(4, int(size * (0.20 * shadow_factor))),
+        )
+        shadow.center = (int(round(shadow_x)), int(round(shadow_y)))
+        shadow_alpha = int((58 if phase in {"drible", "neutro"} else 42) * shadow_factor * clamp(alpha / 255.0))
+        if phase == "rede":
+            shadow_alpha = min(shadow_alpha, 18)
+        self.draw_soft_shadow(shadow, shadow_alpha)
+
+        velocity_x = velocity_y = 0.0
+        if isinstance(velocity, tuple) and len(velocity) == 2:
+            velocity_x, velocity_y = float(velocity[0]), float(velocity[1])
+        elif isinstance(prev_pos, tuple) and len(prev_pos) == 2:
+            velocity_x = (float(x) - float(prev_pos[0])) * FPS
+            velocity_y = (float(y) - float(prev_pos[1])) * FPS
+        speed = math.hypot(velocity_x, velocity_y)
+        blur_strength = smoothstep((speed - 160.0) / 220.0) if phase == "chute" else 0.0
+        if blur_strength > 0.02:
+            frame_dx = velocity_x / FPS
+            frame_dy = velocity_y / FPS
+            displacement = math.hypot(frame_dx, frame_dy)
+            if displacement > 22.0:
+                factor = 22.0 / displacement
+                frame_dx *= factor
+                frame_dy *= factor
+            for amount, ghost_alpha in ((0.82, 10), (0.54, 18), (0.28, 28)):
+                ghost = self.cached_alpha(
+                    frame,
+                    int(ghost_alpha * blur_strength * clamp(alpha / 255.0)),
+                    step=8,
+                )
+                ghost_center = (
+                    int(round(float(x) - frame_dx * amount)),
+                    int(round(float(y) - frame_dy * amount)),
+                )
+                self.screen.blit(ghost, ghost.get_rect(center=ghost_center))
+
         if alpha < 255:
             frame = self.cached_alpha(frame, alpha)
-        ball_rect = frame.get_rect(center=(int(round(x)), int(round(y))))
-        if phase == "rede":
-            contrast_shadow = ball_rect.inflate(2, 2)
-            pygame.draw.ellipse(self.screen, (0, 0, 0, int(14 * clamp(alpha / 255.0))), contrast_shadow)
-        self.screen.blit(frame, ball_rect)
-        if phase in {"chute", "rede"} and alpha > 18:
-            glint_alpha = int((164 if phase == "chute" else 96) * clamp(alpha / 255.0))
-            glint_radius = max(6, int(min(size_x, size_y) * (0.18 if phase == "chute" else 0.17)))
-            glint_center = (
-                int(ball_rect.centerx - size_x * 0.16),
-                int(ball_rect.centery - size_y * 0.18),
-            )
-            if phase == "rede":
-                pygame.draw.circle(self.screen, (255, 255, 235, glint_alpha), glint_center, glint_radius, 2)
-                pygame.draw.circle(self.screen, (255, 255, 235, int(48 * clamp(alpha / 255.0))), glint_center, max(3, glint_radius // 3))
-            else:
-                pygame.draw.circle(self.screen, (255, 255, 235, glint_alpha), glint_center, glint_radius)
+        self.screen.blit(frame, frame.get_rect(center=(int(round(x)), int(round(y)))))
 
-    def cached_ball_trail(self, ux: float, uy: float, alpha: int) -> pygame.Surface:
-        angle_key = int(round(math.atan2(uy, ux) / math.tau * 24)) % 24
-        alpha_key = int(round(clamp(alpha / 255.0) * 16))
-        cache_key = ("ball_trail", angle_key, alpha_key)
-        cached = self.cinematic_overlay_cache.get(cache_key)
-        if cached is not None:
-            return cached
-        angle = angle_key / 24.0 * math.tau
-        ux = math.cos(angle)
-        uy = math.sin(angle)
-        trail = pygame.Surface((220, 140), pygame.SRCALPHA)
-        cx, cy = 110, 70
-        alpha_scale = alpha_key / 16.0
-        for index, (length, width, segment_alpha, color) in enumerate(
-            (
-                (36, 2, 6, (255, 255, 255)),
-                (24, 1, 4, (116, 226, 255)),
-                (14, 1, 3, (250, 195, 67)),
-            )
-        ):
-            start = (int(cx - ux * (16 + index * 7)), int(cy - uy * (16 + index * 7)))
-            end = (int(cx - ux * length), int(cy - uy * length))
-            pygame.draw.line(trail, (*color, int(segment_alpha * alpha_scale)), start, end, width)
-        self.cinematic_overlay_cache[cache_key] = trail
-        return trail
+    def cached_cinematic_ball_material(self, size: int, rotation_degrees: float) -> pygame.Surface:
+        frame_count = len(self.assets.balls)
+        phase_steps = frame_count * 2
+        phase_key = int(round((rotation_degrees % 360.0) / 360.0 * phase_steps)) % phase_steps
+        frame_float = phase_key / 2.0
+        frame_index = int(math.floor(frame_float)) % frame_count
+        next_index = (frame_index + 1) % frame_count
+        blend = frame_float - math.floor(frame_float)
+        base = self.cached_smoothscale(self.assets.balls[frame_index], (size, size))
+        if blend <= 0.01:
+            return base
+        cache_key = ("ball_material", size, phase_key)
+        material = self.cinematic_overlay_cache.get(cache_key)
+        if material is None:
+            material = base.copy()
+            following = self.cached_smoothscale(self.assets.balls[next_index], (size, size))
+            material.blit(self.cached_alpha(following, int(round(255 * blend))), (0, 0))
+            self.cinematic_overlay_cache[cache_key] = material
+        return material
 
     def draw_cinematic_goal_overlay(self, field: pygame.Rect, pred: Prediction) -> None:
         event = self.active_goal_event(pred)
@@ -2956,7 +3222,7 @@ class App:
             pygame.draw.rect(panel, (2, 9, 13, 218), panel.get_rect(), border_radius=18)
             panel.blit(text, (27, 11))
             self.cinematic_overlay_cache[cache_key] = panel
-        panel = self.cached_alpha(panel, alpha)
+        panel = self.cached_alpha(panel, alpha, step=8)
         self.screen.blit(panel, panel.get_rect(center=center))
 
     def cinematic_goal_overlay_center(self, field: pygame.Rect) -> tuple[int, int]:

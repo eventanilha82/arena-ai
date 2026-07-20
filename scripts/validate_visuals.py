@@ -24,6 +24,7 @@ from arena_ai.main import (
     App,
     ALGORITHM_NAMES,
     CINEMATIC_BALL_SIZE,
+    CINEMATIC_SHOT_BALL_SIZE,
     CINEMATIC_KEEPER_SCALE,
     CINEMATIC_NEUTRAL_PLAYER_SCALE,
     CINEMATIC_PLAYER_SCALE,
@@ -41,13 +42,17 @@ from arena_ai.main import (
     SIMULATION_SECONDS,
     SHOT_FOLLOW_THROUGH_HOLD_END,
     SHOT_GOAL_REVEAL_AT,
+    SHOT_KEEPER_DIVE_AT,
     SHOT_KEEPER_FULL_AT,
+    SHOT_KEEPER_READ_AT,
     SHOT_KEEPER_REVEAL_AT,
     SHOT_KICK_AT,
     SHOT_PLANT_AT,
     SHOT_WHOOSH_AT,
     SHOT_NET_AT,
+    SHOT_NET_SETTLE_PROGRESS,
     SHOT_NET_VISUAL_CONTACT_AT,
+    SHOT_RELEASE_END,
     SHOT_REVERB_AT,
     TOURNAMENT_MONTE_CARLO_RUNS,
     TOURNAMENT_MONTE_CARLO_USE_SCENARIO_BANK,
@@ -55,7 +60,6 @@ from arena_ai.main import (
     TOURNAMENT_MIN_LOADING_SECONDS,
     WIDTH,
     HEIGHT,
-    KICK_FOOT_ANCHOR,
     RUNNER_FOOT_ANCHORS,
     clamp,
     smoothstep,
@@ -125,8 +129,27 @@ AUXILIARY_CACHE_LIMITS = {
     "gradient_mask_cache": 8,
     "goal_orientation_cache": 24,
     "surface_bbox_cache": 360,
+    "ball_net_path_cache": 128,
+    "cinematic_ball_history_cache": 32,
     "cinematic_overlay_cache": 512,
 }
+BALL_STATE_CONTRACT_KEYS = (
+    "ball_pos",
+    "ball_prev_pos",
+    "ball_velocity_px_s",
+    "ball_ground_pos",
+    "ball_depth",
+    "ball_rotation_degrees",
+    "ball_scale",
+    "raw_shot_progress",
+)
+TARGET_CINEMATIC_BALL_SIZE = 38
+TARGET_CINEMATIC_SHOT_BALL_SIZE = 32
+BALL_VISIBLE_PLAYER_RATIO = (0.14, 0.18)
+BALL_TRACE_SAMPLE_HZ = 240
+BALL_RUNTIME_FRAME_HZ = 60
+BALL_PREVIOUS_POSITION_TOLERANCE_PX = 1.0
+BALL_OCCLUSION_NUMERICAL_TOLERANCE = 1e-6
 
 
 def alpha_bbox(surface: pygame.Surface) -> pygame.Rect:
@@ -231,6 +254,8 @@ def auxiliary_cache_sizes(app: App) -> dict[str, int]:
         "gradient_mask_cache": len(app.gradient_mask_cache),
         "goal_orientation_cache": len(app.goal_orientation_cache),
         "surface_bbox_cache": len(app.surface_bbox_cache),
+        "ball_net_path_cache": len(app.ball_net_path_cache),
+        "cinematic_ball_history_cache": len(app.cinematic_ball_history_cache),
         "cinematic_overlay_cache": len(app.cinematic_overlay_cache),
     }
 
@@ -286,6 +311,73 @@ def edge_energy(surface: pygame.Surface, step: int = 2) -> float:
 def assert_between(value: float, lower: float, upper: float, label: str) -> None:
     if not lower <= value <= upper:
         raise AssertionError(f"{label} out of AAA gate: {value:.3f} not in [{lower:.3f}, {upper:.3f}]")
+
+
+def finite_pair(value: object, label: str) -> tuple[float, float]:
+    if not isinstance(value, tuple) or len(value) != 2:
+        raise AssertionError(f"{label} must be a 2D tuple, got {value!r}")
+    pair = (float(value[0]), float(value[1]))
+    if not all(math.isfinite(component) for component in pair):
+        raise AssertionError(f"{label} must contain finite values, got {value!r}")
+    return pair
+
+
+def ball_contract_snapshot(state: dict[str, object], label: str) -> dict[str, object]:
+    missing = [key for key in BALL_STATE_CONTRACT_KEYS if key not in state]
+    if missing:
+        raise AssertionError(
+            f"{label} missing cinematic ball runtime contract keys {missing}; "
+            "integrate the current cinematic_scene_state contract before running visual QA"
+        )
+    depth = float(state["ball_depth"])
+    rotation = float(state["ball_rotation_degrees"])
+    scale = float(state["ball_scale"])
+    raw_progress = float(state["raw_shot_progress"])
+    for name, value in (
+        ("ball_depth", depth),
+        ("ball_rotation_degrees", rotation),
+        ("ball_scale", scale),
+        ("raw_shot_progress", raw_progress),
+    ):
+        if not math.isfinite(value):
+            raise AssertionError(f"{label} {name} must be finite, got {value!r}")
+    if not 0.0 <= depth <= 1.0:
+        raise AssertionError(f"{label} ball_depth must stay in [0, 1], got {depth:.6f}")
+    if scale <= 0.0:
+        raise AssertionError(f"{label} ball_scale must be positive, got {scale:.3f}")
+    return {
+        "ball_pos": finite_pair(state["ball_pos"], f"{label} ball_pos"),
+        "ball_prev_pos": finite_pair(state["ball_prev_pos"], f"{label} ball_prev_pos"),
+        "ball_velocity_px_s": finite_pair(state["ball_velocity_px_s"], f"{label} ball_velocity_px_s"),
+        "ball_ground_pos": finite_pair(state["ball_ground_pos"], f"{label} ball_ground_pos"),
+        "ball_depth": depth,
+        "ball_rotation_degrees": rotation,
+        "ball_scale": scale,
+        "raw_shot_progress": raw_progress,
+    }
+
+
+def wrapped_angle_delta(current: float, previous: float) -> float:
+    return (current - previous + 180.0) % 360.0 - 180.0
+
+
+def assert_ball_size_contract() -> None:
+    actual = (CINEMATIC_BALL_SIZE, CINEMATIC_SHOT_BALL_SIZE)
+    expected = (TARGET_CINEMATIC_BALL_SIZE, TARGET_CINEMATIC_SHOT_BALL_SIZE)
+    if actual != expected:
+        raise AssertionError(f"cinematic ball size contract is stale: runtime={actual}, expected={expected}")
+
+
+def visible_ball_diameters(app: App, scale: int) -> list[float]:
+    target = (scale, scale)
+    return [
+        min(scaled_visible_width(frame, target), scaled_visible_height(frame, target))
+        for frame in app.assets.balls
+    ]
+
+
+def visible_ball_radius(app: App, scale: int) -> float:
+    return max(visible_ball_diameters(app, scale)) * 0.5
 
 
 def neutral_sample_second(ramp_position: float) -> float:
@@ -1359,6 +1451,37 @@ def bright_pixel_count(surface: pygame.Surface) -> int:
     return pixels
 
 
+def sampled_alpha_pixel_count(surface: pygame.Surface, threshold: int = 30) -> int:
+    return sum(
+        surface.get_at((x, y)).a > threshold
+        for y in range(0, surface.get_height(), 2)
+        for x in range(0, surface.get_width(), 2)
+    )
+
+
+def alpha_mask_overlap_fraction(
+    subject_surface: pygame.Surface,
+    subject_rect: pygame.Rect,
+    occluder_surface: pygame.Surface,
+    occluder_rect: pygame.Rect,
+    threshold: int = 30,
+) -> float:
+    if not subject_rect.colliderect(occluder_rect):
+        return 0.0
+    subject_mask = pygame.mask.from_surface(subject_surface, threshold)
+    subject_area = subject_mask.count()
+    if subject_area <= 0:
+        return 0.0
+    occluder_mask = pygame.mask.from_surface(occluder_surface, threshold)
+    offset = (occluder_rect.x - subject_rect.x, occluder_rect.y - subject_rect.y)
+    return clamp(subject_mask.overlap_area(occluder_mask, offset) / subject_area)
+
+
+def occlusion_visibility_factor(overlap_fraction: float) -> float:
+    visible_fraction = 1.0 - clamp(overlap_fraction)
+    return visible_fraction * visible_fraction
+
+
 def dark_pixel_count(surface: pygame.Surface, step: int = 2) -> int:
     pixels = 0
     for y in range(0, surface.get_height(), step):
@@ -1448,6 +1571,22 @@ def frame_sample_delta(a: pygame.Surface, b: pygame.Surface, step: int = 6) -> i
             cb = b.get_at((x, y))
             delta += abs(ca.r - cb.r) + abs(ca.g - cb.g) + abs(ca.b - cb.b)
     return delta
+
+
+def changed_sample_count(
+    a: pygame.Surface,
+    b: pygame.Surface,
+    step: int = 2,
+    rgb_delta_threshold: int = 36,
+) -> int:
+    return sum(
+        abs(a.get_at((x, y)).r - b.get_at((x, y)).r)
+        + abs(a.get_at((x, y)).g - b.get_at((x, y)).g)
+        + abs(a.get_at((x, y)).b - b.get_at((x, y)).b)
+        >= rgb_delta_threshold
+        for y in range(0, min(a.get_height(), b.get_height()), step)
+        for x in range(0, min(a.get_width(), b.get_width()), step)
+    )
 
 
 def edge_delta(surface: pygame.Surface, offset: int = 1, step_y: int = 4) -> float:
@@ -1542,16 +1681,35 @@ def validate_parallax_assets() -> None:
 
 
 def goalkeeper_render_for_state(app: App, team: object, state: dict[str, object], flip: bool) -> tuple[pygame.Surface, pygame.Rect]:
-    shot_progress = float(state["shot_progress"])
+    shot_progress = float(state.get("raw_shot_progress", state["shot_progress"]))
+    flip = bool(state.get("keeper_flip", flip))
     team_code = getattr(team, "code")
     frames = app.assets.cinematic_keeper_frames[team_code]
-    index, scale, angle = app.cinematic_keeper_animation_state(True, shot_progress, len(frames), flip)
+    keeper_action = str(state.get("keeper_action", ""))
+    active_goal = bool(state.get("active_goal")) or keeper_action == "dive_save"
+    index, scale, angle = app.cinematic_keeper_animation_state(
+        active_goal,
+        shot_progress,
+        len(frames),
+        flip,
+        keeper_action,
+    )
     frame = frames[index]
     if flip:
         frame = pygame.transform.flip(frame, True, False)
     frame = pygame.transform.rotozoom(frame, angle, scale)
     keeper_x, keeper_y = state["keeper_pos"]  # type: ignore[misc]
-    return frame, frame.get_rect(center=(int(keeper_x), int(keeper_y)))
+    bbox = app.visible_bbox(frame)
+    if bbox.w > 0 and bbox.h > 0:
+        rect = pygame.Rect(
+            int(round(float(keeper_x) - bbox.centerx)),
+            int(round(float(keeper_y) - bbox.centery)),
+            frame.get_width(),
+            frame.get_height(),
+        )
+    else:
+        rect = frame.get_rect(center=(int(keeper_x), int(keeper_y)))
+    return frame, rect
 
 
 def cinematic_goal_layer_target_rect(app: App, goal: pygame.Rect, side: str, ripple: float, as_front: bool) -> pygame.Rect:
@@ -1573,15 +1731,45 @@ def cinematic_goal_layer_target_rect(app: App, goal: pygame.Rect, side: str, rip
     return target
 
 
+def alpha_normalized_ball_draw_visibility(
+    app: App,
+    field: pygame.Rect,
+    with_ball_frame: pygame.Surface,
+    without_ball_frame: pygame.Surface,
+    pos: tuple[float, float],
+    scale: int,
+    squash: tuple[float, float],
+    rotation_degrees: float,
+) -> float:
+    size_x = max(22, int(scale * float(squash[0])))
+    size_y = max(22, int(scale * float(squash[1])))
+    sample_rect = pygame.Rect(0, 0, size_x + 12, size_y + 12)
+    sample_rect.center = (round(float(pos[0])), round(float(pos[1])))
+    sample_rect = sample_rect.clip(field).clip(with_ball_frame.get_rect())
+    if sample_rect.w <= 0 or sample_rect.h <= 0:
+        return 0.0
+    with_ball = with_ball_frame.subsurface(sample_rect).copy()
+    without_ball = without_ball_frame.subsurface(sample_rect).copy()
+    material = app.cached_cinematic_ball_material(scale, rotation_degrees)
+    if material.get_size() != (size_x, size_y):
+        material = pygame.transform.smoothscale(material, (size_x, size_y))
+    alpha_area = sampled_alpha_pixel_count(material)
+    if alpha_area <= 0:
+        raise AssertionError(f"canonical ball material has no alpha area at scale={scale}")
+    return changed_sample_count(with_ball, without_ball) / alpha_area
+
+
 def assert_ball_draw_sequence_stable(app: App, field: pygame.Rect, pred: Prediction, times: tuple[float, ...], label: str) -> None:
     original_ball = app.draw_cinematic_ball
     scales = []
     rendered_sizes = []
     phases = []
-    visibility = []
+    visibility_density = []
+    occlusion_fractions = []
     try:
         for time_value in times:
             app.t = time_value
+            state = app.cinematic_scene_state(field, pred)
             calls = []
 
             def spy_ball(*args: object, **kwargs: object) -> object:
@@ -1606,23 +1794,89 @@ def assert_ball_draw_sequence_stable(app: App, field: pygame.Rect, pred: Predict
             scales.append(scale)
             rendered_sizes.append((size_x, size_y))
             phases.append(str(kwargs.get("phase", "")))
-            sample_rect = pygame.Rect(0, 0, size_x + 12, size_y + 12)
-            sample_rect.center = (int(pos[0]), int(pos[1]))
-            sample = app.screen.subsurface(sample_rect.clip(field)).copy()
-            visibility.append(bright_pixel_count(sample) + dark_pixel_count(sample, step=3))
+            with_ball_frame = app.screen.copy()
+
+            app.draw_cinematic_ball = lambda *args, **kwargs: None  # type: ignore[method-assign]
+            app.screen.fill((0, 0, 0))
+            app.draw_field(pred, pred, "CONFRONTO")
+            without_ball_frame = app.screen.copy()
+            visibility_density.append(
+                alpha_normalized_ball_draw_visibility(
+                    app,
+                    field,
+                    with_ball_frame,
+                    without_ball_frame,
+                    pos,
+                    scale,
+                    (float(squash[0]), float(squash[1])),
+                    float(kwargs.get("rotation_degrees", 0.0)),
+                )
+            )
+            ball_rect = pygame.Rect(0, 0, size_x, size_y)
+            ball_rect.center = (round(float(pos[0])), round(float(pos[1])))
+            occlusion_fraction = 0.0
+            if state.get("active_attack") and state.get("keeper_pos") is not None:
+                keeper_team = app.away if state.get("possession") == "home" else app.home
+                keeper_frame, keeper_rect = goalkeeper_render_for_state(
+                    app,
+                    keeper_team,
+                    state,
+                    bool(state.get("keeper_flip", False)),
+                )
+                ball_material = app.cached_cinematic_ball_material(
+                    scale,
+                    float(kwargs.get("rotation_degrees", 0.0)),
+                )
+                if ball_material.get_size() != ball_rect.size:
+                    ball_material = pygame.transform.smoothscale(ball_material, ball_rect.size)
+                keeper_is_in_front = (
+                    (bool(state.get("active_goal")) and float(state.get("ball_depth", 0.0)) >= 0.78)
+                    or str(state.get("attack_kind", "")) == "save"
+                )
+                if keeper_is_in_front:
+                    occlusion_fraction = alpha_mask_overlap_fraction(
+                        ball_material,
+                        ball_rect,
+                        keeper_frame,
+                        keeper_rect,
+                    )
+            occlusion_fractions.append(occlusion_fraction)
     finally:
         app.draw_cinematic_ball = original_ball  # type: ignore[method-assign]
-    if min(visibility) < 80 or min(visibility) < max(1, int(max(visibility) * 0.30)):
-        raise AssertionError(f"{label} ball visibility flickers across frames: {visibility}, phases={phases}")
+    best_density = max(visibility_density, default=0.0)
+    minimum_unoccluded_density = max(0.16, best_density * 0.30)
+    visibility_failures = [
+        (index, density, occlusion, minimum_unoccluded_density * occlusion_visibility_factor(occlusion))
+        for index, (density, occlusion) in enumerate(zip(visibility_density, occlusion_fractions))
+        if density + BALL_OCCLUSION_NUMERICAL_TOLERANCE
+        < minimum_unoccluded_density * occlusion_visibility_factor(occlusion)
+    ]
+    if visibility_failures:
+        raise AssertionError(
+            f"{label} ball alpha-normalized visibility flickers across frames: "
+            f"densities={[round(value, 3) for value in visibility_density]}, "
+            f"occlusion_fractions={[round(value, 3) for value in occlusion_fractions]}, "
+            f"failures={visibility_failures}, phases={phases}"
+        )
+    allowed_scale_steps = [
+        max(1, math.ceil(abs(following_time - current_time) * BALL_RUNTIME_FRAME_HZ))
+        for current_time, following_time in zip(times, times[1:])
+    ]
     scale_steps = [abs(a - b) for a, b in zip(scales, scales[1:])]
-    if scale_steps and max(scale_steps) > 3:
-        raise AssertionError(f"{label} ball scale changes abruptly between frames: {scales}")
+    if any(step > allowed for step, allowed in zip(scale_steps, allowed_scale_steps)):
+        raise AssertionError(
+            f"{label} ball scale changes faster than 1px per 60Hz frame: "
+            f"scales={scales}, allowed_steps={allowed_scale_steps}"
+        )
     size_steps = [
         max(abs(ax - bx), abs(ay - by))
         for (ax, ay), (bx, by) in zip(rendered_sizes, rendered_sizes[1:])
     ]
-    if size_steps and max(size_steps) > 5:
-        raise AssertionError(f"{label} ball rendered size pops between frames: {rendered_sizes}")
+    if any(step > allowed for step, allowed in zip(size_steps, allowed_scale_steps)):
+        raise AssertionError(
+            f"{label} ball rendered size changes faster than 1px per 60Hz frame: "
+            f"sizes={rendered_sizes}, allowed_steps={allowed_scale_steps}"
+        )
 
 
 def validate_aaa_player_crop_gate() -> None:
@@ -1682,9 +1936,48 @@ def validate_cinematic_scene() -> None:
     if abs(runner_visible - kick_visible) > 1.6:
         raise AssertionError(f"runner and kick visible scale pop: {runner_visible:.1f} vs {kick_visible:.1f}")
 
+    def goal_state_at(
+        prediction: Prediction,
+        goal_minute: int,
+        progress: float,
+    ) -> dict[str, object]:
+        app.match_prediction = prediction
+        app.t = (
+            goal_minute
+            - GOAL_EVENT_WINDOW_MINUTES
+            + progress * GOAL_EVENT_WINDOW_MINUTES
+        ) / 90.0 * SIMULATION_SECONDS
+        return app.cinematic_scene_state(field, prediction)
+
     def set_goal_progress(goal_minute: int, progress: float) -> dict[str, object]:
-        app.t = (goal_minute - 5.0 + progress * 5.0) / 90.0 * 45.0
-        return app.cinematic_scene_state(field, pred)
+        return goal_state_at(pred, goal_minute, progress)
+
+    def assert_kick_toe_anchor(
+        state: dict[str, object],
+        team_code: str,
+        direction: int,
+        label: str,
+    ) -> None:
+        frames = (
+            app.assets.cinematic_players[team_code]
+            if direction > 0
+            else app.assets.cinematic_players_left[team_code]
+        )
+        kick_frame = frames[3]
+        kick_target = app.cinematic_actor_target_size(kick_frame, CINEMATIC_PLAYER_SCALE)
+        toe_anchor = app.cinematic_toe_anchor(kick_frame, direction)
+        expected_kick = app.cinematic_actor_anchor_screen(
+            state["actor_pos"],  # type: ignore[arg-type]
+            kick_target,
+            toe_anchor,
+            False,
+            kick_frame,
+        )
+        if math.dist(state["kick_pos"], expected_kick) > 1.0:  # type: ignore[arg-type]
+            raise AssertionError(
+                f"{label} kick point is not using the rendered toe anchor: "
+                f"{state['kick_pos']} vs {expected_kick}"
+            )
 
     def ball_distance_to_kick(state: dict[str, object]) -> float:
         return math.dist(state["ball_pos"], state["kick_pos"])  # type: ignore[arg-type]
@@ -1713,39 +2006,22 @@ def validate_cinematic_scene() -> None:
         raise AssertionError(f"attacker foot/ball did not cross midfield during goal movement: {state['kick_pos']}")
     assert_goal_render_visible(app, field, pred, "home")
 
-    shot_state = set_goal_progress(first_goal_minute, 0.60)
+    shot_state = set_goal_progress(first_goal_minute, SHOT_KICK_AT)
     kick_x, kick_y = shot_state["kick_pos"]  # type: ignore[misc]
     keeper_x, keeper_y = shot_state["keeper_pos"]  # type: ignore[misc]
-    actor_x, actor_y = shot_state["actor_pos"]  # type: ignore[misc]
-    kick_frame = app.assets.cinematic_players[app.home.code][3]
-    kick_target = app.cinematic_actor_target_size(kick_frame, CINEMATIC_PLAYER_SCALE)
-    expected_kick = app.cinematic_actor_anchor_screen(
-        (field.centerx + 46 - 68, actor_y),
-        kick_target,
-        KICK_FOOT_ANCHOR,
-        False,
-        kick_frame,
-    )
-    if 0.60 <= SHOT_KICK_AT:
-        settle_to_kick = smoothstep((0.60 - SHOT_PLANT_AT) / max(0.001, SHOT_KICK_AT - SHOT_PLANT_AT))
-        roll_cycle = math.sin(0.60 * 38.0 + app.match_seed * 0.01)
-        dribble_foot = (
-            actor_x + 50 + roll_cycle * 4,
-            actor_y - 42 + math.cos(0.60 * 32.0) * 2,
-        )
-        expected_kick = (
-            dribble_foot[0] + (expected_kick[0] - dribble_foot[0]) * settle_to_kick,
-            dribble_foot[1] + (expected_kick[1] - dribble_foot[1]) * settle_to_kick,
-        )
-    if math.dist((kick_x, kick_y), expected_kick) > 1.0:
-        raise AssertionError(f"kick point is not using the sprite foot anchor: {(kick_x, kick_y)} vs {expected_kick}")
+    assert_kick_toe_anchor(shot_state, app.home.code, 1, "home")
     if not field.centerx + 34 <= kick_x <= field.centerx + 66:
         raise AssertionError(f"home shot should start just past midfield, got kick_x={kick_x:.1f}")
     if math.dist((kick_x, kick_y), (keeper_x, keeper_y)) < 145:
         raise AssertionError("home shot starts too close to the goalkeeper")
     actor_y_samples = []
     actor_x_samples = []
-    for progress in (0.46, 0.56, 0.66, 0.70):
+    for progress in (
+        SHOT_PLANT_AT - 0.08,
+        SHOT_PLANT_AT,
+        SHOT_KICK_AT,
+        SHOT_RELEASE_END,
+    ):
         sample_state = set_goal_progress(first_goal_minute, progress)
         actor_x, actor_y = sample_state["actor_pos"]  # type: ignore[misc]
         actor_x_samples.append(actor_x)
@@ -1754,11 +2030,19 @@ def validate_cinematic_scene() -> None:
         raise AssertionError(f"attacker appears to float during shot: y samples={actor_y_samples}")
     if abs(actor_x_samples[-1] - actor_x_samples[1]) > 14:
         raise AssertionError(f"attacker keeps sprinting after planting foot: x samples={actor_x_samples}")
-    if ball_distance_to_kick(set_goal_progress(first_goal_minute, 0.555)) > 14:
+    contact_gap_limit = visible_ball_radius(app, CINEMATIC_BALL_SIZE) + 3.0
+    if ball_distance_to_kick(set_goal_progress(first_goal_minute, SHOT_KICK_AT - 0.01)) > contact_gap_limit:
         raise AssertionError("ball is not attached to foot before the shot")
-    if ball_distance_to_kick(set_goal_progress(first_goal_minute, 0.66)) < 35:
+    if ball_distance_to_kick(set_goal_progress(first_goal_minute, SHOT_RELEASE_END)) < 56:
         raise AssertionError("ball did not leave the foot after the shot")
-    for progress in (0.62, 0.70, 0.78, 0.86, 0.90, 0.92, 0.94, 0.955):
+    pre_net_progresses = (
+        SHOT_PLANT_AT,
+        SHOT_KICK_AT,
+        SHOT_RELEASE_END,
+        max(SHOT_RELEASE_END + 0.05, 0.86),
+        SHOT_NET_AT,
+    )
+    for progress in pre_net_progresses:
         sample_state = set_goal_progress(first_goal_minute, progress)
         goal_rect = sample_state["goal_rect"]
         ball_x, ball_y = sample_state["ball_pos"]  # type: ignore[misc]
@@ -1771,11 +2055,24 @@ def validate_cinematic_scene() -> None:
         raise AssertionError(f"ball does not enter the net after impact: {(post_ball_x, post_ball_y)} in {post_goal_rect}")
     if float(post_net_state.get("net_progress", 0.0)) <= 0.0:
         raise AssertionError("net ripple did not start once the ball entered the net")
-    flight_samples = [set_goal_progress(first_goal_minute, progress)["ball_pos"] for progress in (0.62, 0.70, 0.78, 0.86, 0.94)]
+    flight_progresses = (
+        SHOT_KICK_AT,
+        SHOT_RELEASE_END,
+        max(SHOT_RELEASE_END + 0.05, 0.86),
+        SHOT_NET_AT,
+        SHOT_NET_VISUAL_CONTACT_AT,
+    )
+    flight_samples = [
+        set_goal_progress(first_goal_minute, progress)["ball_pos"]
+        for progress in flight_progresses
+    ]
     for current, following in zip(flight_samples, flight_samples[1:]):
         if following[0] + 2 < current[0]:
             raise AssertionError(f"home ball flight is not monotonic toward goal: {flight_samples}")
-    home_dive_state = set_goal_progress(first_goal_minute, 0.86)
+    home_dive_state = set_goal_progress(
+        first_goal_minute,
+        max(SHOT_RELEASE_END + 0.05, 0.86),
+    )
     home_goal = home_dive_state["goal_rect"]
     if not isinstance(home_goal, pygame.Rect):
         raise AssertionError("home goal rect missing during keeper dive")
@@ -1796,17 +2093,17 @@ def validate_cinematic_scene() -> None:
     if float(away_state["kick_pos"][0]) >= field.centerx:
         raise AssertionError(f"away attacker foot/ball did not cross midfield during goal movement: {away_state['kick_pos']}")
     def set_away_goal_progress(progress: float) -> dict[str, object]:
-        app.t = (first_away_goal - 5.0 + progress * 5.0) / 90.0 * 45.0
-        return app.cinematic_scene_state(field, away_pred)
+        return goal_state_at(away_pred, first_away_goal, progress)
 
-    away_shot = set_away_goal_progress(0.60)
+    away_shot = set_away_goal_progress(SHOT_KICK_AT)
     away_kick_x, away_kick_y = away_shot["kick_pos"]  # type: ignore[misc]
     away_keeper_x, away_keeper_y = away_shot["keeper_pos"]  # type: ignore[misc]
+    assert_kick_toe_anchor(away_shot, app.away.code, -1, "away")
     if not field.centerx - 66 <= away_kick_x <= field.centerx - 34:
         raise AssertionError(f"away shot should start just past midfield, got kick_x={away_kick_x:.1f}")
     if math.dist((away_kick_x, away_kick_y), (away_keeper_x, away_keeper_y)) < 145:
         raise AssertionError("away shot starts too close to the goalkeeper")
-    away_dive_state = set_away_goal_progress(0.86)
+    away_dive_state = set_away_goal_progress(max(SHOT_RELEASE_END + 0.05, 0.86))
     away_goal = away_dive_state["goal_rect"]
     if not isinstance(away_goal, pygame.Rect):
         raise AssertionError("away goal rect missing during keeper dive")
@@ -1930,6 +2227,7 @@ def validate_cinematic_scene() -> None:
 def validate_aaa_cinematic_design_gate() -> None:
     app = App(seed=2026)
     app.set_simulate("match")
+    assert_ball_size_contract()
     field = pygame.Rect(32, 110, 910, 490)
     pred = home_win_prediction()
     first_goal_minute = app.goal_schedule(pred)[0][0]
@@ -1944,7 +2242,14 @@ def validate_aaa_cinematic_design_gate() -> None:
 
     assert_between(player_h / field.h, 0.39, 0.46, "player height versus field")
     assert_between(abs(player_h - kick_h), 0.0, 1.6, "run to kick visual scale pop")
-    assert_between(CINEMATIC_BALL_SIZE / player_h, 0.24, 0.30, "ball size versus player")
+    ball_diameters = visible_ball_diameters(app, CINEMATIC_BALL_SIZE)
+    for index, diameter in enumerate(ball_diameters):
+        assert_between(
+            diameter / player_h,
+            BALL_VISIBLE_PLAYER_RATIO[0],
+            BALL_VISIBLE_PLAYER_RATIO[1],
+            f"visible ball frame {index} versus visible player",
+        )
 
     shadow_w = max(74, int(player_w * 0.84))
     shadow_h = int(13 * CINEMATIC_PLAYER_SCALE)
@@ -1991,10 +2296,23 @@ def validate_aaa_cinematic_design_gate() -> None:
         raise AssertionError("right-side 3D goal is inverted; depth must point away from midfield")
 
     def goal_progress_state(progress: float) -> dict[str, object]:
-        app.t = (first_goal_minute - 5.0 + progress * 5.0) / 90.0 * 45.0
+        app.match_prediction = pred
+        app.t = (
+            first_goal_minute
+            - GOAL_EVENT_WINDOW_MINUTES
+            + progress * GOAL_EVENT_WINDOW_MINUTES
+        ) / 90.0 * SIMULATION_SECONDS
         return app.cinematic_scene_state(field, pred)
 
-    for progress in (0.0, 0.40, 0.54, 0.60, 0.72):
+    sequence_progresses = (
+        0.0,
+        SHOT_PLANT_AT - 0.08,
+        SHOT_PLANT_AT,
+        SHOT_KICK_AT,
+        SHOT_RELEASE_END,
+        SHOT_NET_AT,
+    )
+    for progress in sequence_progresses:
         state = goal_progress_state(progress)
         kick_window, stride = app.cinematic_stride_state(progress, float(state["stride_phase"]))
         frame = kick if kick_window else app.assets.cinematic_runners[app.home.code][stride]
@@ -2005,18 +2323,39 @@ def validate_aaa_cinematic_design_gate() -> None:
         actor_rect.midbottom = (int(planted_x), int(actor_y))
         if not field.contains(actor_rect):
             raise AssertionError(f"player sprite is clipped during AAA sequence at {progress:.2f}: {actor_rect}")
-    for progress in (0.54, 0.62, 0.68, SHOT_FOLLOW_THROUGH_HOLD_END - 0.01):
+    hold_progresses = (
+        SHOT_PLANT_AT,
+        SHOT_KICK_AT,
+        SHOT_RELEASE_END,
+        SHOT_FOLLOW_THROUGH_HOLD_END - 0.01,
+    )
+    for progress in hold_progresses:
         impact_kick_window, _stride = app.cinematic_stride_state(progress, 0.0)
         if not impact_kick_window:
-            raise AssertionError(f"player must hold kick/follow-through through impact at progress={progress:.3f}")
-    for progress in (SHOT_FOLLOW_THROUGH_HOLD_END + 0.03, 0.84, 0.90):
+            raise AssertionError(
+                f"player must hold the kick pose from plant through follow-through at progress={progress:.3f}"
+            )
+    late_progresses = (
+        SHOT_FOLLOW_THROUGH_HOLD_END + 0.01,
+        (SHOT_FOLLOW_THROUGH_HOLD_END + SHOT_NET_AT) * 0.5,
+        SHOT_NET_AT,
+        SHOT_NET_VISUAL_CONTACT_AT,
+    )
+    for progress in late_progresses:
         late_kick_window, _stride = app.cinematic_stride_state(progress, 0.0)
         if late_kick_window:
             raise AssertionError(f"player remains frozen in kick pose during ball flight at progress={progress:.3f}")
 
     keeper_distances = []
     shot_target = app.cinematic_shot_target(goal, 1, first_goal_minute)
-    for progress in (0.52, 0.70, 0.86, SHOT_NET_VISUAL_CONTACT_AT):
+    keeper_progresses = (
+        SHOT_KEEPER_REVEAL_AT,
+        SHOT_KEEPER_FULL_AT,
+        SHOT_KEEPER_READ_AT,
+        SHOT_KEEPER_DIVE_AT,
+        SHOT_NET_VISUAL_CONTACT_AT,
+    )
+    for progress in keeper_progresses:
         state = goal_progress_state(progress)
         keeper_x, keeper_y = state["keeper_pos"]  # type: ignore[misc]
         _keeper_render, keeper_rect = goalkeeper_render_for_state(app, app.away, state, False)
@@ -2081,14 +2420,76 @@ def validate_aaa_screen_composition_gate() -> None:
         raise AssertionError("AAA screen gate: goal scene lacks contact shadows/depth at impact")
     impact_ball_x, impact_ball_y = impact["ball_pos"]  # type: ignore[misc]
     impact_ball = pygame.Rect(0, 0, int(impact["ball_scale"]), int(impact["ball_scale"]))
-    impact_ball.center = (int(impact_ball_x), int(impact_ball_y))
+    impact_ball.center = (round(impact_ball_x), round(impact_ball_y))
     if not goal.collidepoint(impact_ball.center):
         raise AssertionError(f"AAA screen gate: impact ball is not inside the net, ball={impact_ball}, goal={goal}")
-    ball_sample = app.screen.subsurface(impact_ball.inflate(12, 12).clip(field)).copy()
-    if bright_pixel_count(ball_sample) < 96:
-        raise AssertionError(f"AAA screen gate: ball is not independently readable at net impact: {impact_ball}")
-    if edge_energy(ball_sample) < 18:
+    ball_sample = app.screen.subsurface(impact_ball.clip(field)).copy()
+    keeper_team = app.away if impact.get("possession") == "home" else app.home
+    keeper_frame, keeper_rect = goalkeeper_render_for_state(
+        app,
+        keeper_team,
+        impact,
+        bool(impact.get("keeper_flip", False)),
+    )
+
+    original_keeper = app.draw_cinematic_keeper
+    app.draw_cinematic_keeper = lambda *args, **kwargs: None  # type: ignore[method-assign]
+    try:
+        unobstructed_impact = render_goal_progress(pred, first_goal_minute, SHOT_NET_VISUAL_CONTACT_AT)
+        unobstructed_ball_x, unobstructed_ball_y = unobstructed_impact["ball_pos"]  # type: ignore[misc]
+        unobstructed_ball = pygame.Rect(0, 0, int(unobstructed_impact["ball_scale"]), int(unobstructed_impact["ball_scale"]))
+        unobstructed_ball.center = (round(unobstructed_ball_x), round(unobstructed_ball_y))
+        unobstructed_sample = app.screen.subsurface(unobstructed_ball.clip(field)).copy()
+    finally:
+        app.draw_cinematic_keeper = original_keeper  # type: ignore[method-assign]
+
+    ball_material = app.cached_cinematic_ball_material(
+        int(impact["ball_scale"]),
+        float(impact["ball_rotation_degrees"]),
+    )
+    occlusion_fraction = alpha_mask_overlap_fraction(
+        ball_material,
+        impact_ball,
+        keeper_frame,
+        keeper_rect,
+    )
+    visible_alpha_area = sampled_alpha_pixel_count(ball_material)
+    if visible_alpha_area <= 0:
+        raise AssertionError("AAA screen gate: canonical ball material has no visible alpha area")
+    canonical_bright_density = bright_pixel_count(ball_material) / visible_alpha_area
+    actual_bright_density = bright_pixel_count(ball_sample) / visible_alpha_area
+    unobstructed_bright_density = bright_pixel_count(unobstructed_sample) / visible_alpha_area
+    minimum_bright_density = max(0.18, canonical_bright_density * 0.72)
+    if unobstructed_bright_density < minimum_bright_density:
+        raise AssertionError(
+            f"AAA screen gate: 32px ball loses normalized alpha-area legibility at net impact: "
+            f"unobstructed={unobstructed_bright_density:.3f}, minimum={minimum_bright_density:.3f}, "
+            f"alpha_samples={visible_alpha_area}, ball={impact_ball}"
+        )
+    minimum_actual_density = minimum_bright_density * occlusion_visibility_factor(occlusion_fraction)
+    if actual_bright_density + BALL_OCCLUSION_NUMERICAL_TOLERANCE < minimum_actual_density:
+        raise AssertionError(
+            f"AAA screen gate: impact ball loss exceeds physical goalkeeper occlusion: "
+            f"actual={actual_bright_density:.3f}, required={minimum_actual_density:.3f}, "
+            f"occlusion_fraction={occlusion_fraction:.3f}, keeper={keeper_rect}, ball={impact_ball}"
+        )
+    if edge_energy(unobstructed_sample) < 18:
         raise AssertionError(f"AAA screen gate: ball lost panel/texture definition at net impact: {impact_ball}")
+    if occlusion_fraction > BALL_OCCLUSION_NUMERICAL_TOLERANCE:
+        post_impact = render_goal_progress(
+            pred,
+            first_goal_minute,
+            SHOT_NET_VISUAL_CONTACT_AT + 0.22,
+        )
+        post_x, post_y = post_impact["ball_pos"]  # type: ignore[misc]
+        post_ball = pygame.Rect(0, 0, int(post_impact["ball_scale"]), int(post_impact["ball_scale"]))
+        post_ball.center = (round(post_x), round(post_y))
+        post_sample = app.screen.subsurface(post_ball.clip(field)).copy()
+        if edge_energy(post_sample) < 18:
+            raise AssertionError(
+                f"AAA screen gate: ball never becomes legible after goalkeeper occlusion: {post_ball}"
+            )
+        render_goal_progress(pred, first_goal_minute, SHOT_NET_VISUAL_CONTACT_AT)
     post_sample = app.screen.subsurface(goal.inflate(8, 8).clip(field)).copy()
     if bright_pixel_count(post_sample) < 160 or dark_pixel_count(post_sample) < 760:
         raise AssertionError("AAA screen gate: trave/postes do not keep independent depth at impact")
@@ -2096,7 +2497,9 @@ def validate_aaa_screen_composition_gate() -> None:
     local_impact.center = impact_ball.center
     local_impact = local_impact.clip(field)
     if bright_pixel_count(app.screen.subsurface(local_impact).copy()) < 160:
-        raise AssertionError(f"AAA screen gate: net impact lacks local burst/ripple around the ball: {local_impact}")
+        raise AssertionError(
+            f"AAA screen gate: ball/net contact is not locally readable at impact: {local_impact}"
+        )
     text = app.f_lg.render("GOOOL!", True, (255, 255, 255))
     overlay = pygame.Rect(0, 0, text.get_width() + 54, text.get_height() + 22)
     overlay.center = app.cinematic_goal_overlay_center(field)
@@ -2132,24 +2535,36 @@ def validate_aaa_screen_composition_gate() -> None:
     order_app.draw_cinematic_goal_front_posts = spy_goal_front_posts  # type: ignore[method-assign]
     order_app.draw_cinematic_goal_impact = spy_goal_impact  # type: ignore[method-assign]
     order_app.draw_field(pred, pred, "CONFRONTO")
-    required_layers = {"goal_back", "runner", "ball", "keeper", "goal_front"}
+    required_layers = {"goal_back", "runner", "ball", "impact", "goal_front", "keeper"}
     missing_layers = sorted(required_layers - set(render_order))
     if missing_layers:
         raise AssertionError(f"AAA screen gate: missing active goal render layers {missing_layers}: {render_order}")
-    actor_indexes = [render_order.index(layer) for layer in ("runner", "ball", "keeper")]
-    if render_order.index("goal_back") >= min(actor_indexes):
+    foreground_indexes = [render_order.index(layer) for layer in ("runner", "ball", "keeper")]
+    if render_order.index("goal_back") >= min(foreground_indexes):
         raise AssertionError(f"AAA screen gate: goal net/back layer must render before actors and ball: {render_order}")
-    if render_order.index("goal_front") <= render_order.index("runner"):
+    if render_order.index("goal_front") <= max(
+        render_order.index("runner"),
+        render_order.index("ball"),
+    ):
         raise AssertionError(
-            f"AAA screen gate: front posts must render after the runner enters the goal scene: {render_order}"
+            f"AAA screen gate: front posts/crossbar must render after the attacker and deep ball: "
+            f"{render_order}"
         )
     if render_order.index("goal_front") >= render_order.index("keeper"):
         raise AssertionError(
-            f"AAA screen gate: goalkeeper must render in front of the goal posts: {render_order}"
+            f"AAA screen gate: goalkeeper at the mouth must occlude the front goal layer: {render_order}"
         )
-    if "impact" in render_order and render_order.index("impact") <= render_order.index("ball"):
+    if float(impact.get("ball_depth", 0.0)) >= 0.78 and render_order.index("ball") >= render_order.index("keeper"):
         raise AssertionError(
-            f"AAA screen gate: net impact should render after the ball reaches the net: {render_order}"
+            f"AAA screen gate: deep ball must render behind the goalkeeper: {render_order}"
+        )
+    physical_goal_chain = [
+        render_order.index(layer)
+        for layer in ("ball", "impact", "goal_front", "keeper")
+    ]
+    if physical_goal_chain != sorted(physical_goal_chain):
+        raise AssertionError(
+            f"AAA screen gate: expected ball < impact < goal_front < keeper: {render_order}"
         )
 
     away_pred = away_win_prediction()
@@ -2301,10 +2716,33 @@ def validate_aaa_chance_outcome_gate() -> None:
     if save_variants != {"stand", "dive"}:
         raise AssertionError(f"save chances must alternate standing and diving saves, got {save_variants}")
 
+    chance_duration_seconds = CHANCE_EVENT_WINDOW_MINUTES / 90.0 * SIMULATION_SECONDS
+    chance_frame_progress = (1.0 / BALL_RUNTIME_FRAME_HZ) / chance_duration_seconds
+
     for kind, (pred, (minute, side, _kind)) in chance_events.items():
-        app.match_prediction = pred
-        app.t = (minute - CHANCE_EVENT_WINDOW_MINUTES + 0.98 * CHANCE_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
-        state = app.cinematic_scene_state(field, pred)
+        def chance_state_at(progress: float) -> dict[str, object]:
+            app.match_prediction = pred
+            app.t = (
+                minute
+                - CHANCE_EVENT_WINDOW_MINUTES
+                + progress * CHANCE_EVENT_WINDOW_MINUTES
+            ) / 90.0 * SIMULATION_SECONDS
+            return app.cinematic_scene_state(field, pred)
+
+        contact_progress = SHOT_NET_AT
+        pre_progress = contact_progress - chance_frame_progress * 2.0
+        post_progress = contact_progress + chance_frame_progress * 2.0
+        pre_state = chance_state_at(pre_progress)
+        state = chance_state_at(contact_progress)
+        post_state = chance_state_at(post_progress)
+        timeline_states = (
+            ("pre", pre_progress, pre_state),
+            ("contact", contact_progress, state),
+            ("post", post_progress, post_state),
+        )
+        if kind == "save":
+            rebound_progress = contact_progress + 0.10
+            timeline_states = (*timeline_states, ("rebound", rebound_progress, chance_state_at(rebound_progress)))
         if state.get("active_goal"):
             raise AssertionError(f"{kind} no-goal chance was treated as a goal")
         active_attack = state.get("active_attack")
@@ -2318,7 +2756,20 @@ def validate_aaa_chance_outcome_gate() -> None:
             raise AssertionError(f"{kind} chance goalkeeper is not staged in the goal: keeper={state['keeper_pos']}, goal={goal}")
         ball_x, ball_y = state["ball_pos"]  # type: ignore[misc]
         ball_rect = pygame.Rect(0, 0, int(state["ball_scale"]), int(state["ball_scale"]))
-        ball_rect.center = (int(ball_x), int(ball_y))
+        ball_rect.center = (round(ball_x), round(ball_y))
+        direction = 1 if side == "home" else -1
+        pre_ball = pre_state["ball_pos"]  # type: ignore[assignment]
+        post_ball = post_state["ball_pos"]  # type: ignore[assignment]
+        incoming_step = (
+            (float(ball_x) - float(pre_ball[0])) * direction,
+            float(ball_y) - float(pre_ball[1]),
+        )
+        outgoing_step = (
+            (float(post_ball[0]) - float(ball_x)) * direction,
+            float(post_ball[1]) - float(ball_y),
+        )
+        if incoming_step[0] <= 0.0:
+            raise AssertionError(f"{kind} chance reverses before contact: incoming={incoming_step}")
         if kind == "save":
             if math.dist((ball_x, ball_y), (keeper_x, keeper_y)) > 130:
                 raise AssertionError(f"save chance does not read as a goalkeeper action: ball={ball_rect}, keeper={state['keeper_pos']}")
@@ -2357,16 +2808,48 @@ def validate_aaa_chance_outcome_gate() -> None:
                     raise AssertionError(
                         f"diving save ball must meet the extended glove: ball={ball_rect.center}, glove={glove_pos}, dist={glove_contact_distance:.1f}"
                     )
+            incoming_speed = math.hypot(*pre_state["ball_velocity_px_s"])  # type: ignore[arg-type]
+            outgoing_speed = math.hypot(*post_state["ball_velocity_px_s"])  # type: ignore[arg-type]
+            if outgoing_step[0] > 1.0:
+                raise AssertionError(
+                    f"save chance lets the ball continue through the glove: outgoing={outgoing_step}"
+                )
+            if outgoing_speed >= incoming_speed * 0.45:
+                raise AssertionError(
+                    f"save chance does not absorb/rebound the shot: incoming={incoming_speed:.1f}px/s, "
+                    f"outgoing={outgoing_speed:.1f}px/s"
+                )
         else:
             if goal.contains(ball_rect.inflate(-8, -8)):
                 raise AssertionError(f"wide chance must miss the goal mouth: ball={ball_rect}, goal={goal}")
             near_post_pos = state.get("chance_near_post_pos")
             if not isinstance(near_post_pos, tuple):
                 raise AssertionError(f"wide chance must expose a near-post anchor: {state}")
-            near_post_distance = math.dist((ball_x, ball_y), (float(near_post_pos[0]), float(near_post_pos[1])))
-            if not 4 <= near_post_distance <= 30:
+            near_post_distances = [
+                math.dist(
+                    sample_state["ball_pos"],  # type: ignore[arg-type]
+                    (float(near_post_pos[0]), float(near_post_pos[1])),
+                )
+                for _phase, _progress, sample_state in timeline_states
+            ]
+            near_post_distance = min(near_post_distances)
+            visible_radius = visible_ball_radius(app, int(state["ball_scale"]))
+            if not 2.0 <= near_post_distance <= visible_radius + 3.0:
                 raise AssertionError(
-                    f"wide chance must read as raspando a trave: ball={ball_rect.center}, post={near_post_pos}, dist={near_post_distance:.1f}"
+                    f"wide chance must read as raspando a trave: post={near_post_pos}, "
+                    f"distances={[round(value, 1) for value in near_post_distances]}, "
+                    f"allowed=[2.0, {visible_radius + 3.0:.1f}]"
+                )
+            incoming_distance = math.hypot(*incoming_step)
+            outgoing_distance = math.hypot(*outgoing_step)
+            if outgoing_step[0] <= 0.0:
+                raise AssertionError(f"wide chance reverses after passing the post: outgoing={outgoing_step}")
+            if abs(outgoing_distance - incoming_distance) > max(
+                visible_radius * 2.0,
+                incoming_distance * 0.35,
+            ):
+                raise AssertionError(
+                    f"wide chance loses continuity after the post: incoming={incoming_step}, outgoing={outgoing_step}"
                 )
 
         goal_3d_calls: list[tuple[str, float]] = []
@@ -2389,6 +2872,7 @@ def validate_aaa_chance_outcome_gate() -> None:
             keeper_calls.append((bool(kwargs.get("active_goal", False)), str(kwargs.get("keeper_action", ""))))
             original_keeper(*args, **kwargs)  # type: ignore[arg-type]
 
+        chance_state_at(contact_progress)
         app.draw_cinematic_goal_3d = spy_goal_3d  # type: ignore[method-assign]
         app.draw_cinematic_keeper = spy_keeper  # type: ignore[method-assign]
         app.screen.fill((0, 0, 0))
@@ -2411,11 +2895,71 @@ def validate_aaa_chance_outcome_gate() -> None:
                 raise AssertionError("diving save must keep the dive animation path active")
             if state.get("save_variant") == "stand" and any(active for active, _action in keeper_calls):
                 raise AssertionError("standing save should not reuse the full dive animation path")
-        payoff_sample = app.screen.subsurface(ball_rect.inflate(110, 88).clip(field)).copy()
-        if bright_pixel_count(payoff_sample) < 120:
-            raise AssertionError(f"{kind} chance payoff effect is not visible enough")
-        if dark_pixel_count(payoff_sample) < 60:
-            raise AssertionError(f"{kind} chance payoff lacks grounding/depth")
+        defending_team = app.away if side == "home" else app.home
+        keeper_flip = bool(state.get("keeper_flip", side == "away"))
+        for phase, progress, sample_state in timeline_states:
+            contract = ball_contract_snapshot(sample_state, f"{kind} {phase}-contact")
+            sample_ball_x, sample_ball_y = contract["ball_pos"]  # type: ignore[misc]
+            sample_scale = int(round(float(contract["ball_scale"])))
+            sample_ball_rect = pygame.Rect(0, 0, sample_scale, sample_scale)
+            sample_ball_rect.center = (round(sample_ball_x), round(sample_ball_y))
+            ground_x, ground_y = contract["ball_ground_pos"]  # type: ignore[misc]
+            turf_top = field.bottom - int(field.h * 0.30)
+            if not turf_top <= float(ground_y) <= field.bottom + 2:
+                raise AssertionError(
+                    f"{kind} {phase}-contact shadow leaves the turf plane: {contract['ball_ground_pos']}"
+                )
+            if float(ground_y) < float(sample_ball_y) - 1.0:
+                raise AssertionError(
+                    f"{kind} {phase}-contact shadow rises above the ball: "
+                    f"ball={contract['ball_pos']}, ground={contract['ball_ground_pos']}"
+                )
+            if abs(float(ground_x) - float(sample_ball_x)) > max(12.0, sample_scale * 0.5):
+                raise AssertionError(
+                    f"{kind} {phase}-contact shadow is horizontally detached: "
+                    f"ball={contract['ball_pos']}, ground={contract['ball_ground_pos']}"
+                )
+
+            chance_state_at(progress)
+            app.screen.fill((0, 0, 0))
+            app.draw_field(pred, pred, "CONFRONTO")
+            clipped_ball_rect = sample_ball_rect.clip(field)
+            if clipped_ball_rect.w <= 0 or clipped_ball_rect.h <= 0:
+                raise AssertionError(f"{kind} {phase}-contact ball leaves the visible frame: {sample_ball_rect}")
+            material_sample = app.screen.subsurface(clipped_ball_rect).copy()
+            canonical_material = app.cached_cinematic_ball_material(
+                sample_scale,
+                float(contract["ball_rotation_degrees"]),
+            )
+            canonical_edge = edge_energy(canonical_material)
+            rendered_edge = edge_energy(material_sample)
+            edge_retention = rendered_edge / max(1.0, canonical_edge)
+            occlusion_fraction = 0.0
+            if kind == "save" and phase in {"contact", "post"}:
+                glove = sample_state.get("keeper_glove_pos")
+                keeper_render, keeper_rect = goalkeeper_render_for_state(
+                    app,
+                    defending_team,
+                    sample_state,
+                    keeper_flip,
+                )
+                if (
+                    isinstance(glove, tuple)
+                    and math.dist(contract["ball_pos"], glove) <= visible_ball_radius(app, sample_scale) * 2.0  # type: ignore[arg-type]
+                ):
+                    occlusion_fraction = alpha_mask_overlap_fraction(
+                        canonical_material,
+                        sample_ball_rect,
+                        keeper_render,
+                        keeper_rect,
+                    )
+            required_edge_retention = 0.18 * occlusion_visibility_factor(occlusion_fraction)
+            if edge_retention + BALL_OCCLUSION_NUMERICAL_TOLERANCE < required_edge_retention:
+                raise AssertionError(
+                    f"{kind} {phase}-contact loses physical/material legibility: "
+                    f"edge_retention={edge_retention:.3f}, required={required_edge_retention:.3f}, "
+                    f"occlusion_fraction={occlusion_fraction:.3f}, ball={sample_ball_rect}"
+                )
         if side != state.get("possession"):
             raise AssertionError(f"{kind} chance changed possession during payoff: {side} vs {state.get('possession')}")
 
@@ -2596,14 +3140,29 @@ def validate_aaa_goalkeeper_front_layer_gate() -> None:
             state = app.cinematic_scene_state(field, pred)
             possession = str(state["possession"])
             keeper_team = app.away if possession == "home" else app.home
-            flip_keeper = possession == "away"
+            flip_keeper = bool(state.get("keeper_flip", possession == "away"))
+            goal = state["goal_rect"]
+            target = state.get("shot_target")
+            if not isinstance(goal, pygame.Rect) or not isinstance(target, tuple):
+                raise AssertionError(f"{label} missing goal/target for goalkeeper direction check")
+            expected_flip = float(target[0]) < goal.centerx
+            if flip_keeper != expected_flip:
+                raise AssertionError(
+                    f"{label} goalkeeper faces away from the shot: flip={flip_keeper}, "
+                    f"target={target}, goal_center={goal.centerx}"
+                )
+            frame_index, _scale, _angle = app.cinematic_keeper_animation_state(
+                True,
+                float(state.get("raw_shot_progress", state["shot_progress"])),
+                4,
+                flip_keeper,
+            )
+            if progress == 0.86 and frame_index != 2:
+                raise AssertionError(f"{label} goalkeeper recovers before impact: frame={frame_index}")
             keeper_frame, keeper_rect = goalkeeper_render_for_state(app, keeper_team, state, flip_keeper)
             if not field.contains(keeper_rect):
                 raise AssertionError(f"{label} goalkeeper clips before front-layer check: {keeper_rect}")
 
-            goal = state["goal_rect"]
-            if not isinstance(goal, pygame.Rect):
-                raise AssertionError(f"{label} missing goal rect for front-layer check")
             render_order: list[str] = []
             original_front_posts = app.draw_cinematic_goal_front_posts
             original_keeper = app.draw_cinematic_keeper
@@ -2631,6 +3190,18 @@ def validate_aaa_goalkeeper_front_layer_gate() -> None:
             if visible_score < 900 or edge_energy(keeper_sample) < 30:
                 raise AssertionError(f"{label} goalkeeper loses visual presence after goal-front draw: visible={visible_score}, edge={edge_energy(keeper_sample):.1f}")
 
+        recovery_progress = SHOT_NET_VISUAL_CONTACT_AT + 0.06
+        app.t = (first_goal - GOAL_EVENT_WINDOW_MINUTES + recovery_progress * GOAL_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
+        recovery_state = app.cinematic_scene_state(field, pred)
+        recovery_index, _scale, _angle = app.cinematic_keeper_animation_state(
+            True,
+            float(recovery_state.get("raw_shot_progress", recovery_progress)),
+            4,
+            bool(recovery_state.get("keeper_flip", False)),
+        )
+        if recovery_index != 3:
+            raise AssertionError(f"{label} goalkeeper does not enter recovery after impact: frame={recovery_index}")
+
 
 def validate_cinematic_temporal_stability() -> None:
     app = App(seed=2026)
@@ -2640,17 +3211,26 @@ def validate_cinematic_temporal_stability() -> None:
     app.match_prediction = pred
     first_goal_minute = app.goal_schedule(pred)[0][0]
     actor_y_samples = []
-    ball_visibility = []
-    pre_kick_visibility = []
+    ball_visibility_density = []
     previous_ball = None
-    for index in range(25):
-        progress = 0.46 + index * 0.01
-        app.t = (first_goal_minute - 5.0 + progress * 5.0) / 90.0 * 45.0
+    temporal_start = SHOT_PLANT_AT - 0.12
+    temporal_end = max(SHOT_RELEASE_END + 0.05, 0.86)
+    temporal_progresses = [
+        temporal_start + index * (temporal_end - temporal_start) / 24
+        for index in range(25)
+    ]
+    contact_gap_limit = visible_ball_radius(app, CINEMATIC_BALL_SIZE) + 3.0
+    for progress in temporal_progresses:
+        app.t = (
+            first_goal_minute
+            - GOAL_EVENT_WINDOW_MINUTES
+            + progress * GOAL_EVENT_WINDOW_MINUTES
+        ) / 90.0 * SIMULATION_SECONDS
         state = app.cinematic_scene_state(field, pred)
         actor_y_samples.append(float(state["actor_pos"][1]))  # type: ignore[index]
         ball_x, ball_y = state["ball_pos"]  # type: ignore[misc]
         kick_x, kick_y = state["kick_pos"]  # type: ignore[misc]
-        if progress <= SHOT_KICK_AT and math.dist((ball_x, ball_y), (kick_x, kick_y)) > 28:
+        if progress <= SHOT_KICK_AT and math.dist((ball_x, ball_y), (kick_x, kick_y)) > contact_gap_limit:
             raise AssertionError(f"ball flickers away from foot before kick at progress={progress:.2f}")
         if previous_ball is not None:
             jump = math.dist(previous_ball, (ball_x, ball_y))
@@ -2662,21 +3242,454 @@ def validate_cinematic_temporal_stability() -> None:
 
         app.screen.fill((0, 0, 0))
         app.draw_field(pred, pred, "CONFRONTO")
+        with_ball_frame = app.screen.copy()
+        original_ball = app.draw_cinematic_ball
+        app.draw_cinematic_ball = lambda *args, **kwargs: None  # type: ignore[method-assign]
+        try:
+            app.screen.fill((0, 0, 0))
+            app.draw_field(pred, pred, "CONFRONTO")
+            without_ball_frame = app.screen.copy()
+        finally:
+            app.draw_cinematic_ball = original_ball  # type: ignore[method-assign]
         ball_size = int(state["ball_scale"])
-        sample_rect = pygame.Rect(0, 0, ball_size + 10, ball_size + 10)
-        sample_rect.center = (int(ball_x), int(ball_y))
-        sample = app.screen.subsurface(sample_rect.clip(field)).copy()
-        visible = bright_pixel_count(sample) + dark_pixel_count(sample, step=3)
-        ball_visibility.append(visible)
-        if progress <= SHOT_KICK_AT:
-            pre_kick_visibility.append(visible)
+        squash = state.get("ball_squash", (1.0, 1.0))
+        if not isinstance(squash, tuple):
+            raise AssertionError(f"temporal ball squash must be a tuple: {squash}")
+        ball_visibility_density.append(
+            alpha_normalized_ball_draw_visibility(
+                app,
+                field,
+                with_ball_frame,
+                without_ball_frame,
+                (float(ball_x), float(ball_y)),
+                ball_size,
+                (float(squash[0]), float(squash[1])),
+                float(state["ball_rotation_degrees"]),
+            )
+        )
     if max(actor_y_samples) - min(actor_y_samples) > 8:
         raise AssertionError(f"runner vertical baseline flickers during kick: {actor_y_samples}")
-    if min(pre_kick_visibility) < max(1, int(max(pre_kick_visibility) * 0.70)):
-        raise AssertionError(f"ball visibility flickers near foot/shot: {ball_visibility}")
+    if (
+        min(ball_visibility_density) < 0.16
+        or min(ball_visibility_density) < max(ball_visibility_density) * 0.30
+    ):
+        raise AssertionError(
+            f"ball alpha-normalized visibility flickers near foot/shot: "
+            f"{[round(value, 3) for value in ball_visibility_density]}"
+        )
+
+
+def validate_dense_ball_trace(
+    app: App,
+    field: pygame.Rect,
+    pred: Prediction,
+    event_minute: int,
+    event_window_minutes: float,
+    direction: int,
+    event_kind: str,
+    label: str,
+) -> None:
+    event_duration_seconds = event_window_minutes / 90.0 * SIMULATION_SECONDS
+    dense_dt = 1.0 / BALL_TRACE_SAMPLE_HZ
+    progress_step = dense_dt / event_duration_seconds
+    runtime_progress_step = (1.0 / BALL_RUNTIME_FRAME_HZ) / event_duration_seconds
+    start_progress = 0.40
+    end_progress = max(1.16, SHOT_NET_VISUAL_CONTACT_AT + SHOT_NET_SETTLE_PROGRESS + 0.08)
+    collision_progress = SHOT_NET_VISUAL_CONTACT_AT if event_kind == "goal" else SHOT_NET_AT
+    sample_count = int(math.floor((end_progress - start_progress) / progress_step)) + 1
+    trace: list[tuple[float, dict[str, object], dict[str, object]]] = []
+
+    def snapshot_at(progress: float) -> tuple[dict[str, object], dict[str, object]]:
+        app.match_prediction = pred
+        app.t = (
+            event_minute - event_window_minutes + progress * event_window_minutes
+        ) / 90.0 * SIMULATION_SECONDS
+        state = app.cinematic_scene_state(field, pred)
+        snapshot = ball_contract_snapshot(state, f"{label} progress={progress:.6f}")
+        if abs(float(snapshot["raw_shot_progress"]) - progress) > 0.002:
+            raise AssertionError(
+                f"{label} raw_shot_progress drifted from the sampled timeline: "
+                f"state={snapshot['raw_shot_progress']}, requested={progress:.6f}"
+            )
+        if state.get("attack_kind") != event_kind:
+            raise AssertionError(
+                f"{label} lost its active {event_kind!r} event at progress={progress:.6f}: "
+                f"attack_kind={state.get('attack_kind')!r}"
+            )
+        return state, snapshot
+
+    for index in range(sample_count):
+        progress = start_progress + index * progress_step
+        state, snapshot = snapshot_at(progress)
+        trace.append((progress, state, snapshot))
+
+    def nearest_snapshot(progress: float) -> dict[str, object]:
+        return min(trace, key=lambda item: abs(item[0] - progress))[2]
+
+    pre_kick_scale = float(nearest_snapshot(0.50)["ball_scale"])
+    flight_scale = float(nearest_snapshot(SHOT_NET_AT)["ball_scale"])
+    if abs(pre_kick_scale - TARGET_CINEMATIC_BALL_SIZE) > 1.0:
+        raise AssertionError(
+            f"{label} pre-kick scale does not use the 38px ball contract: {pre_kick_scale:.3f}"
+        )
+    if abs(flight_scale - TARGET_CINEMATIC_SHOT_BALL_SIZE) > 1.0:
+        raise AssertionError(
+            f"{label} late-flight scale does not use the 32px shot contract: {flight_scale:.3f}"
+        )
+
+    field_with_tolerance = field.inflate(4, 4)
+    turf_top = field.bottom - int(field.h * 0.30)
+    samples_per_runtime_frame = BALL_TRACE_SAMPLE_HZ // BALL_RUNTIME_FRAME_HZ
+    if samples_per_runtime_frame * BALL_RUNTIME_FRAME_HZ != BALL_TRACE_SAMPLE_HZ:
+        raise AssertionError("ball trace sample rate must be divisible by the runtime frame rate")
+    previous_rotation_step: float | None = None
+
+    for index, (progress, _state, snapshot) in enumerate(trace):
+        pos = snapshot["ball_pos"]  # type: ignore[assignment]
+        ground = snapshot["ball_ground_pos"]  # type: ignore[assignment]
+        scale = float(snapshot["ball_scale"])
+        if event_kind != "wide" and not field_with_tolerance.collidepoint(round(ground[0]), round(ground[1])):  # type: ignore[index]
+            raise AssertionError(f"{label} ball shadow projection left the field at {progress:.6f}: {ground}")
+        if abs(float(ground[0]) - float(pos[0])) > max(12.0, scale * 0.5):  # type: ignore[index]
+            raise AssertionError(
+                f"{label} ball shadow is horizontally detached at {progress:.6f}: "
+                f"ball={pos}, ground={ground}, scale={scale:.2f}"
+            )
+        if not turf_top <= float(ground[1]) <= field.bottom + 2:  # type: ignore[index]
+            raise AssertionError(
+                f"{label} ball shadow left the turf plane at {progress:.6f}: "
+                f"ground={ground}, turf_y=[{turf_top}, {field.bottom}]"
+            )
+        minimum_ground_y = (
+            float(pos[1]) + scale * 0.18  # type: ignore[index]
+            if progress < collision_progress
+            else float(pos[1]) - 1.0  # type: ignore[index]
+        )
+        if float(ground[1]) < minimum_ground_y:  # type: ignore[index]
+            raise AssertionError(
+                f"{label} ball shadow rises above the ball at {progress:.6f}: "
+                f"ball={pos}, ground={ground}, minimum_ground_y={minimum_ground_y:.2f}"
+            )
+
+        visibility_margin = int(math.ceil(scale * 2.0))
+        perceptually_visible = field.inflate(visibility_margin * 2, visibility_margin * 2).collidepoint(
+            round(float(pos[0])),  # type: ignore[index]
+            round(float(pos[1])),  # type: ignore[index]
+        )
+        if event_kind == "wide" and not perceptually_visible:
+            continue
+
+        if index == 0:
+            continue
+        previous = trace[index - 1][2]
+        previous_pos = previous["ball_pos"]  # type: ignore[assignment]
+        velocity = snapshot["ball_velocity_px_s"]  # type: ignore[assignment]
+        previous_velocity = previous["ball_velocity_px_s"]  # type: ignore[assignment]
+        displacement = (
+            float(pos[0]) - float(previous_pos[0]),  # type: ignore[index]
+            float(pos[1]) - float(previous_pos[1]),  # type: ignore[index]
+        )
+        trapezoid_displacement = (
+            (float(previous_velocity[0]) + float(velocity[0])) * 0.5 * dense_dt,  # type: ignore[index]
+            (float(previous_velocity[1]) + float(velocity[1])) * 0.5 * dense_dt,  # type: ignore[index]
+        )
+        local_speed = max(math.hypot(*previous_velocity), math.hypot(*velocity))  # type: ignore[arg-type]
+        integration_error = math.dist(displacement, trapezoid_displacement)
+        integration_tolerance = max(1.0, local_speed * dense_dt * 0.22)
+        position_step = math.hypot(*displacement)
+        if position_step > 8.0:
+            raise AssertionError(
+                f"{label} position continuity failed at {progress:.6f}: step={position_step:.3f}px, "
+                f"delta={displacement}"
+            )
+        transition_window = runtime_progress_step + progress_step
+        crosses_phase_boundary = any(
+            abs(progress - transition) <= transition_window
+            for transition in (SHOT_KICK_AT, collision_progress)
+        )
+        if (
+            progress >= SHOT_KICK_AT
+            and integration_error > integration_tolerance
+            and not crosses_phase_boundary
+        ):
+            raise AssertionError(
+                f"{label} position/velocity continuity failed at {progress:.6f}: "
+                f"delta={displacement}, integrated={trapezoid_displacement}, error={integration_error:.3f}px"
+            )
+
+        rotation_step = wrapped_angle_delta(
+            float(snapshot["ball_rotation_degrees"]),
+            float(previous["ball_rotation_degrees"]),
+        )
+        if abs(rotation_step) > 20.0:
+            raise AssertionError(
+                f"{label} ball rotation strobes at 240Hz: progress={progress:.6f}, "
+                f"delta={rotation_step:.3f}deg"
+            )
+        if previous_rotation_step is not None and abs(rotation_step - previous_rotation_step) > 14.0:
+            raise AssertionError(
+                f"{label} ball rotation changes discontinuously at 240Hz: progress={progress:.6f}, "
+                f"previous_step={previous_rotation_step:.3f}deg, step={rotation_step:.3f}deg"
+            )
+        previous_rotation_step = rotation_step
+
+        if index >= samples_per_runtime_frame:
+            runtime_previous = trace[index - samples_per_runtime_frame][2]
+            scale_step = abs(float(snapshot["ball_scale"]) - float(runtime_previous["ball_scale"]))
+            if scale_step > 1.0 + 1e-6:
+                raise AssertionError(
+                    f"{label} ball scale changes more than 1px per 60Hz frame at {progress:.6f}: "
+                    f"{runtime_previous['ball_scale']} -> {snapshot['ball_scale']}"
+                )
+            previous_frame_pos = runtime_previous["ball_pos"]  # type: ignore[assignment]
+            trail_prev_pos = snapshot["ball_prev_pos"]  # type: ignore[assignment]
+            if math.dist(previous_frame_pos, trail_prev_pos) > BALL_PREVIOUS_POSITION_TOLERANCE_PX:  # type: ignore[arg-type]
+                raise AssertionError(
+                    f"{label} ball_prev_pos is not the previous 60Hz position at {progress:.6f}: "
+                    f"contract={trail_prev_pos}, sampled={previous_frame_pos}"
+                )
+            runtime_angle_step = abs(
+                wrapped_angle_delta(
+                    float(snapshot["ball_rotation_degrees"]),
+                    float(runtime_previous["ball_rotation_degrees"]),
+                )
+            )
+            if runtime_angle_step > 80.0:
+                raise AssertionError(
+                    f"{label} ball rotation strobes at 60Hz: progress={progress:.6f}, "
+                    f"delta={runtime_angle_step:.3f}deg"
+                )
+
+        if SHOT_KICK_AT + progress_step <= progress < collision_progress - progress_step:
+            if displacement[0] * direction < -0.05:
+                raise AssertionError(
+                    f"{label} ball reverses before collision at {progress:.6f}: delta_x={displacement[0]:.4f}"
+                )
+            if float(velocity[0]) * direction < -8.0:  # type: ignore[index]
+                raise AssertionError(
+                    f"{label} reported velocity reverses before collision at {progress:.6f}: {velocity}"
+                )
+            if float(snapshot["ball_depth"]) + 0.002 < float(previous["ball_depth"]):
+                raise AssertionError(
+                    f"{label} ball depth reverses before collision at {progress:.6f}: "
+                    f"{previous['ball_depth']} -> {snapshot['ball_depth']}"
+                )
+
+    transition_contracts = [
+        (SHOT_KICK_AT, 0.38, 180.0),
+        (SHOT_NET_AT, 0.58, 150.0),
+    ]
+    if event_kind == "goal":
+        transition_contracts.append((SHOT_NET_VISUAL_CONTACT_AT, 0.58, 150.0))
+    for transition, velocity_fraction, absolute_limit in transition_contracts:
+        transition_trace = [
+            snapshot_at(transition + offset * progress_step)[1]
+            for offset in (-1, 0, 1)
+        ]
+        velocities = [sample["ball_velocity_px_s"] for sample in transition_trace]
+        peak_speed = max(math.hypot(*velocity) for velocity in velocities)  # type: ignore[arg-type]
+        velocity_jumps = [math.dist(a, b) for a, b in zip(velocities, velocities[1:])]  # type: ignore[arg-type]
+        allowed_jump = max(absolute_limit, peak_speed * velocity_fraction)
+        if max(velocity_jumps) > allowed_jump:
+            raise AssertionError(
+                f"{label} velocity discontinuity at transition={transition:.3f}: "
+                f"jumps={velocity_jumps}, allowed={allowed_jump:.3f}, velocities={velocities}"
+            )
+
+    if event_kind == "goal":
+        declared_rest_start = (
+            SHOT_NET_VISUAL_CONTACT_AT
+            + SHOT_NET_SETTLE_PROGRESS
+            + runtime_progress_step
+            + progress_step
+        )
+        capture_rest_progress = SHOT_NET_VISUAL_CONTACT_AT + SHOT_NET_SETTLE_PROGRESS + 0.02
+        if declared_rest_start > capture_rest_progress:
+            raise AssertionError(
+                f"{label} declared net settle exceeds the final capture at p={capture_rest_progress:.3f}: "
+                f"rest_start={declared_rest_start:.6f}"
+            )
+        rest_start = max(capture_rest_progress, declared_rest_start)
+        rest_trace = [
+            snapshot_at(rest_start + offset)[1]
+            for offset in (0.0, 0.01, 0.02, 0.04)
+        ]
+        rest_positions = [sample["ball_pos"] for sample in rest_trace]
+        rest_speeds = [math.hypot(*sample["ball_velocity_px_s"]) for sample in rest_trace]  # type: ignore[arg-type]
+        rest_drift = max(math.dist(rest_positions[0], position) for position in rest_positions[1:])  # type: ignore[arg-type]
+        rest_scale_span = max(float(sample["ball_scale"]) for sample in rest_trace) - min(
+            float(sample["ball_scale"]) for sample in rest_trace
+        )
+        rest_rotation = sum(
+            abs(
+                wrapped_angle_delta(
+                    float(current["ball_rotation_degrees"]),
+                    float(previous["ball_rotation_degrees"]),
+                )
+            )
+            for previous, current in zip(rest_trace, rest_trace[1:])
+        )
+        if max(rest_speeds) > 12.0 or rest_drift > 1.5 or rest_scale_span > 1.0 or rest_rotation > 8.0:
+            raise AssertionError(
+                f"{label} ball does not settle after the net: speeds={rest_speeds}, drift={rest_drift:.3f}, "
+                f"scale_span={rest_scale_span:.3f}, rotation={rest_rotation:.3f}"
+            )
+
+
+def validate_aaa_dense_ball_motion_gate() -> None:
+    assert_ball_size_contract()
+    app = App(seed=2026)
+    app.set_simulate("match")
+    field = pygame.Rect(32, 110, 910, 490)
+
+    for label, pred in (("home goal", home_win_prediction()), ("away goal", away_win_prediction())):
+        goal_minute, side = app.goal_schedule(pred)[0]
+        validate_dense_ball_trace(
+            app,
+            field,
+            pred,
+            goal_minute,
+            GOAL_EVENT_WINDOW_MINUTES,
+            1 if side == "home" else -1,
+            "goal",
+            label,
+        )
+
+    chance_pred = home_win_prediction()
+    chance_events = {kind: (minute, side) for minute, side, kind in app.chance_schedule(chance_pred)}
+    for kind in ("save", "wide"):
+        if kind not in chance_events:
+            raise AssertionError(f"dense cinematic QA requires a {kind!r} event, got {chance_events}")
+        chance_minute, side = chance_events[kind]
+        validate_dense_ball_trace(
+            app,
+            field,
+            chance_pred,
+            chance_minute,
+            CHANCE_EVENT_WINDOW_MINUTES,
+            1 if side == "home" else -1,
+            kind,
+            f"{kind} chance",
+        )
+
+
+def validate_aaa_net_energy_dissipation_gate() -> None:
+    app = App(seed=2026)
+    app.set_simulate("match")
+    field = pygame.Rect(32, 110, 910, 490)
+    event_duration_seconds = GOAL_EVENT_WINDOW_MINUTES / 90.0 * SIMULATION_SECONDS
+    progress_step = (1.0 / BALL_TRACE_SAMPLE_HZ) / event_duration_seconds
+    sampled_zones: set[str] = set()
+    arc_heights: dict[str, list[float]] = {}
+    worst_ratio = 0.0
+    worst_case: tuple[object, ...] | None = None
+
+    for seed in range(2026, 2127):
+        app.match_seed = seed
+        goal_minute = (18, 31, 47, 66, 82)[seed % 5]
+        for direction in (-1, 1):
+            goal = app.cinematic_goal_rect(field, "right" if direction > 0 else "left")
+            profile = app.cinematic_shot_profile(goal, direction, goal_minute)
+            sampled_zones.add(profile.zone)
+            foot = (field.centerx + direction * 50.0, field.bottom - 114.0)
+
+            def position_at(progress: float) -> tuple[float, float]:
+                return app.cinematic_ball_for_progress(
+                    foot,
+                    profile.target,
+                    direction,
+                    progress,
+                    0.0,
+                    goal_minute,
+                    is_goal=True,
+                    shot_profile=profile,
+                    ground_y=float(field.bottom - 60),
+                ).position
+
+            before_contact = position_at(SHOT_NET_VISUAL_CONTACT_AT - progress_step)
+            contact = position_at(SHOT_NET_VISUAL_CONTACT_AT)
+            flight_points = [
+                position_at(
+                    SHOT_KICK_AT
+                    + index * (SHOT_NET_VISUAL_CONTACT_AT - SHOT_KICK_AT) / 16.0
+                )
+                for index in range(17)
+            ]
+            arc_heights.setdefault(profile.zone, []).append(
+                float(flight_points[0][1]) - min(float(point[1]) for point in flight_points)
+            )
+            entry_speed = math.dist(before_contact, contact) / progress_step
+            if entry_speed <= 1e-6:
+                raise AssertionError(f"net energy gate found zero entry speed: seed={seed}, direction={direction}")
+
+            previous = contact
+            maximum_net_speed = 0.0
+            net_speeds: list[float] = []
+            sample_count = math.ceil(SHOT_NET_SETTLE_PROGRESS / progress_step) + 2
+            for index in range(1, sample_count + 1):
+                current = position_at(SHOT_NET_VISUAL_CONTACT_AT + index * progress_step)
+                net_speed = math.dist(previous, current) / progress_step
+                net_speeds.append(net_speed)
+                maximum_net_speed = max(maximum_net_speed, net_speed)
+                previous = current
+
+            speed_ratio = maximum_net_speed / entry_speed
+            if speed_ratio > worst_ratio:
+                worst_ratio = speed_ratio
+                worst_case = (
+                    seed,
+                    direction,
+                    goal_minute,
+                    profile.zone,
+                    entry_speed,
+                    maximum_net_speed,
+                )
+            if speed_ratio > 1.03:
+                raise AssertionError(
+                    "ball gains energy inside the net: "
+                    f"seed={seed}, direction={direction}, zone={profile.zone}, "
+                    f"entry={entry_speed:.3f}px/progress, peak={maximum_net_speed:.3f}px/progress, "
+                    f"ratio={speed_ratio:.4f}"
+                )
+            monotonic_tolerance = entry_speed * 0.005
+            lowest_speed = net_speeds[0]
+            for following_speed in net_speeds[1:]:
+                if following_speed > lowest_speed + monotonic_tolerance:
+                    raise AssertionError(
+                        "ball reaccelerates while the net should dissipate energy: "
+                        f"seed={seed}, direction={direction}, zone={profile.zone}, "
+                        f"running_minimum={lowest_speed:.3f}, following={following_speed:.3f}, "
+                        f"tolerance={monotonic_tolerance:.3f}px/progress"
+                    )
+                lowest_speed = min(lowest_speed, following_speed)
+
+            rest_progress = SHOT_NET_VISUAL_CONTACT_AT + SHOT_NET_SETTLE_PROGRESS + progress_step
+            rest = position_at(rest_progress)
+            later = position_at(rest_progress + 0.02)
+            if math.dist(rest, later) > 0.25:
+                raise AssertionError(
+                    f"ball keeps moving after net settle: seed={seed}, direction={direction}, "
+                    f"zone={profile.zone}, drift={math.dist(rest, later):.4f}px"
+                )
+
+    required_zones = {"alto firme", "baixo cruzado", "meia altura", "angulo seco", "rasteiro forte", "central forte"}
+    if sampled_zones != required_zones:
+        raise AssertionError(f"net energy sweep did not cover every shot profile: {sorted(sampled_zones)}")
+    mean_arc_heights = {
+        zone: sum(values) / len(values)
+        for zone, values in arc_heights.items()
+    }
+    if (
+        max(mean_arc_heights.values()) - min(mean_arc_heights.values()) < 8.0
+        or mean_arc_heights["angulo seco"] < mean_arc_heights["rasteiro forte"] + 6.0
+    ):
+        raise AssertionError(f"shot profiles collapse to the same arc height: {mean_arc_heights}")
+    if worst_case is None or worst_ratio <= 0.0:
+        raise AssertionError("net energy sweep did not execute")
 
 
 def validate_aaa_ball_physics_gate() -> None:
+    assert_ball_size_contract()
     app = App(seed=2026)
     app.set_simulate("match")
     field = pygame.Rect(32, 110, 910, 490)
@@ -2688,31 +3701,78 @@ def validate_aaa_ball_physics_gate() -> None:
 
     for label, pred in (("home", home_win_prediction()), ("away", away_win_prediction())):
         goal_minute, _side = app.goal_schedule(pred)[0]
-        for progress in (0.50, 0.54, 0.555):
+        dribble_contact_limit = visible_ball_radius(app, CINEMATIC_BALL_SIZE) + 3.0
+        for progress in (
+            SHOT_PLANT_AT - 0.08,
+            SHOT_PLANT_AT,
+            SHOT_KICK_AT - 0.01,
+        ):
             state = state_at(pred, goal_minute, progress)
             ball = state["ball_pos"]  # type: ignore[assignment]
             kick = state["kick_pos"]  # type: ignore[assignment]
-            if math.dist(ball, kick) > 18:
-                raise AssertionError(f"{label} dribble ball is not physically attached to the foot at {progress:.3f}: {ball} vs {kick}")
+            if math.dist(ball, kick) > dribble_contact_limit:
+                raise AssertionError(
+                    f"{label} dribble ball has a visible gap from the toe at {progress:.3f}: "
+                    f"distance={math.dist(ball, kick):.3f}px, limit={dribble_contact_limit:.3f}px, "
+                    f"ball={ball}, toe={kick}"
+                )
 
-        arc_samples = [state_at(pred, goal_minute, progress) for progress in (SHOT_KICK_AT, 0.66, 0.78, 0.90, 0.955)]
+        arc_progresses = (
+            SHOT_KICK_AT,
+            min(SHOT_RELEASE_END, SHOT_NET_AT - 0.08),
+            max(SHOT_RELEASE_END + 0.05, 0.86),
+            SHOT_NET_AT,
+            SHOT_NET_VISUAL_CONTACT_AT,
+        )
+        arc_samples = [state_at(pred, goal_minute, progress) for progress in arc_progresses]
         arc_y = [float(state["ball_pos"][1]) for state in arc_samples]  # type: ignore[index]
         apex_index = min(range(len(arc_y)), key=arc_y.__getitem__)
-        if apex_index in {0, len(arc_y) - 1} or arc_y[apex_index] > min(arc_y[0], arc_y[-1]) - 24 or arc_y[-1] < arc_y[apex_index] + 16:
+        loft_height = arc_y[0] - arc_y[apex_index]
+        descent_height = arc_y[-1] - arc_y[apex_index]
+        flight_visible_diameter = max(visible_ball_diameters(app, CINEMATIC_SHOT_BALL_SIZE))
+        if (
+            apex_index in {0, len(arc_y) - 1}
+            or loft_height < flight_visible_diameter * 0.85
+            or descent_height < flight_visible_diameter * 0.12
+        ):
             raise AssertionError(f"{label} shot has no readable loft/descent arc: y={arc_y}")
-        if float(arc_samples[0]["ball_spin_rate"]) < 30 or float(arc_samples[2]["ball_spin_rate"]) < 26:  # type: ignore[index]
-            raise AssertionError(f"{label} ball spin is too low for a driven shot")
+        arc_rotation = [
+            float(ball_contract_snapshot(state, f"{label} arc")["ball_rotation_degrees"])
+            for state in arc_samples
+        ]
+        arc_rotation_distance = sum(
+            abs(wrapped_angle_delta(current, previous))
+            for previous, current in zip(arc_rotation, arc_rotation[1:])
+        )
+        if arc_rotation_distance < 18.0:
+            raise AssertionError(f"{label} ball rotation is visually static during flight: {arc_rotation}")
 
-        samples = [state_at(pred, goal_minute, 0.58 + index * 0.035) for index in range(11)]
+        sampled_progresses = [
+            SHOT_KICK_AT
+            + index * (SHOT_NET_VISUAL_CONTACT_AT - SHOT_KICK_AT) / 10
+            for index in range(11)
+        ]
+        samples = [state_at(pred, goal_minute, progress) for progress in sampled_progresses]
         direction = 1 if samples[0]["goal_side"] == "right" else -1
         xs = [float(state["ball_pos"][0]) for state in samples]  # type: ignore[index]
         for current, following in zip(xs, xs[1:]):
             if (following - current) * direction < -3:
                 raise AssertionError(f"{label} ball path reverses during flight: {xs}")
         scales = [int(state["ball_scale"]) for state in samples]
+        scale_step_limit = max(
+            1,
+            math.ceil(
+                (sampled_progresses[1] - sampled_progresses[0])
+                * (GOAL_EVENT_WINDOW_MINUTES / 90.0 * SIMULATION_SECONDS)
+                * BALL_RUNTIME_FRAME_HZ
+            ),
+        )
         for current, following in zip(scales, scales[1:]):
-            if abs(following - current) > 3:
-                raise AssertionError(f"{label} ball scale pops during flight: {scales}")
+            if abs(following - current) > scale_step_limit:
+                raise AssertionError(
+                    f"{label} ball scale exceeds 1px per 60Hz frame: "
+                    f"scales={scales}, step_limit={scale_step_limit}"
+                )
         squash_ratios = []
         for state in [*samples, state_at(pred, goal_minute, SHOT_NET_VISUAL_CONTACT_AT), state_at(pred, goal_minute, 1.0)]:
             squash = state.get("ball_squash", (1.0, 1.0))
@@ -2758,6 +3818,7 @@ def validate_aaa_ball_physics_gate() -> None:
 
 
 def validate_ball_physics_contract_fast() -> None:
+    assert_ball_size_contract()
     field = pygame.Rect(32, 110, 910, 490)
 
     target_zones: set[tuple[int, int, int]] = set()
@@ -2777,8 +3838,21 @@ def validate_ball_physics_contract_fast() -> None:
                 zone_x = int(clamp((target_x - goal.left) / max(1, goal.w), 0, 0.999) * 4)
                 zone_y = int(clamp((target_y - goal.top) / max(1, goal.h), 0, 0.999) * 4)
                 target_zones.add((direction, zone_x, zone_y))
-                if not (70.0 <= abs(profile.entry[0] - profile.target[0]) <= 170.0):
-                    raise AssertionError(f"shot entry depth is not plausible: {profile}")
+                expected_mouth_x = float(goal.left + 2 if direction > 0 else goal.right - 2)
+                if abs(float(profile.entry[0]) - expected_mouth_x) > 0.75:
+                    raise AssertionError(
+                        f"shot entry is not on the front goal plane: direction={direction}, "
+                        f"entry_x={profile.entry[0]:.3f}, expected={expected_mouth_x:.3f}, goal={goal}"
+                    )
+                net_penetration = (float(profile.target[0]) - float(profile.entry[0])) * direction
+                minimum_penetration = CINEMATIC_SHOT_BALL_SIZE * 0.72
+                maximum_penetration = goal.w - CINEMATIC_SHOT_BALL_SIZE * 0.58
+                if not minimum_penetration <= net_penetration <= maximum_penetration:
+                    raise AssertionError(
+                        f"shot target has implausible net penetration: depth={net_penetration:.3f}, "
+                        f"expected=[{minimum_penetration:.3f}, {maximum_penetration:.3f}], "
+                        f"profile={profile}, goal={goal}"
+                    )
     if len(target_zones) < 9:
         raise AssertionError(f"shot targets are not diverse enough: zones={sorted(target_zones)}")
 
@@ -2794,6 +3868,7 @@ def validate_ball_physics_contract_fast() -> None:
         app.set_simulate("match")
         goal_minute, _side = app.goal_schedule(pred)[0]
         release_state = state_at(app, pred, goal_minute, SHOT_KICK_AT)
+        ball_contract_snapshot(release_state, f"{label} release")
         release = release_state["ball_pos"]  # type: ignore[assignment]
         target = release_state.get("shot_target")
         if not isinstance(target, tuple):
@@ -2804,8 +3879,24 @@ def validate_ball_physics_contract_fast() -> None:
         prev_progress = -0.05
         prev_ball = release
         lateral_offsets: list[float] = []
-        for progress in (0.58, 0.62, 0.66, 0.70, 0.76, 0.82, 0.88, 0.93, 0.955, 0.970, SHOT_NET_VISUAL_CONTACT_AT):
+        flight_progresses = tuple(
+            sorted(
+                {
+                    SHOT_KICK_AT,
+                    SHOT_KICK_AT + 0.02,
+                    SHOT_RELEASE_END,
+                    max(SHOT_RELEASE_END + 0.05, 0.86),
+                    0.90,
+                    0.93,
+                    SHOT_NET_AT,
+                    (SHOT_NET_AT + SHOT_NET_VISUAL_CONTACT_AT) * 0.5,
+                    SHOT_NET_VISUAL_CONTACT_AT,
+                }
+            )
+        )
+        for progress in flight_progresses:
             state = state_at(app, pred, goal_minute, progress)
+            ball_contract_snapshot(state, f"{label} fast progress={progress:.3f}")
             ball = state["ball_pos"]  # type: ignore[assignment]
             bx = float(ball[0]) - float(release[0])
             by = float(ball[1]) - float(release[1])
@@ -2821,7 +3912,7 @@ def validate_ball_physics_contract_fast() -> None:
             scale = int(state["ball_scale"])
             squash = state.get("ball_squash", (1.0, 1.0))
             sx, sy = float(squash[0]), float(squash[1])  # type: ignore[index]
-            if abs(sx - sy) > 0.015 or not (40 <= scale <= 52):
+            if abs(sx - sy) > 0.015 or not (TARGET_CINEMATIC_SHOT_BALL_SIZE - 4 <= scale <= TARGET_CINEMATIC_BALL_SIZE):
                 raise AssertionError(f"{label} ball should stay round and stable: scale={scale}, squash={squash}")
         if max(lateral_offsets) < 8:
             raise AssertionError(f"{label} shot has no readable bend/loft deviation: offsets={lateral_offsets}")
@@ -2969,7 +4060,7 @@ def validate_aaa_findings_light_gate() -> None:
         if render_order.index("goal_back") >= render_order.index("ball"):
             raise AssertionError(f"goal back/net layer must render before the ball: {render_order}")
         if render_order.index("impact") <= render_order.index("ball"):
-            raise AssertionError(f"net impact burst must render after the ball reaches the net: {render_order}")
+            raise AssertionError(f"net deformation layer must render after the ball reaches the net: {render_order}")
 
     for label, pred in (("home", home_win_prediction()), ("away", away_win_prediction())):
         goal_minute, _side = app.goal_schedule(pred)[0]
@@ -2995,23 +4086,6 @@ def validate_aaa_findings_light_gate() -> None:
         decay_values = [late_decay.get(key) for key in ripple_alpha_keys if isinstance(late_decay.get(key), (int, float))]
         if decay_values and any(float(value) >= float(peak.get("net_progress", 0.0)) for value in decay_values):
             raise AssertionError(f"{label} explicit net decay metadata does not decay: {decay_values}")
-        side = str(peak["goal_side"])
-        def burst_alpha_weight(ripple: float) -> int:
-            burst = app.cached_goal_impact_burst(side, ripple, 255)
-            return sum(
-                burst.get_at((x, y)).a
-                for y in range(0, burst.get_height(), 2)
-                for x in range(0, burst.get_width(), 2)
-            )
-
-        early_ripple = burst_alpha_weight(0.18)
-        peak_ripple = burst_alpha_weight(0.62)
-        late_ripple = burst_alpha_weight(1.0)
-        if peak_ripple <= early_ripple * 1.20:
-            raise AssertionError(f"{label} net burst does not visibly expand: early={early_ripple}, peak={peak_ripple}")
-        if late_ripple >= peak_ripple * 0.72:
-            raise AssertionError(f"{label} net burst does not visibly decay: peak={peak_ripple}, late={late_ripple}")
-
         app.t = time_for_progress(goal_minute, SHOT_NET_VISUAL_CONTACT_AT - 0.012)
         if app.active_goal_event(pred) is not None:
             raise AssertionError(f"{label} GOOOL overlay can activate before visual impact")
@@ -4351,20 +5425,32 @@ def validate_sixty_fps_budget() -> None:
     app.match_prediction = pred
     warmup_frames = 120
     for _index in range(warmup_frames):
+        pygame.event.pump()
         app.update(1 / 60)
         app.draw()
+        app.flush_queued_match_audio()
     gc.collect()
     frame_times = []
     frames = int(SIMULATION_SECONDS / (1 / 60)) + 1
     for _index in range(frames):
         start = time.perf_counter()
+        pygame.event.pump()
         app.update(1 / 60)
         app.draw()
+        app.flush_queued_match_audio()
         frame_times.append(time.perf_counter() - start)
     ordered = sorted(frame_times)
-    p95 = ordered[int(len(ordered) * 0.95)]
-    if p95 > 0.024:
-        raise AssertionError(f"60fps visual budget failed: p95={p95 * 1000:.2f}ms")
+    p95 = ordered[min(len(ordered) - 1, math.ceil(len(ordered) * 0.95) - 1)]
+    p99 = ordered[min(len(ordered) - 1, math.ceil(len(ordered) * 0.99) - 1)]
+    maximum = ordered[-1]
+    two_frame_budget = 1.0 / 30.0
+    severe_frame_ratio = sum(frame_time > two_frame_budget for frame_time in frame_times) / len(frame_times)
+    if p95 > 0.014 or p99 > 1.0 / 60.0 or maximum > two_frame_budget or severe_frame_ratio > 0.001:
+        raise AssertionError(
+            "60fps visual budget failed: "
+            f"p95={p95 * 1000:.2f}ms, p99={p99 * 1000:.2f}ms, "
+            f"max={maximum * 1000:.2f}ms, frames_over_33ms={severe_frame_ratio:.3%}"
+        )
     stats = app.surface_cache.stats()
     if (
         stats["scaled"] >= app.surface_cache.max_scaled
@@ -4737,6 +5823,8 @@ AAA_STEPS = (
     validate_aaa_cinematic_fade_gate,
     validate_aaa_goalkeeper_front_layer_gate,
     validate_cinematic_temporal_stability,
+    validate_aaa_dense_ball_motion_gate,
+    validate_aaa_net_energy_dissipation_gate,
     validate_aaa_ball_physics_gate,
     validate_aaa_findings_light_gate,
     validate_runtime_oracle_legibility,
