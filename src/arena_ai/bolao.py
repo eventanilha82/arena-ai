@@ -1701,7 +1701,8 @@ def render_intro(console: Console, board: GroupStageBoard) -> None:
             f"({snapshot.source_label}; as-of {snapshot.as_of_utc_text}) | "
             f"[cyan]projeções pendentes:[/cyan] {total_group_matches - observed_matches}\n"
             f"[green]Mata-mata confirmado:[/green] {locked_knockout_matches} jogo(s) travado(s) no CSV interno\n"
-            "[yellow]Proveniência:[/yellow] snapshot manual local; sem fonte FIFA ou validação independente.\n"
+            "[yellow]Proveniência dos grupos:[/yellow] snapshot manual local e não oficial; "
+            "o mata-mata preserva a fonte declarada por jogo no CSV interno.\n"
             "[cyan]Sem seed:[/cyan] a mesma base de resultados e forma preserva o mesmo placar projetado.\n"
             f"[cyan]Política:[/cyan] {float(board.policy['classifier_weight']):.0%} classificador 1X2 + "
             f"{float(board.policy['poisson_weight']):.0%} Poisson/Dixon-Coles | prorrogação DC + pênaltis 50/50\n"
@@ -1738,6 +1739,35 @@ def render_monte_carlo_ranking(
     workers: int | None,
 ) -> list[ChampionOption]:
     _ = workers
+    final_result = board.knockout_results.get(104)
+    if final_result is not None:
+        champion = ChampionOption(
+            rank=1,
+            team=final_result.winner,
+            wins=max(1, int(runs)),
+            probability=1.0,
+        )
+        total_home = final_result.home_goals_90 + final_result.extra_time_home_goals
+        total_away = final_result.away_goals_90 + final_result.extra_time_away_goals
+        resolution = {
+            "90min": "90 min",
+            "extra_time": "prorrogação",
+            "penalties": "pênaltis",
+        }[final_result.resolution]
+        console.print(
+            Panel(
+                f"[bold green]Campeão observado:[/bold green] {team_name(final_result.winner, names)}\n"
+                f"[cyan]Final confirmada:[/cyan] {team_name(final_result.home, names)} "
+                f"{total_home} x {total_away} {team_name(final_result.away, names)} ({resolution})\n"
+                "O Monte Carlo não é executado após a final. O campeão está travado pelo resultado, "
+                "não por uma probabilidade de 100% estimada pelo modelo.",
+                title="[bold cyan]Torneio encerrado[/bold cyan]",
+                border_style="green",
+                box=box.ROUNDED,
+            )
+        )
+        return [champion]
+
     form_line = (
         "aplica a forma observada da Copa validada no holdout temporal."
         if board.form.is_enabled
@@ -1842,6 +1872,27 @@ def render_selected_champion(
     console.print(knockout_table(bracket, names, champion_team=option.team))
 
 
+def render_completed_tournament(
+    console: Console,
+    model: WorldCupModel,
+    board: GroupStageBoard,
+    names: dict[str, str],
+) -> None:
+    final_result = board.knockout_results.get(104)
+    if final_result is None:
+        raise ValueError("torneio ainda não possui final observada")
+    bracket = build_conditioned_knockout(model, board, final_result.winner)
+    console.rule("[bold green]Chave final observada[/bold green]")
+    console.print(
+        knockout_table(
+            bracket,
+            names,
+            champion_team=final_result.winner,
+            title="Mata-mata observado",
+        )
+    )
+
+
 def match_table(group: str, board: GroupStageBoard, names: dict[str, str]) -> Table:
     table = Table(
         title="Jogos e placares",
@@ -1922,9 +1973,15 @@ def standings_table(group: str, board: GroupStageBoard, names: dict[str, str]) -
     return table
 
 
-def knockout_table(bracket: pd.DataFrame, names: dict[str, str], *, champion_team: str) -> Table:
+def knockout_table(
+    bracket: pd.DataFrame,
+    names: dict[str, str],
+    *,
+    champion_team: str,
+    title: str = "Mata-mata condicionado",
+) -> Table:
     table = Table(
-        title="Mata-mata condicionado",
+        title=title,
         box=box.ROUNDED,
         border_style="gold1",
         header_style="bold gold1",
@@ -2090,6 +2147,12 @@ def main(argv: list[str] | None = None) -> None:
         top_n=max(1, int(args.top)),
         workers=args.workers,
     )
+
+    if 104 in board.knockout_results:
+        if args.campeao and resolve_choice(str(args.campeao), ranking, names) is None:
+            raise SystemExit(f"Campeão inválido: {args.campeao}")
+        render_completed_tournament(console, model, board, names)
+        return
 
     if args.campeao:
         option = resolve_choice(str(args.campeao), ranking, names)

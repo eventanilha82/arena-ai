@@ -2,35 +2,29 @@
   "comparisons": [
     {
       "baseline_top": [
-        "Spain",
-        "Argentina",
-        "France",
-        "England"
+        "Spain"
       ],
       "candidate_top": [
-        "Spain",
-        "Argentina",
-        "France",
-        "England"
+        "Spain"
       ],
       "from_runs": 1000,
-      "max_abs_probability_delta": 0.010000000000000009,
-      "mean_abs_probability_delta": 0.00103125,
+      "max_abs_probability_delta": 0.0,
+      "mean_abs_probability_delta": 0.0,
       "to_runs": 2000,
       "top_n": 10,
       "top_n_overlap": 1.0
     }
   ],
   "fixed_group_stage": {
-    "fingerprint_sha256": "6bf4f68247766c9c328cc2838bc61dd34c84f257a5b20430527ff2427ffdfd78",
+    "fingerprint_sha256": "b6d719c931a0e167db6d3c21461ecc4fa632b48e13c85fc896d4c070438d6a73",
     "form": {
       "calibration_status": "enabled_validation",
       "historical_validation_log_likelihood": -70.54787658819419,
       "is_enabled": true,
-      "knockout_form_matches": 28,
+      "knockout_form_matches": 32,
       "knockout_form_policy": "regulation_90_only_frozen_group_prior",
-      "knockout_observed_matches": 28,
-      "median_current_weight": 0.4228161497876227,
+      "knockout_observed_matches": 32,
+      "median_current_weight": 0.43392509876741703,
       "observed_result_count": 72,
       "prior_goal_equivalents": 8.0,
       "validation_log_likelihood": -69.87768557415214,
@@ -233,6 +227,34 @@
         "match_number": 100,
         "resolution": "extra_time",
         "winner": "Argentina"
+      },
+      {
+        "away": "Spain",
+        "home": "France",
+        "match_number": 101,
+        "resolution": "90min",
+        "winner": "Spain"
+      },
+      {
+        "away": "Argentina",
+        "home": "England",
+        "match_number": 102,
+        "resolution": "90min",
+        "winner": "Argentina"
+      },
+      {
+        "away": "England",
+        "home": "France",
+        "match_number": 103,
+        "resolution": "90min",
+        "winner": "England"
+      },
+      {
+        "away": "Argentina",
+        "home": "Spain",
+        "match_number": 104,
+        "resolution": "extra_time",
+        "winner": "Spain"
       }
     ],
     "manual_snapshot": {
@@ -941,12 +963,12 @@
     "independent_seeds": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.019000000000000017,
+          "actual": 0.0,
           "limit": 0.06,
           "passed": true
         },
         "max_two_sample_z": {
-          "actual": 1.3589545597326937,
+          "actual": 0.0,
           "limit": 4.0,
           "passed": true
         },
@@ -961,7 +983,7 @@
     "nested_prefixes": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.010000000000000009,
+          "actual": 0.0,
           "limit": 0.04,
           "passed": true
         },
@@ -975,29 +997,23 @@
     },
     "passed": true
   },
-  "generated_at": "2026-07-12T05:21:31.363161Z",
+  "generated_at": "2026-07-20T03:00:15.844567Z",
   "independent_seed_audit": {
     "comparisons": [
       {
         "baseline_seed": 20260628,
         "baseline_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "candidate_seed": 20260629,
         "candidate_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.006500000000000006,
-        "max_two_sample_z": 0.47838850961478696,
-        "max_two_sample_z_team": "England",
-        "mean_abs_probability_delta": 0.0005937500000000005,
+        "max_abs_probability_delta": 0.0,
+        "max_two_sample_z": 0.0,
+        "max_two_sample_z_team": null,
+        "mean_abs_probability_delta": 0.0,
         "to_runs": 2000,
         "top_n": 10,
         "top_n_overlap": 1.0
@@ -1005,23 +1021,17 @@
       {
         "baseline_seed": 20260628,
         "baseline_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "candidate_seed": 20260630,
         "candidate_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.019000000000000017,
-        "max_two_sample_z": 1.3589545597326937,
-        "max_two_sample_z_team": "Argentina",
-        "mean_abs_probability_delta": 0.0012812500000000011,
+        "max_abs_probability_delta": 0.0,
+        "max_two_sample_z": 0.0,
+        "max_two_sample_z_team": null,
+        "mean_abs_probability_delta": 0.0,
         "to_runs": 2000,
         "top_n": 10,
         "top_n_overlap": 1.0
@@ -1029,23 +1039,17 @@
       {
         "baseline_seed": 20260629,
         "baseline_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "candidate_seed": 20260630,
         "candidate_top": [
-          "Spain",
-          "Argentina",
-          "France",
-          "England"
+          "Spain"
         ],
         "from_runs": 2000,
-        "max_abs_probability_delta": 0.016000000000000014,
-        "max_two_sample_z": 1.1423443686355272,
-        "max_two_sample_z_team": "Argentina",
-        "mean_abs_probability_delta": 0.0014375000000000013,
+        "max_abs_probability_delta": 0.0,
+        "max_two_sample_z": 0.0,
+        "max_two_sample_z_team": null,
+        "mean_abs_probability_delta": 0.0,
         "to_runs": 2000,
         "top_n": 10,
         "top_n_overlap": 1.0
@@ -1054,12 +1058,12 @@
     "gate": {
       "checks": {
         "max_abs_probability_delta": {
-          "actual": 0.019000000000000017,
+          "actual": 0.0,
           "limit": 0.06,
           "passed": true
         },
         "max_two_sample_z": {
-          "actual": 1.3589545597326937,
+          "actual": 0.0,
           "limit": 4.0,
           "passed": true
         },
@@ -1076,7 +1080,7 @@
       {
         "probabilities": {
           "Algeria": 0.0,
-          "Argentina": 0.257,
+          "Argentina": 0.0,
           "Australia": 0.0,
           "Austria": 0.0,
           "Belgium": 0.0,
@@ -1090,8 +1094,8 @@
           "Côte d'Ivoire": 0.0,
           "Ecuador": 0.0,
           "Egypt": 0.0,
-          "England": 0.1595,
-          "France": 0.2295,
+          "England": 0.0,
+          "France": 0.0,
           "Germany": 0.0,
           "Ghana": 0.0,
           "Japan": 0.0,
@@ -1103,7 +1107,7 @@
           "Portugal": 0.0,
           "Senegal": 0.0,
           "South Africa": 0.0,
-          "Spain": 0.354,
+          "Spain": 1.0,
           "Sweden": 0.0,
           "Switzerland": 0.0,
           "USA": 0.0
@@ -1112,44 +1116,11 @@
         "seed": 20260628,
         "top_champions": [
           {
-            "mc_sampling_interval_95": {
-              "lower": 0.3333396874968936,
-              "upper": 0.3752201108424561
-            },
-            "probability": 0.354,
+            "mc_sampling_interval_95": null,
+            "probability": 1.0,
             "rank": 1,
             "team": "Spain",
-            "titles": 708
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.23832708876788475,
-              "upper": 0.27660463038596456
-            },
-            "probability": 0.257,
-            "rank": 2,
-            "team": "Argentina",
-            "titles": 514
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.2115992331032282,
-              "upper": 0.24843792751864935
-            },
-            "probability": 0.2295,
-            "rank": 3,
-            "team": "France",
-            "titles": 459
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.1441080153452353,
-              "upper": 0.17619754174071403
-            },
-            "probability": 0.1595,
-            "rank": 4,
-            "team": "England",
-            "titles": 319
+            "titles": 2000
           }
         ],
         "total_titles": 2000
@@ -1157,7 +1128,7 @@
       {
         "probabilities": {
           "Algeria": 0.0,
-          "Argentina": 0.26,
+          "Argentina": 0.0,
           "Australia": 0.0,
           "Austria": 0.0,
           "Belgium": 0.0,
@@ -1171,8 +1142,8 @@
           "Côte d'Ivoire": 0.0,
           "Ecuador": 0.0,
           "Egypt": 0.0,
-          "England": 0.154,
-          "France": 0.2255,
+          "England": 0.0,
+          "France": 0.0,
           "Germany": 0.0,
           "Ghana": 0.0,
           "Japan": 0.0,
@@ -1184,7 +1155,7 @@
           "Portugal": 0.0,
           "Senegal": 0.0,
           "South Africa": 0.0,
-          "Spain": 0.3605,
+          "Spain": 1.0,
           "Sweden": 0.0,
           "Switzerland": 0.0,
           "USA": 0.0
@@ -1193,44 +1164,11 @@
         "seed": 20260629,
         "top_champions": [
           {
-            "mc_sampling_interval_95": {
-              "lower": 0.33974261126208544,
-              "upper": 0.38179226454845766
-            },
-            "probability": 0.3605,
+            "mc_sampling_interval_95": null,
+            "probability": 1.0,
             "rank": 1,
             "team": "Spain",
-            "titles": 721
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.24124904042671538,
-              "upper": 0.27967117602153074
-            },
-            "probability": 0.26,
-            "rank": 2,
-            "team": "Argentina",
-            "titles": 520
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.2077204833663125,
-              "upper": 0.24433201419636913
-            },
-            "probability": 0.2255,
-            "rank": 3,
-            "team": "France",
-            "titles": 451
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.1388453030142302,
-              "upper": 0.17048134236532475
-            },
-            "probability": 0.154,
-            "rank": 4,
-            "team": "England",
-            "titles": 308
+            "titles": 2000
           }
         ],
         "total_titles": 2000
@@ -1238,7 +1176,7 @@
       {
         "probabilities": {
           "Algeria": 0.0,
-          "Argentina": 0.276,
+          "Argentina": 0.0,
           "Australia": 0.0,
           "Austria": 0.0,
           "Belgium": 0.0,
@@ -1252,8 +1190,8 @@
           "Côte d'Ivoire": 0.0,
           "Ecuador": 0.0,
           "Egypt": 0.0,
-          "England": 0.161,
-          "France": 0.2155,
+          "England": 0.0,
+          "France": 0.0,
           "Germany": 0.0,
           "Ghana": 0.0,
           "Japan": 0.0,
@@ -1265,7 +1203,7 @@
           "Portugal": 0.0,
           "Senegal": 0.0,
           "South Africa": 0.0,
-          "Spain": 0.3475,
+          "Spain": 1.0,
           "Sweden": 0.0,
           "Switzerland": 0.0,
           "USA": 0.0
@@ -1274,44 +1212,11 @@
         "seed": 20260630,
         "top_champions": [
           {
-            "mc_sampling_interval_95": {
-              "lower": 0.32694098377557623,
-              "upper": 0.36864373709258014
-            },
-            "probability": 0.3475,
+            "mc_sampling_interval_95": null,
+            "probability": 1.0,
             "rank": 1,
             "team": "Spain",
-            "titles": 695
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.2568521382764228,
-              "upper": 0.2960067304086071
-            },
-            "probability": 0.276,
-            "rank": 2,
-            "team": "Argentina",
-            "titles": 552
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.19803417610265373,
-              "upper": 0.23405666381203816
-            },
-            "probability": 0.2155,
-            "rank": 3,
-            "team": "France",
-            "titles": 431
-          },
-          {
-            "mc_sampling_interval_95": {
-              "lower": 0.14554447824951808,
-              "upper": 0.17775532748362974
-            },
-            "probability": 0.161,
-            "rank": 4,
-            "team": "England",
-            "titles": 322
+            "titles": 2000
           }
         ],
         "total_titles": 2000
@@ -1331,7 +1236,7 @@
   "runtime_fingerprints": {
     "bolao": {
       "path": "src/arena_ai/bolao.py",
-      "sha256": "96153417432545805cc629ebb43822176399a52a18f7a857f62ef3d91a3b2fdb"
+      "sha256": "67376f519e2f2dc73dac6119c668684b3df3b782b9f50d4ce62a5dbd6bd94a0f"
     },
     "model_package": {
       "path": "modeling/worldcup_2026_ml/models/model_sota.pkl",
@@ -1339,7 +1244,7 @@
     },
     "observed_knockout_results": {
       "path": "modeling/worldcup_2026_ml/data/observed/worldcup_2026_knockout_results.csv",
-      "sha256": "6fd00a10cc4e6b9d12285ecd6d4dd9f1cad2fa0a2b75cff116ac619432eb7f2d"
+      "sha256": "93aa7ad7b8bfeefe94b1c66a08ae5da3f83d443b659fdb436ea240432a17b810"
     },
     "observed_results": {
       "path": "modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv",
@@ -1359,7 +1264,7 @@
     },
     "stability_audit": {
       "path": "scripts/bolao_mc_stability.py",
-      "sha256": "a14792b835c46dbaf136b063c6e5d075def02ad7ff2e9175d52f61caf863e02e"
+      "sha256": "8d1e4ad59251de8d185f65bd83ba57a82e5776c0c5eeab30298e971bf6d16aee"
     },
     "worldcup_model": {
       "path": "src/arena_ai/worldcup_model.py",
@@ -1370,14 +1275,15 @@
   "simulation_scope": {
     "current_tournament_form": "included",
     "group_stage": "fixed_board",
-    "knockout": "observed_results_locked_then_form_aware_hybrid_sampled",
-    "sampling": "nested_prefixes_one_seed_plus_independent_seeds"
+    "knockout": "completed_bracket_fully_observed_no_future_matches_sampled",
+    "sampling": "deterministic_replay_across_run_counts_and_seeds",
+    "tournament_complete": true
   },
   "snapshots": [
     {
       "probabilities": {
         "Algeria": 0.0,
-        "Argentina": 0.266,
+        "Argentina": 0.0,
         "Australia": 0.0,
         "Austria": 0.0,
         "Belgium": 0.0,
@@ -1391,8 +1297,8 @@
         "Côte d'Ivoire": 0.0,
         "Ecuador": 0.0,
         "Egypt": 0.0,
-        "England": 0.153,
-        "France": 0.237,
+        "England": 0.0,
+        "France": 0.0,
         "Germany": 0.0,
         "Ghana": 0.0,
         "Japan": 0.0,
@@ -1404,7 +1310,7 @@
         "Portugal": 0.0,
         "Senegal": 0.0,
         "South Africa": 0.0,
-        "Spain": 0.344,
+        "Spain": 1.0,
         "Sweden": 0.0,
         "Switzerland": 0.0,
         "USA": 0.0
@@ -1412,44 +1318,11 @@
       "runs": 1000,
       "top_champions": [
         {
-          "mc_sampling_interval_95": {
-            "lower": 0.3152039757998436,
-            "upper": 0.37399001655911024
-          },
-          "probability": 0.344,
+          "mc_sampling_interval_95": null,
+          "probability": 1.0,
           "rank": 1,
           "team": "Spain",
-          "titles": 344
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.2395462548357791,
-            "upper": 0.29424473370265175
-          },
-          "probability": 0.266,
-          "rank": 2,
-          "team": "Argentina",
-          "titles": 266
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.21168091851549473,
-            "upper": 0.26433203014094675
-          },
-          "probability": 0.237,
-          "rank": 3,
-          "team": "France",
-          "titles": 237
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.13201885442660544,
-            "upper": 0.1766370131923496
-          },
-          "probability": 0.153,
-          "rank": 4,
-          "team": "England",
-          "titles": 153
+          "titles": 1000
         }
       ],
       "total_titles": 1000
@@ -1457,7 +1330,7 @@
     {
       "probabilities": {
         "Algeria": 0.0,
-        "Argentina": 0.257,
+        "Argentina": 0.0,
         "Australia": 0.0,
         "Austria": 0.0,
         "Belgium": 0.0,
@@ -1471,8 +1344,8 @@
         "Côte d'Ivoire": 0.0,
         "Ecuador": 0.0,
         "Egypt": 0.0,
-        "England": 0.1595,
-        "France": 0.2295,
+        "England": 0.0,
+        "France": 0.0,
         "Germany": 0.0,
         "Ghana": 0.0,
         "Japan": 0.0,
@@ -1484,7 +1357,7 @@
         "Portugal": 0.0,
         "Senegal": 0.0,
         "South Africa": 0.0,
-        "Spain": 0.354,
+        "Spain": 1.0,
         "Sweden": 0.0,
         "Switzerland": 0.0,
         "USA": 0.0
@@ -1492,44 +1365,11 @@
       "runs": 2000,
       "top_champions": [
         {
-          "mc_sampling_interval_95": {
-            "lower": 0.3333396874968936,
-            "upper": 0.3752201108424561
-          },
-          "probability": 0.354,
+          "mc_sampling_interval_95": null,
+          "probability": 1.0,
           "rank": 1,
           "team": "Spain",
-          "titles": 708
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.23832708876788475,
-            "upper": 0.27660463038596456
-          },
-          "probability": 0.257,
-          "rank": 2,
-          "team": "Argentina",
-          "titles": 514
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.2115992331032282,
-            "upper": 0.24843792751864935
-          },
-          "probability": 0.2295,
-          "rank": 3,
-          "team": "France",
-          "titles": 459
-        },
-        {
-          "mc_sampling_interval_95": {
-            "lower": 0.1441080153452353,
-            "upper": 0.17619754174071403
-          },
-          "probability": 0.1595,
-          "rank": 4,
-          "team": "England",
-          "titles": 319
+          "titles": 2000
         }
       ],
       "total_titles": 2000
@@ -1537,12 +1377,12 @@
   ],
   "uncertainty": {
     "does_not_measure": [
+      "predictive_model_uncertainty_after_outcome_lock",
       "model_misspecification",
       "data_quality_or_manual_snapshot_error",
-      "parameter_uncertainty",
-      "future_match_uncertainty_beyond_the_simulation_model"
+      "parameter_uncertainty"
     ],
-    "interval": "wilson_score_95_percent",
-    "scope": "monte_carlo_sampling_error_only"
+    "interval": "not_applicable_completed_tournament",
+    "scope": "observed_outcome_lock_consistency_only"
   }
 }

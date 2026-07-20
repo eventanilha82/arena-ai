@@ -1,0 +1,458 @@
+{
+  "report_type": "arena_bolao_final_calibration",
+  "generated_at": "2026-07-20T03:02:48.442404+00:00",
+  "scope": {
+    "observed_windows": [
+      "Semifinals",
+      "Third Place Playoff",
+      "Final"
+    ],
+    "observed_matches": 4,
+    "evaluation_target": "90-minute 1X2, exact regulation score, and eventual advancement",
+    "look_ahead": "none; snapshots were frozen after the quarterfinals, after the semifinals, and after the third-place match respectively"
+  },
+  "observed_resolution": {
+    "regulation": 3,
+    "extra_time": 1,
+    "penalties": 0
+  },
+  "window_metrics": {
+    "semifinals": {
+      "historical_baseline": {
+        "matches": 2,
+        "log_loss_1x2": 0.8440849951078435,
+        "brier_1x2": 0.487617920918584,
+        "accuracy_1x2": 1.0,
+        "exact_score_log_loss": 2.503502821290944,
+        "advance_log_loss": 0.5372285397694646,
+        "advance_brier": 0.17275946875554438,
+        "advance_accuracy": 1.0,
+        "observed_draws": 0,
+        "expected_draws": 0.5882632057116389,
+        "draw_standardized_residual": -0.9129104023554179
+      },
+      "group_only_form": {
+        "matches": 2,
+        "log_loss_1x2": 0.8472041330014601,
+        "brier_1x2": 0.48990036660255565,
+        "accuracy_1x2": 1.0,
+        "exact_score_log_loss": 2.510294796700243,
+        "advance_log_loss": 0.5405329112481088,
+        "advance_brier": 0.17436473379574013,
+        "advance_accuracy": 1.0,
+        "observed_draws": 0,
+        "expected_draws": 0.5900137823940982,
+        "draw_standardized_residual": -0.9148411867662197
+      },
+      "frozen_form": {
+        "matches": 2,
+        "log_loss_1x2": 0.8519147541214136,
+        "brier_1x2": 0.4933666288958259,
+        "accuracy_1x2": 1.0,
+        "exact_score_log_loss": 2.4637524935071458,
+        "advance_log_loss": 0.5467028914166564,
+        "advance_brier": 0.17736297245811505,
+        "advance_accuracy": 1.0,
+        "observed_draws": 0,
+        "expected_draws": 0.5912511176559123,
+        "draw_standardized_residual": -0.9162161020054478
+      },
+      "loss_gap_frozen_form_minus_historical": {
+        "log_loss_1x2": 0.007829759013570081,
+        "brier_1x2": 0.0057487079772418626,
+        "exact_score_log_loss": -0.039750327783798056,
+        "advance_log_loss": 0.009474351647191792,
+        "advance_brier": 0.004603503702570677
+      },
+      "metrics_favoring_frozen_form": [
+        "exact_score_log_loss"
+      ],
+      "metrics_within_operational_margin": [
+        "log_loss_1x2",
+        "brier_1x2",
+        "exact_score_log_loss",
+        "advance_log_loss",
+        "advance_brier"
+      ],
+      "all_loss_gaps_within_operational_margin": true
+    },
+    "third_place": {
+      "historical_baseline": {
+        "matches": 1,
+        "log_loss_1x2": 1.2348690982620891,
+        "brier_1x2": 0.7616663376353477,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 9.3979170431193,
+        "advance_log_loss": 0.8376682116632008,
+        "advance_brier": 0.3218084641169178,
+        "advance_accuracy": 0.0,
+        "observed_draws": 0,
+        "expected_draws": 0.2938415319202649,
+        "draw_standardized_residual": -0.6450680085081801
+      },
+      "group_only_form": {
+        "matches": 1,
+        "log_loss_1x2": 1.2527523477914408,
+        "brier_1x2": 0.7736042752645875,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 9.280376195760669,
+        "advance_log_loss": 0.8659479126163377,
+        "advance_brier": 0.33564338479617517,
+        "advance_accuracy": 0.0,
+        "observed_draws": 0,
+        "expected_draws": 0.2927027826910603,
+        "draw_standardized_residual": -0.6432983698690642
+      },
+      "frozen_form": {
+        "matches": 1,
+        "log_loss_1x2": 1.2622112284868272,
+        "brier_1x2": 0.7796622036781455,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 9.588168587410571,
+        "advance_log_loss": 0.8787579555675885,
+        "advance_brier": 0.3418759486963767,
+        "advance_accuracy": 0.0,
+        "observed_draws": 0,
+        "expected_draws": 0.29295822169703645,
+        "draw_standardized_residual": -0.643695254054686
+      },
+      "loss_gap_frozen_form_minus_historical": {
+        "log_loss_1x2": 0.02734213022473808,
+        "brier_1x2": 0.017995866042797792,
+        "exact_score_log_loss": 0.19025154429127156,
+        "advance_log_loss": 0.04108974390438769,
+        "advance_brier": 0.020067484579458894
+      },
+      "metrics_favoring_frozen_form": [],
+      "metrics_within_operational_margin": [],
+      "all_loss_gaps_within_operational_margin": false
+    },
+    "final": {
+      "historical_baseline": {
+        "matches": 1,
+        "log_loss_1x2": 1.2192638187058236,
+        "brier_1x2": 0.7495145717819449,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 2.6682777307966346,
+        "advance_log_loss": 0.584355537160368,
+        "advance_brier": 0.1958372159982341,
+        "advance_accuracy": 1.0,
+        "observed_draws": 1,
+        "expected_draws": 0.2954475898719142,
+        "draw_standardized_residual": 1.544245792292089
+      },
+      "group_only_form": {
+        "matches": 1,
+        "log_loss_1x2": 1.210853495373605,
+        "brier_1x2": 0.74347200556441,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 2.4374310719517127,
+        "advance_log_loss": 0.600042303448837,
+        "advance_brier": 0.20359188996208277,
+        "advance_accuracy": 1.0,
+        "observed_draws": 1,
+        "expected_draws": 0.29794287801213226,
+        "draw_standardized_residual": 1.5350400835037645
+      },
+      "frozen_form": {
+        "matches": 1,
+        "log_loss_1x2": 1.2146138268274465,
+        "brier_1x2": 0.7479703871066163,
+        "accuracy_1x2": 0.0,
+        "exact_score_log_loss": 2.414243025814131,
+        "advance_log_loss": 0.5604832549520717,
+        "advance_brier": 0.18409841246055464,
+        "advance_accuracy": 1.0,
+        "observed_draws": 1,
+        "expected_draws": 0.2968246178685824,
+        "draw_standardized_residual": 1.5391532732133948
+      },
+      "loss_gap_frozen_form_minus_historical": {
+        "log_loss_1x2": -0.004649991878377113,
+        "brier_1x2": -0.0015441846753285748,
+        "exact_score_log_loss": -0.25403470498250336,
+        "advance_log_loss": -0.02387228220829629,
+        "advance_brier": -0.011738803537679449
+      },
+      "metrics_favoring_frozen_form": [
+        "log_loss_1x2",
+        "brier_1x2",
+        "exact_score_log_loss",
+        "advance_log_loss",
+        "advance_brier"
+      ],
+      "metrics_within_operational_margin": [
+        "log_loss_1x2",
+        "brier_1x2",
+        "exact_score_log_loss",
+        "advance_log_loss",
+        "advance_brier"
+      ],
+      "all_loss_gaps_within_operational_margin": true
+    },
+    "combined_prequential": {
+      "historical_baseline": {
+        "matches": 4,
+        "log_loss_1x2": 1.0355757267959,
+        "brier_1x2": 0.6216041878136151,
+        "accuracy_1x2": 0.5,
+        "exact_score_log_loss": 4.268300104124456,
+        "advance_log_loss": 0.6241202070906245,
+        "advance_brier": 0.2157911544065602,
+        "advance_accuracy": 0.75,
+        "observed_draws": 1,
+        "expected_draws": 1.177552327503818,
+        "draw_standardized_residual": -0.19478513210935705
+      },
+      "group_only_form": {
+        "matches": 4,
+        "log_loss_1x2": 1.0395035272919917,
+        "brier_1x2": 0.6242192535085271,
+        "accuracy_1x2": 0.5,
+        "exact_score_log_loss": 4.184599215278217,
+        "advance_log_loss": 0.6367640096403481,
+        "advance_brier": 0.22199118558743455,
+        "advance_accuracy": 0.75,
+        "observed_draws": 1,
+        "expected_draws": 1.1806594430972908,
+        "draw_standardized_residual": -0.19804401008026457
+      },
+      "frozen_form": {
+        "matches": 4,
+        "log_loss_1x2": 1.0451636408892753,
+        "brier_1x2": 0.6285914621441033,
+        "accuracy_1x2": 0.5,
+        "exact_score_log_loss": 4.232479150059748,
+        "advance_log_loss": 0.6331617483382432,
+        "advance_brier": 0.22017507651829038,
+        "advance_accuracy": 0.75,
+        "observed_draws": 1,
+        "expected_draws": 1.1810339572215311,
+        "draw_standardized_residual": -0.19843710614837431
+      },
+      "loss_gap_frozen_form_minus_historical": {
+        "log_loss_1x2": 0.009587914093375227,
+        "brier_1x2": 0.00698727433048818,
+        "exact_score_log_loss": -0.03582095406470742,
+        "advance_log_loss": 0.00904154124761869,
+        "advance_brier": 0.004383922111730193
+      },
+      "metrics_favoring_frozen_form": [
+        "exact_score_log_loss"
+      ],
+      "metrics_within_operational_margin": [
+        "log_loss_1x2",
+        "brier_1x2",
+        "exact_score_log_loss",
+        "advance_log_loss",
+        "advance_brier"
+      ],
+      "all_loss_gaps_within_operational_margin": true
+    }
+  },
+  "pre_match_predictions": {
+    "semifinals": [
+      {
+        "window": "pre_semifinal",
+        "match_number": 101,
+        "round": "Semifinals",
+        "home": "France",
+        "away": "Spain",
+        "frozen_form_home_xg": 1.1629316764702384,
+        "frozen_form_away_xg": 1.2812862986897824,
+        "frozen_form_p_home_90": 0.2748281952257928,
+        "frozen_form_p_draw_90": 0.29925364509941366,
+        "frozen_form_p_away_90": 0.42591815967479346,
+        "frozen_form_p_home_advances": 0.42074571392733046,
+        "frozen_form_most_likely_to_advance": "Spain",
+        "frozen_form_modal_score_90": "0-1",
+        "home_goals_90": 0,
+        "away_goals_90": 2,
+        "winner": "Spain",
+        "resolution": "90min"
+      },
+      {
+        "window": "pre_semifinal",
+        "match_number": 102,
+        "round": "Semifinals",
+        "home": "England",
+        "away": "Argentina",
+        "frozen_form_home_xg": 1.4049971957707732,
+        "frozen_form_away_xg": 1.5835426300837971,
+        "frozen_form_p_home_90": 0.280724963224748,
+        "frozen_form_p_draw_90": 0.29199747255649866,
+        "frozen_form_p_away_90": 0.4272775642187534,
+        "frozen_form_p_home_advances": 0.4215435791564273,
+        "frozen_form_most_likely_to_advance": "Argentina",
+        "frozen_form_modal_score_90": "1-2",
+        "home_goals_90": 1,
+        "away_goals_90": 2,
+        "winner": "Argentina",
+        "resolution": "90min"
+      }
+    ],
+    "medal_matches": [
+      {
+        "window": "pre_third_place",
+        "match_number": 103,
+        "round": "Third Place Playoff",
+        "home": "France",
+        "away": "England",
+        "frozen_form_home_xg": 1.6453341513246889,
+        "frozen_form_away_xg": 1.1648457834576709,
+        "frozen_form_p_home_90": 0.42401428271021124,
+        "frozen_form_p_draw_90": 0.29295822169703645,
+        "frozen_form_p_away_90": 0.2830274955927524,
+        "frozen_form_p_home_advances": 0.5847015894423212,
+        "frozen_form_most_likely_to_advance": "France",
+        "frozen_form_modal_score_90": "2-1",
+        "home_goals_90": 4,
+        "away_goals_90": 6,
+        "winner": "England",
+        "resolution": "90min"
+      },
+      {
+        "window": "pre_final",
+        "match_number": 104,
+        "round": "Final",
+        "home": "Spain",
+        "away": "Argentina",
+        "frozen_form_home_xg": 1.548508588029951,
+        "frozen_form_away_xg": 1.0617738547547795,
+        "frozen_form_p_home_90": 0.4076544372398836,
+        "frozen_form_p_draw_90": 0.2968246178685824,
+        "frozen_form_p_away_90": 0.295520944891534,
+        "frozen_form_p_home_advances": 0.5709330909280528,
+        "frozen_form_most_likely_to_advance": "Spain",
+        "frozen_form_modal_score_90": "1-0",
+        "home_goals_90": 0,
+        "away_goals_90": 0,
+        "winner": "Spain",
+        "resolution": "extra_time"
+      }
+    ]
+  },
+  "monte_carlo_snapshots": {
+    "runs": 2000,
+    "seed": 20260628,
+    "pre_semifinal": [
+      {
+        "rank": 1,
+        "team": "Spain",
+        "titles": 708,
+        "probability": 0.354
+      },
+      {
+        "rank": 2,
+        "team": "Argentina",
+        "titles": 514,
+        "probability": 0.257
+      },
+      {
+        "rank": 3,
+        "team": "France",
+        "titles": 459,
+        "probability": 0.2295
+      },
+      {
+        "rank": 4,
+        "team": "England",
+        "titles": 319,
+        "probability": 0.1595
+      }
+    ],
+    "pre_final": [
+      {
+        "rank": 1,
+        "team": "Spain",
+        "titles": 1158,
+        "probability": 0.579
+      },
+      {
+        "rank": 2,
+        "team": "Argentina",
+        "titles": 842,
+        "probability": 0.421
+      }
+    ],
+    "actual_champion": "Spain",
+    "spain_probability_pre_semifinal": 0.354,
+    "spain_probability_pre_final": 0.579,
+    "post_tournament_interpretation": "Once match 104 is locked, Spain at 100% is an observed result, not a model probability."
+  },
+  "current_form_update": {
+    "policy": "regulation_90_only_frozen_group_prior",
+    "prior_goal_equivalents_frozen": 8.0,
+    "median_weight_before_semifinals": 0.4228161497876227,
+    "median_weight_before_third_place": 0.42607610204652246,
+    "median_weight_before_final": 0.42683532908384675,
+    "median_weight_after_tournament": 0.43392509876741703,
+    "matches_appended_in_final_stage": 4,
+    "total_knockout_matches_appended": 32,
+    "extra_time_goals_observed": 1,
+    "extra_time_goals_appended": 0,
+    "shootout_kicks_appended": 0
+  },
+  "deviation_analysis": {
+    "extreme_regulation_score_threshold": "at least 8 total goals",
+    "extreme_matches": [
+      {
+        "match_number": 103,
+        "match": "France 4-6 England",
+        "frozen_form_score_probability": 6.853482228009046e-05
+      }
+    ],
+    "third_place_stage_history_available_in_training_matrix": false,
+    "third_place_data_gap": "The processed training matrix has no stage label, so the project cannot estimate whether third-place matches have a distinct scoring regime.",
+    "final_regulation_draw": true,
+    "final_extra_time_goal_used_only_for_bracket_resolution": true
+  },
+  "decision": {
+    "retain_frozen_current_form_policy_for_archival_snapshot": true,
+    "append_final_stage_regulation_evidence": true,
+    "retune_xgboost_or_global_hybrid_weights": false,
+    "add_third_place_goal_multiplier": false,
+    "recalibrate_draw_probability": false,
+    "recalibrate_extra_time_probability": false,
+    "recalibrate_penalty_probability": false,
+    "reason": "The frozen snapshots identified both finalists and Spain as champion, while the 6-4 third-place score is an extreme tail event that the current dataset cannot isolate by stage. Four dependent matches cannot justify a retrospective global retune. Regulation evidence is archived under the frozen policy, and the 2026 tournament must remain an out-of-sample block in any future retraining."
+  },
+  "limitations": [
+    "Four final-stage matches are descriptive and cannot identify stable global recalibration.",
+    "The 6-4 third-place result is one extreme observation, not evidence for a fitted multiplier.",
+    "The processed historical matrix has no stage label for estimating a third-place scoring regime.",
+    "The audit has final scores but no event-level xG, lineups, injuries, red-card state, or closing odds.",
+    "The final extra-time goal resolves the champion but is excluded from the 90-minute posterior.",
+    "Monte Carlo intervals measure sampling error only; after the final, simulation uncertainty is moot."
+  ],
+  "artifacts": {
+    "semifinal_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_semifinal_calibration.csv",
+    "medal_csv": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/reports/bolao_medal_matches_calibration.csv"
+  },
+  "source_fingerprints": {
+    "model_package": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a",
+    "sota_pipeline": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770",
+    "bolao": "67376f519e2f2dc73dac6119c668684b3df3b782b9f50d4ce62a5dbd6bd94a0f",
+    "final_calibration_audit": "e2c6da120a377f802cc67773296c7bbd2f34a07a7f47f5c2c456d028f6784879",
+    "quarterfinal_calibration_audit": "3483cbaf373b2c9585d30b75796c35d96699c38956b5c2ac2b234d7e90bc70fb",
+    "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
+    "observed_knockout_results": "93aa7ad7b8bfeefe94b1c66a08ae5da3f83d443b659fdb436ea240432a17b810",
+    "training_matrix": "bf67d740e988fa3d38310e3b97c201844dab618bcdff689dbbe251dea88e6a25"
+  },
+  "hard_gates": {
+    "complete_final_stage_snapshot": true,
+    "official_final_stage_bracket": true,
+    "candidate_frozen_before_semifinals": true,
+    "candidate_frozen_before_third_place": true,
+    "candidate_frozen_before_final": true,
+    "semifinalists_identified_before_kickoff": true,
+    "champion_identified_before_final": true,
+    "spain_led_pre_semifinal_monte_carlo": true,
+    "spain_led_pre_final_monte_carlo": true,
+    "extra_time_goal_excluded_from_regulation_form": true,
+    "final_score_separated_correctly": true,
+    "tournament_complete_with_spain_champion": true,
+    "combined_loss_gaps_within_operational_margin": true
+  },
+  "approved": true
+}

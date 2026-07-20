@@ -120,6 +120,8 @@ def team_rows(
     historical_ranking: list[bolao.ChampionOption],
     pair_rows: pd.DataFrame,
     runs: int,
+    *,
+    tournament_complete: bool,
 ) -> list[dict[str, object]]:
     historical = ranking_map(historical_ranking)
     rows: list[dict[str, object]] = []
@@ -140,14 +142,17 @@ def team_rows(
         subset = pair_rows[pair_rows["team"] == option.team]
         historical_option = historical.get(option.team)
         historical_probability = float(historical_option.probability) if historical_option is not None else 0.0
-        lower, upper = bolao.mc_sampling_interval_95(float(option.probability), runs)
+        lower: float | None = None
+        upper: float | None = None
+        if not tournament_complete:
+            lower, upper = bolao.mc_sampling_interval_95(float(option.probability), runs)
         row = {
             "rank": int(option.rank),
             "team": option.team,
             "titles": int(option.wins),
             "champion_probability": float(option.probability),
-            "champion_probability_mc95_low": float(lower),
-            "champion_probability_mc95_high": float(upper),
+            "champion_probability_mc95_low": lower,
+            "champion_probability_mc95_high": upper,
             "historical_form_probability": historical_probability,
             "current_form_delta": float(option.probability) - historical_probability,
             "max_single_match_advance": float(subset["p_team_advances"].max()),
@@ -176,6 +181,13 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
 
     model = WorldCupModel()
     board = bolao.build_group_stage_board(model)
+    expected_knockout_matches = {
+        int(game.match_number)
+        for game in model.fixtures[model.fixtures["stage_id"] > sota.GROUP_STAGE_ID].itertuples(index=False)
+    }
+    tournament_complete = bool(expected_knockout_matches) and expected_knockout_matches.issubset(
+        board.knockout_results
+    )
     active_ranking = bolao.build_champion_ranking(
         model,
         board,
@@ -200,7 +212,13 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
     csv_out.parent.mkdir(parents=True, exist_ok=True)
     pairs.to_csv(csv_out, index=False)
 
-    rows = team_rows(active_ranking, baseline_ranking, pairs, runs)
+    rows = team_rows(
+        active_ranking,
+        baseline_ranking,
+        pairs,
+        runs,
+        tournament_complete=tournament_complete,
+    )
     observed_losers = sorted(
         result.away if result.winner == result.home else result.home for result in board.knockout_results.values()
     )
@@ -221,16 +239,34 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
             for team in candidates
             if team != opponents[0]
         ),
+        "completed_tournament_lock_consistent": not tournament_complete
+        or (
+            len(active_ranking) == 1
+            and active_ranking[0].team == "Spain"
+            and float(active_ranking[0].probability) == 1.0
+        ),
     }
     report = {
         "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
         "scope": {
-            "ranking": "fixed observed group stage, observed knockout results locked, form-aware hybrid Monte Carlo",
+            "ranking": (
+                "completed observed bracket lock; no future match prediction"
+                if tournament_complete
+                else "fixed observed group stage, observed knockout results locked, form-aware hybrid Monte Carlo"
+            ),
+            "tournament_complete": tournament_complete,
+            "prediction_status": (
+                "observed_outcome_not_model_probability" if tournament_complete else "prospective_monte_carlo"
+            ),
             "runs_per_form_scenario": int(runs),
             "seed": int(seed),
             "top": int(len(candidates)),
             "pair_scope": "each top candidate against every other qualified team with no fixture context, to isolate nominal bracket-order bias",
-            "monte_carlo_interval": "Wilson 95% sampling error only; not total model uncertainty",
+            "monte_carlo_interval": (
+                "not applicable after completed tournament"
+                if tournament_complete
+                else "Wilson 95% sampling error only; not total model uncertainty"
+            ),
         },
         "current_form": {
             "is_enabled": bool(board.form.is_enabled),
@@ -270,6 +306,7 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
             "bolao": file_sha256(ROOT / "src/arena_ai/bolao.py"),
             "observed_group_results": file_sha256(bolao.OBSERVED_GROUP_RESULTS_PATH),
             "observed_knockout_results": file_sha256(bolao.OBSERVED_KNOCKOUT_RESULTS_PATH),
+            "top10_bias_audit": file_sha256(Path(__file__)),
         },
     }
     out.parent.mkdir(parents=True, exist_ok=True)

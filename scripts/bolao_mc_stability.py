@@ -167,23 +167,31 @@ def fixed_group_stage_payload(board: bolao.GroupStageBoard) -> dict[str, object]
     return payload
 
 
-def ranking_rows(counts: Counter[str], candidates: list[str], runs: int, top_n: int) -> list[dict[str, object]]:
+def ranking_rows(
+    counts: Counter[str],
+    candidates: list[str],
+    runs: int,
+    top_n: int,
+    *,
+    include_sampling_intervals: bool,
+) -> list[dict[str, object]]:
     observed_champions = [team for team in candidates if counts[team] > 0]
     ordered = sorted(observed_champions, key=lambda team: (-counts[team], team))[: min(top_n, len(observed_champions))]
     rows = []
     for rank, team in enumerate(ordered, start=1):
         wins = int(counts[team])
         probability = wins / runs
+        interval = None
+        if include_sampling_intervals:
+            lower, upper = mc_sampling_interval_95(probability, runs)
+            interval = {"lower": lower, "upper": upper}
         rows.append(
             {
                 "rank": rank,
                 "team": team,
                 "titles": wins,
                 "probability": probability,
-                "mc_sampling_interval_95": {
-                    "lower": mc_sampling_interval_95(probability, runs)[0],
-                    "upper": mc_sampling_interval_95(probability, runs)[1],
-                },
+                "mc_sampling_interval_95": interval,
             }
         )
     return rows
@@ -199,6 +207,8 @@ def nested_snapshots(
 ) -> list[dict[str, object]]:
     candidates = sorted(board.qualified_teams)
     knockout_games, third_slot_assignment = knockout_setup(model, board)
+    expected_match_numbers = {int(game.match_number) for game in knockout_games}
+    tournament_complete = bool(expected_match_numbers) and expected_match_numbers.issubset(board.knockout_results)
     counts: Counter[str] = Counter()
     rng = random.Random(seed)
     targets = set(runs)
@@ -218,7 +228,13 @@ def nested_snapshots(
         snapshots.append(
             {
                 "runs": completed,
-                "top_champions": ranking_rows(counts, candidates, completed, top_n),
+                "top_champions": ranking_rows(
+                    counts,
+                    candidates,
+                    completed,
+                    top_n,
+                    include_sampling_intervals=not tournament_complete,
+                ),
                 "probabilities": {team: counts[team] / completed for team in candidates},
                 "total_titles": int(sum(counts.values())),
             }
@@ -366,6 +382,9 @@ def build_report(
     min_independent_top_overlap: float,
     max_independent_sampling_z: float,
 ) -> dict[str, object]:
+    knockout_games, _ = knockout_setup(model, board)
+    expected_match_numbers = {int(game.match_number) for game in knockout_games}
+    tournament_complete = bool(expected_match_numbers) and expected_match_numbers.issubset(board.knockout_results)
     snapshots = nested_snapshots(model, board, runs=runs, seed=seed, top_n=top_n)
     comparisons = [
         compare_snapshots(snapshots[index - 1], snapshots[index], top_n=top_n)
@@ -396,20 +415,42 @@ def build_report(
         "simulation_scope": {
             "group_stage": "fixed_board",
             "current_tournament_form": "included",
-            "knockout": "observed_results_locked_then_form_aware_hybrid_sampled",
-            "sampling": "nested_prefixes_one_seed_plus_independent_seeds",
+            "tournament_complete": tournament_complete,
+            "knockout": (
+                "completed_bracket_fully_observed_no_future_matches_sampled"
+                if tournament_complete
+                else "observed_results_locked_then_form_aware_hybrid_sampled"
+            ),
+            "sampling": (
+                "deterministic_replay_across_run_counts_and_seeds"
+                if tournament_complete
+                else "nested_prefixes_one_seed_plus_independent_seeds"
+            ),
         },
         "fixed_group_stage": fixed_group_stage_payload(board),
-        "uncertainty": {
-            "interval": "wilson_score_95_percent",
-            "scope": "monte_carlo_sampling_error_only",
-            "does_not_measure": [
-                "model_misspecification",
-                "data_quality_or_manual_snapshot_error",
-                "parameter_uncertainty",
-                "future_match_uncertainty_beyond_the_simulation_model",
-            ],
-        },
+        "uncertainty": (
+            {
+                "interval": "not_applicable_completed_tournament",
+                "scope": "observed_outcome_lock_consistency_only",
+                "does_not_measure": [
+                    "predictive_model_uncertainty_after_outcome_lock",
+                    "model_misspecification",
+                    "data_quality_or_manual_snapshot_error",
+                    "parameter_uncertainty",
+                ],
+            }
+            if tournament_complete
+            else {
+                "interval": "wilson_score_95_percent",
+                "scope": "monte_carlo_sampling_error_only",
+                "does_not_measure": [
+                    "model_misspecification",
+                    "data_quality_or_manual_snapshot_error",
+                    "parameter_uncertainty",
+                    "future_match_uncertainty_beyond_the_simulation_model",
+                ],
+            }
+        ),
         "snapshots": snapshots,
         "comparisons": comparisons,
         "independent_seed_audit": independent_audit,

@@ -27,3 +27,7 @@ match_number,round,home_team,away_team,home_goals_90,away_goals_90,extra_time_ho
 98,Quarterfinals,Spain,Belgium,2,1,0,0,Spain,90min,,,user_reported_and_web_verified_2026-07-12
 99,Quarterfinals,Norway,England,1,1,0,1,England,extra_time,,,user_reported_and_web_verified_2026-07-12
 100,Quarterfinals,Argentina,Switzerland,1,1,2,0,Argentina,extra_time,,,user_reported_and_web_verified_2026-07-12
+101,Semifinals,France,Spain,0,2,0,0,Spain,90min,,,user_reported_and_web_verified_2026-07-19
+102,Semifinals,England,Argentina,1,2,0,0,Argentina,90min,,,user_reported_and_web_verified_2026-07-19
+103,Third Place Playoff,France,England,4,6,0,0,England,90min,,,user_reported_and_web_verified_2026-07-19
+104,Final,Spain,Argentina,0,0,1,0,Spain,extra_time,,,user_reported_and_web_verified_2026-07-19

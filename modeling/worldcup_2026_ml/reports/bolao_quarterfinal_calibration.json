@@ -1,6 +1,6 @@
 {
   "report_type": "arena_bolao_quarterfinal_calibration",
-  "generated_at": "2026-07-12T05:21:03.556565+00:00",
+  "generated_at": "2026-07-20T03:00:06.707929+00:00",
   "scope": {
     "observed_round": "Quarterfinals",
     "observed_matches": 4,
@@ -150,12 +150,12 @@
   "source_fingerprints": {
     "model_package": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a",
     "sota_pipeline": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770",
-    "bolao": "96153417432545805cc629ebb43822176399a52a18f7a857f62ef3d91a3b2fdb",
+    "bolao": "67376f519e2f2dc73dac6119c668684b3df3b782b9f50d4ce62a5dbd6bd94a0f",
     "quarterfinal_calibration_audit": "3483cbaf373b2c9585d30b75796c35d96699c38956b5c2ac2b234d7e90bc70fb",
     "round16_calibration_audit": "fdf22dba91ac86b66bf71187f2e5628f6b05c3c0c1cd02cdfb8931dd1ee83563",
     "round32_calibration_audit": "60374008f71867eab178f3fce82f54175619462812286aed458cc124d9a27013",
     "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
-    "observed_knockout_results": "6fd00a10cc4e6b9d12285ecd6d4dd9f1cad2fa0a2b75cff116ac619432eb7f2d"
+    "observed_knockout_results": "93aa7ad7b8bfeefe94b1c66a08ae5da3f83d443b659fdb436ea240432a17b810"
   },
   "hard_gates": {
     "complete_quarterfinal_snapshot": true,

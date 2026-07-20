@@ -78,7 +78,7 @@ O bolão é um utilitário Rich do projeto: não gera aplicativo, binário ou ZI
 release próprio. Quando for a hora de distribuir o produto, `make build-release`
 gera apenas os artefatos Mac e Windows do ArenaAI.
 
-O bolão lê os placares registrados em `modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv` junto com a metadata local `worldcup_2026_group_stage_snapshot.json`. A metadata declara o `as_of` com timezone, contagem e hash do CSV, proveniência manual local e `official_source: false`; o programa confere identidade do confronto, grupo, ordem cronológica e que cada jogo observado já teria terminado (kickoff + duas horas) no `as_of`. A metadata também aceita `fair_play_scores` agregado por seleção, desde que cubra as 48 equipes. Sem esse dado, qualquer empate de grupo que dependa de fair play é recusado em vez de cair para o ranking FIFA. Isso não é uma fonte FIFA nem uma validação independente dos resultados. Jogos eliminatórios concluídos ficam em `worldcup_2026_knockout_results.csv`, com o placar de 90 minutos, prorrogação e pênaltis quando houver; os 28 jogos até o fim das quartas estão registrados ali. Eles são travados na chave e uma seleção eliminada não pode voltar em uma trilha condicionada.
+O bolão lê os placares registrados em `modeling/worldcup_2026_ml/data/observed/worldcup_2026_group_stage_results.csv` junto com a metadata local `worldcup_2026_group_stage_snapshot.json`. A metadata declara o `as_of` com timezone, contagem e hash do CSV, proveniência manual local e `official_source: false`; o programa confere identidade do confronto, grupo, ordem cronológica e que cada jogo observado já teria terminado (kickoff + duas horas) no `as_of`. A metadata também aceita `fair_play_scores` agregado por seleção, desde que cubra as 48 equipes. Sem esse dado, qualquer empate de grupo que dependa de fair play é recusado em vez de cair para o ranking FIFA. Isso não é uma fonte FIFA nem uma validação independente dos resultados. Jogos eliminatórios concluídos ficam em `worldcup_2026_knockout_results.csv`, com o placar de 90 minutos, prorrogação e pênaltis quando houver; os 32 jogos até a final estão registrados ali. Eles são travados na chave e uma seleção eliminada não pode voltar em uma trilha condicionada.
 
 Para cada seleção, os gols registrados na Copa são comparados ao xG histórico previsto antes do jogo. Nos jogos vindos do CSV, o console exibe esse xG pré-jogo/base, sem recalculá-lo depois de observar todos os 72 resultados. O ajuste candidato de forma só é avaliado depois da fotografia completa dos 72 jogos: é um posterior Gamma-Poisson por ataque e defesa, aplicado apenas às projeções futuras nos lambdas da matriz Poisson/Dixon-Coles. O prior é escolhido somente nos primeiros dois terços cronológicos do CSV e precisa superar o baseline histórico no terço final. Se não superar, o bolão preserva o híbrido histórico; ele não força um peso mínimo para a forma atual.
 
@@ -88,7 +88,9 @@ As oito oitavas são avaliadas contra a foto congelada ao fim dos 16 avos. Nessa
 
 As quatro quartas usam a foto congelada após as oitavas como novo teste prospectivo. Ela identificou os quatro classificados e melhorou marginalmente o log-loss 1X2 (`0,9099` para `0,9089`) e o Brier (`0,5576` para `0,5557`) frente ao histórico puro. Placar exato e perdas de avanço ficaram ligeiramente piores, mas todas as diferenças permaneceram abaixo do mesmo guardrail de `0,01`. Os dois empates em 90 minutos, contra `1,00` esperado, produzem resíduo padronizado de `1,16` e não sustentam recalibração de empate ou prorrogação. Só os placares regulamentares entram no posterior: o peso mediano passa de `41,9%` para `42,3%`, e o maior deslocamento de avanço nas semifinais é `0,32 p.p.`.
 
-Depois, o console roda 1000 Copas Monte Carlo somente nos jogos ainda abertos da chave que nasce dessa fase fixa para listar até 10 campeões possíveis; após as quartas, restam apenas quatro. Empates de mata-mata seguem a matriz Poisson/Dixon-Coles na prorrogação e usam pênaltis neutros, sem extrapolar uma probabilidade de 90 minutos para a disputa. O intervalo de Wilson de 95% mostrado por seleção representa somente erro de amostragem da simulação; não mede a incerteza total do modelo, da forma ou do snapshot manual. A partir desse ranking, você escolhe um campeão e o console monta uma trilha modal condicionada para esse time ser campeão. Essa trilha é explicativa, não uma amostra de `P(chave | campeão)`.
+Os quatro jogos finais são avaliados em três fotos prospectivas: antes das semifinais, antes do terceiro lugar e antes da final. A foto acertou os dois finalistas e indicou a Espanha como campeã: `35,4%` no Monte Carlo pré-semifinal e `57,9%` antes da final. No conjunto, acertou três dos quatro vencedores; o erro foi França `4 x 6` Inglaterra, placar cuja probabilidade exata era `0,0069%`. Mesmo assim, as cinco diferenças agregadas de perda contra o histórico ficaram dentro do guardrail de `0,01`. O dataset processado não contém a fase histórica do jogo, portanto não permite estimar um regime próprio de terceiro lugar: nenhum multiplicador foi inventado. O peso mediano final passa de `42,3%` para `43,4%`, e o gol espanhol da prorrogação permanece fora do posterior de 90 minutos.
+
+Enquanto existem jogos abertos, o console roda 1000 Copas Monte Carlo para listar até 10 campeões possíveis. Empates de mata-mata seguem a matriz Poisson/Dixon-Coles na prorrogação e usam pênaltis neutros, sem extrapolar uma probabilidade de 90 minutos para a disputa. O intervalo de Wilson de 95% mostrado por seleção representa somente erro de amostragem da simulação; não mede a incerteza total do modelo, da forma ou do snapshot manual. Depois que a final é travada, o console não executa Monte Carlo nem apresenta `100%` como previsão: exibe a Espanha como campeã observada e a chave encerrada.
 
 Confrontos neutros também são calculados nos dois sentidos da ordem da chave e espelhados antes de produzir o 1X2, xG, prorrogação e avanço. Assim, aparecer como mandante nominal não cria vantagem estatística; descanso, viagem e sede continuam podendo entrar quando o fixture fornece esse contexto real.
 
@@ -126,13 +128,21 @@ make bolao-quarterfinal-audit
 
 O alvo preserva a foto pré-quartas, audita os quatro resultados sem look-ahead e grava `bolao_quarterfinal_calibration.json/.csv`. A nova foto fica em `bolao_semifinal_predictions.csv`, com `França x Espanha` e `Inglaterra x Argentina`. A auditoria exige os 28 resultados travados, exclui os três gols de prorrogação do posterior de 90 minutos e impede que quatro jogos sejam usados para retreinar XGBoost ou selecionar novos pesos globais.
 
+Auditoria final do torneio:
+
+```bash
+make bolao-final-audit
+```
+
+O alvo congela snapshots antes das semifinais, do terceiro lugar e da final. Ele grava `bolao_final_calibration.json`, `bolao_semifinal_calibration.csv` e `bolao_medal_matches_calibration.csv`, recupera as probabilidades Monte Carlo prospectivas da Espanha, mede o desvio do `6 x 4` e valida que a final foi `0 x 0` em 90 minutos antes do `1 x 0` na prorrogação. O relatório mantém 2026 como bloco fora da amostra para qualquer retreino futuro.
+
 Auditoria de estabilidade do próprio bolão:
 
 ```bash
 make bolao-mc-stability
 ```
 
-O gate roda prefixos MC aninhados de `1k` e `2k` Copas e três repetições de `2k` com seeds independentes sobre os grupos fixos, a forma temporal e o mata-mata do bolão. Ele grava `modeling/worldcup_2026_ml/reports/bolao_monte_carlo_stability.json`, registra fingerprints do código, modelo, cache, auditoria e snapshot fixo, e falha se o delta máximo de probabilidade, a sobreposição do top ou o z-score de duas amostras configurados não passarem em qualquer um dos dois testes. Os intervalos de Wilson presentes nesse relatório também são apenas de erro de amostragem MC, não de incerteza total do modelo.
+O gate roda prefixos MC aninhados de `1k` e `2k` Copas e três repetições de `2k` com seeds independentes sobre os grupos fixos, a forma temporal e o mata-mata do bolão. Ele grava `modeling/worldcup_2026_ml/reports/bolao_monte_carlo_stability.json`, registra fingerprints do código, modelo, cache, auditoria e snapshot fixo, e falha se o delta máximo de probabilidade, a sobreposição do top ou o z-score de duas amostras configurados não passarem. Com a final observada, o resultado é deterministicamente Espanha em todas as execuções; isso valida o lock da chave, não a calibração de uma probabilidade de título. Nesse estado o relatório marca a incerteza preditiva como não aplicável e não publica intervalo Wilson para o 100% observado.
 
 Auditoria de viés do top 10:
 
@@ -140,7 +150,7 @@ Auditoria de viés do top 10:
 make bolao-top10-audit
 ```
 
-Esse alvo compara até dez candidatos ainda vivos com e sem a forma atual, verifica cada candidato contra todos os demais classificados nas duas ordens nominais e reprova diferença de 1X2, xG, avanço ou pênaltis além de erro numérico. O relatório fica em `modeling/worldcup_2026_ml/reports/bolao_top10_bias_audit.json` e os pares auditados em `bolao_top10_bias_audit.csv`. A comparação de forma é uma análise de sensibilidade; ela não trata o intervalo Monte Carlo como incerteza total do modelo.
+Esse alvo compara até dez candidatos ainda vivos com e sem a forma atual, verifica cada candidato contra todos os demais classificados nas duas ordens nominais e reprova diferença de 1X2, xG, avanço ou pênaltis além de erro numérico. O relatório fica em `modeling/worldcup_2026_ml/reports/bolao_top10_bias_audit.json` e os pares auditados em `bolao_top10_bias_audit.csv`. Após a final, sobra apenas a campeã observada; a auditoria continua útil para simetria e integridade, não como ranking preditivo, e deixa vazios os intervalos Monte Carlo da campeã travada.
 
 Auditoria estatística do pacote:
 
