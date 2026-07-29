@@ -15,6 +15,7 @@ from .audio_manifest import (
     KICK_SOUND_BAG,
     NEAR_MISS_REACTION_SOUND_BAG,
     NET_SOUND_BAG,
+    SAVE_IMPACT_SOUND_BAG,
     WHOOSH_SOUND_BAG,
     audio_asset,
 )
@@ -118,6 +119,7 @@ MATCH_CUE_MIX: dict[str, AudioCueMix] = {
     "kick": AudioCueMix(0.52, 0.560),
     "whoosh": AudioCueMix(0.14, 0.720),
     "net": AudioCueMix(0.36, 0.980),
+    "save_impact": AudioCueMix(0.20, 0.420),
     "bass": AudioCueMix(0.46, 1.100, 0.35),
     "goal_roar": AudioCueMix(0.58, 6.800, 0.20),
     "goal_explosion": AudioCueMix(0.46, 4.200, 0.45),
@@ -205,6 +207,7 @@ class AudioEngine:
         self.next_cup_tick_ms = 0
         self.scene = "menu"
         self._last_bag_choice: dict[str, int] = {}
+        self._sound_asset_names: dict[int, str] = {}
         self.layer_volumes = {
             "base": 0.0,
             "air": 0.0,
@@ -299,6 +302,10 @@ class AudioEngine:
         self.net = self.load_sound(NET_SOUND_BAG[0])
         self.net_alt = self.load_sound(NET_SOUND_BAG[1])
         self.kick_bag = [sound for sound in (self.kick, self.kick_alt, self.kick_more, self.kick_soft) if sound is not None]
+        kick_sound_by_name = dict(zip(KICK_SOUND_BAG, (self.kick, self.kick_alt, self.kick_more, self.kick_soft), strict=True))
+        self.save_impact_bag = [
+            sound for filename in SAVE_IMPACT_SOUND_BAG if (sound := kick_sound_by_name[filename]) is not None
+        ]
         self.whoosh_bag = [sound for sound in (self.whoosh, self.whoosh_alt) if sound is not None]
         self.net_bag = [sound for sound in (self.net, self.net_alt) if sound is not None]
         self.whistle = self.load_sound("whistle_start_01.wav")
@@ -315,10 +322,14 @@ class AudioEngine:
         try:
             sound = pygame.mixer.Sound(AUDIO_DIR / audio_asset(filename).filename)
             sound.set_volume(AUDIO_SOUND_VOLUMES[filename])
+            self._sound_asset_names[id(sound)] = filename
             return sound
         except (pygame.error, OSError) as exc:
             self.disabled_reason = str(exc)
             return None
+
+    def sound_asset_name(self, sound: pygame.mixer.Sound | None) -> str | None:
+        return self._sound_asset_names.get(id(sound)) if sound is not None else None
 
     def choose_bag(self, key: str, sounds: list[pygame.mixer.Sound]) -> pygame.mixer.Sound | None:
         if not sounds:
@@ -460,7 +471,13 @@ class AudioEngine:
             fade_ms=120,
         )
 
-    def play(self, name: str, pan: float = 0.0) -> None:
+    def play(
+        self,
+        name: str,
+        pan: float = 0.0,
+        *,
+        already_armed: bool = False,
+    ) -> None:
         if not self.channels:
             return
         pan = clamp(pan, -0.75, 0.75)
@@ -493,39 +510,55 @@ class AudioEngine:
             self.buses["ui"].play(self.final_whistle, volume=0.24, key="final_whistle", preferred="whistle", cooldown_ms=1200, maxtime=1400)
             return
         if name == "kick":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             sound = self.choose_bag("kick", self.kick_bag)
             cue = MATCH_CUE_MIX["kick"]
             self.buses["ball"].play(sound, volume=cue.volume, key="kick", preferred="ball", cooldown_ms=120, maxtime=int(cue.maxtime * 1000), pan=pan)
             return
         if name == "whoosh":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             whoosh_pan = clamp(pan + self.rng.uniform(-0.12, 0.12), -0.75, 0.75)
             cue = MATCH_CUE_MIX["whoosh"]
             self.buses["ball"].play(self.choose_bag("whoosh", self.whoosh_bag), volume=cue.volume, key="whoosh", preferred="motion", cooldown_ms=120, maxtime=int(cue.maxtime * 1000), pan=whoosh_pan)
             return
         if name == "net":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             cue = MATCH_CUE_MIX["net"]
             self.buses["ball"].play(self.choose_bag("net", self.net_bag), volume=cue.volume, key="net", preferred="net", cooldown_ms=180, maxtime=int(cue.maxtime * 1000), pan=pan)
             return
         if name == "save":
-            self.arm_event(name)
-            self.buses["ball"].play(self.choose_bag("save_net", self.net_bag), volume=0.20, key="save_ball", preferred="net", cooldown_ms=240, maxtime=620, fade_ms=20, pan=pan)
+            if not already_armed:
+                self.arm_event(name)
+            cue = MATCH_CUE_MIX["save_impact"]
+            self.buses["ball"].play(
+                self.choose_bag("save_impact", self.save_impact_bag),
+                volume=cue.volume,
+                key="save_impact",
+                preferred="ball_alt",
+                cooldown_ms=240,
+                maxtime=int(cue.maxtime * 1000),
+                fade_ms=16,
+                pan=pan,
+            )
             self.buses["crowd"].play(self.choose_bag("save_reaction", self.crowd_reactions), volume=0.12, key="save_reaction", preferred="react", cooldown_ms=650, maxtime=1700, fade_ms=80, pan=pan * 0.25)
             return
         if name == "near_miss":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             self.buses["crowd"].play(self.choose_bag("near_miss_reaction", self.near_miss_reactions), volume=0.10, key="near_miss_reaction", preferred="react", cooldown_ms=650, maxtime=1800, fade_ms=90, pan=pan * 0.20)
-            self.buses["goal"].play(self.reverb_tail, volume=0.08, key="near_miss_tail", preferred="reverb", cooldown_ms=700, maxtime=1450, fade_ms=180, pan=pan * 0.18)
             return
         if name == "bass":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             cue = MATCH_CUE_MIX["bass"]
             self.buses["goal"].play(self.bass_hit, volume=cue.volume, key="bass", preferred="bass", cooldown_ms=300, maxtime=int(cue.maxtime * 1000), pan=pan * cue.pan_scale)
             return
         if name == "cheer":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             roar = MATCH_CUE_MIX["goal_roar"]
             self.buses["goal"].play(self.choose_bag("goal_roar", self.goal_roars), volume=roar.volume, key="goal_roar", preferred="roar", cooldown_ms=700, maxtime=int(roar.maxtime * 1000), fade_ms=55, pan=pan * roar.pan_scale)
             explosion = self.choose_bag("goal_explosion", self.goal_explosions) or self.goal_crowd_cc0
@@ -537,6 +570,7 @@ class AudioEngine:
             self.buses["crowd"].play(self.crowd_attack, volume=swell.volume, key="goal_attack_swell", preferred="react", cooldown_ms=900, maxtime=int(swell.maxtime * 1000), fade_ms=70, pan=pan * swell.pan_scale)
             return
         if name == "reverb":
-            self.arm_event(name)
+            if not already_armed:
+                self.arm_event(name)
             cue = MATCH_CUE_MIX["reverb"]
             self.buses["goal"].play(self.reverb_tail, volume=cue.volume, key="reverb", preferred="reverb", cooldown_ms=360, maxtime=int(cue.maxtime * 1000), fade_ms=260, pan=pan * cue.pan_scale)

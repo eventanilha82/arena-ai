@@ -43,7 +43,7 @@ Fontes de verdade:
 
 `assets/sounds/downloaded_audio_manifest.csv` é o inventário bruto dos downloads manuais. Ele guarda o detalhe técnico que não deve ser duplicado em texto narrativo: caminho, duração, camada, origem e status de cada candidato.
 
-No `assets/asset_manifest.json`, `generated_runtime_globs` deve apontar apenas para arquivos finais usados pelo jogo. Sheets brutos de `image_gen`, fontes de recorte, flag sheets e parallax sources ficam em `generated_source_globs`; candidatos de áudio ficam em `curation_asset_globs`. O empacotador reprova qualquer glob de runtime que aponte para fontes brutas ou diretórios de curadoria.
+No `assets/asset_manifest.json`, `generated_runtime_globs` e `release_runtime_globs` devem apontar para o mesmo conjunto final usado e empacotado pelo jogo. Somente fontes ainda necessárias para reconstrução, como flag sheets e parallax sources, ficam em `generated_source_globs`; candidatos de áudio ficam em `curation_asset_globs`. O empacotador reprova divergência entre inventários, cardinalidade inesperada e qualquer fonte bruta ou arquivo extra no payload.
 
 O contrato de áudio define:
 
@@ -82,7 +82,7 @@ O `AudioEngine` usa buses:
 | `ui` | apitos, ticks e stingers de interface |
 | `music` | abertura/menu |
 
-`draw()` deve ser puro. Eventos de áudio são disparados no `update()` e em transições de estado, com cooldown, ducking, pan, randomização, fade e sound-bags que evitam repetição imediata. A regra de cada cue fica centralizada em `AudioCuePolicy`: o `App` apenas arma/enfileira eventos, e o `AudioEngine` decide suppressão, boost, foco de impacto e ducking.
+`draw()` deve ser puro. Eventos de áudio são disparados no `update()` e em transições de estado, com cooldown, ducking, pan, randomização, fade e sound-bags que evitam repetição imediata. A regra de cada cue fica centralizada em `AudioCuePolicy`: o `App` arma cada evento uma única vez antes do frame e o flush o reproduz como já armado, sem prolongar suppressão, boost, foco de impacto ou ducking.
 
 O ducking não pode matar o estádio. Em chute/gol, a cama `stadium_base + air` permanece audível; o corte leve acontece nas camadas de música/tensão/chant para abrir espaço para `kick`, `net`, `bass` e explosão. O `crowd_attack_rise` deixou de ser reação randômica e virou arco de gol/ataque, enquanto reações aleatórias usam takes curtos.
 
@@ -467,28 +467,41 @@ Embora este documento consolide principalmente fontes/licenças, estes grupos ta
 - `assets/generated/stadium_parallax_real.png`: estádio/campo do confronto.
 - `assets/generated/parallax_sources/imagen_turf_*.png`: fontes do gramado geradas por `image_gen`.
 - `assets/generated/parallax/turf_*_strip.png`: faixas preparadas para parallax.
-- `assets/generated/cinematic_sources/imagen_oracle_*.png`: sheets de jogadores gerados por `image_gen`, com `ORACLE` no centro da camisa.
-- `assets/generated/cinematic/runner_*.png`: corrida por uniforme.
-- `assets/generated/cinematic/keeper_anim_*.png`: goleiro.
-- `assets/generated/cinematic/goal_net_*.png`: camada traseira da trave/rede.
-- `assets/generated/cinematic/goal_front_*.png`: camada frontal com postes/trave limpos, sem rede duplicada.
-- `assets/generated/cinematic/goal_impact_*.png`: deformação da rede.
-- `assets/generated/ball_sources/plain_ball_sheet_8frames.png`: fonte da bola.
-- `assets/generated/balls3d/*.png`: frames da bola.
+- `assets/generated/cinematic/runner*_smooth_*.png`: inventário final de 54 sheets para 9 uniformes, 2 direções e corrida/chute/parada. Cada direção tem 16 poses de corrida, 16 de chute e 8 de parada. Não há espelhamento, fluxo óptico, recoloração de jogador ou wordmark sobreposto; `ORACLE` está nos pixels originais.
+- `assets/generated/cinematic/runner_motion.json`: contrato runtime v8 de pivô, baseline, pelve, apoio, toque, compensação autoral de altura e `ball_clearance_offset_px` alpha-safe em cada quadro de corrida e chute.
+- `assets/generated/cinematic/keeper_anim_{right,left}_{0..15}.png` e `keeper_motion.json`: 16 quadros finais por direção; o jogo separa a direção visual do asset da projeção do goleiro, ancora o pouso no gramado, mantém a pose derrotada após gol sofrido e usa a recuperação completa nos lances sem gol.
+- `assets/generated/cinematic/poc7_runtime_contract.json`: contrato cinematográfico v5 promovido. Contém 30 sequências, amostras gerais a 60 Hz, cues de áudio, pesos dos medoids, cadências da rede e hashes de todas as camadas rasterizadas.
+- `assets/generated/cinematic/poc7_net/`: 58 PNGs finais: quatro camadas compartilhadas e três arquivos por campanha de gol (`static_back`, atlas traseiro e atlas de contato). Cada uma das 18 campanhas possui 70 estados traseiros a 30 Hz e contato frontal até `180 ms`; o runtime nunca usa crossfade.
+- `assets/generated/balls3d/ball_{0..31}.png`: 32 quadros finais promovidos; o runtime escolhe um quadro nativo, sem blend sintético.
 - `assets/generated/flags/*.png`: 48 bandeiras em sprite.
 
 Z-order oficial do gol:
 
 ```text
-goal_back -> jogador/bola -> goal_front/impact -> goleiro
+rede/trave traseira -> jogador -> bola/goleiro por profundidade -> contato local -> postes/trave frontais
 ```
+
+Em gol e defesa, a bola é desenhada antes do goleiro; no `wide`, depois de
+ultrapassar a profundidade do goleiro, ela passa para a camada seguinte. O
+contato frontal localizado e os postes fecham a oclusão. Essa ordem vem de
+`ball_after_keeper` no contrato e não é inferida novamente pelo runtime.
 
 Regra de sprites:
 
 - sprites principais do jogo devem ser gerados pelo `image_gen`;
-- recorte e preparação ficam em scripts;
+- recorte e preparação acontecem offline antes da promoção;
 - runtime não deve fazer recorte/chroma key pesado;
 - nenhum jogador deve ter escudo no shorts, brasão, número ou marcas além de `ORACLE` no centro da camisa.
+
+Os ciclos de corrida são artefatos promovidos e protegidos por inventário, cardinalidade, hash e validação visual:
+
+```bash
+make validate
+make cinematic-game-qa
+make aaa-qa
+```
+
+O runtime não executa chroma key, fluxo óptico, espelhamento de personagem, recoloração dos jogadores de linha ou sobreposição de `ORACLE`. Cada pose visível vem de um quadro GPT Image direto, com esquerda e direita produzidas separadamente. A escala de composição permanece constante durante a animação; deslocamento mundial, sombra, bola e câmera são integrados em substeps fixos de 60 Hz. O uniforme contrastante do goleiro permanece como a única adaptação cromática em runtime. Se um sheet, direção, pose, contrato ou metadata estiver ausente ou stale, os gates reprovam o inventário.
 
 ## Validação
 
@@ -497,6 +510,7 @@ Gates:
 ```bash
 make audio-qa
 make visual-qa
+make visual-qa-check
 make aaa-qa
 make validate
 ```
@@ -526,19 +540,25 @@ artifacts/visual_qa/current/
 
 `make aaa-qa` adiciona gates pesados:
 
-- sprites antigos no runtime;
-- `ORACLE` legível no peito;
+- ausência de sprites obsoletos no inventário runtime;
+- `ORACLE` nativo e visível no peito em 720 combinações de uniforme, direção e quadro de corrida/chute/parada, com área, limites, contraste e cobertura medidos nos pixels finais; as folhas de contato mantêm a leitura tipográfica como revisão visual explícita, sem fingir que a heurística de cor é OCR;
+- locomoção e planta medidas na silhueta alpha final dos nove uniformes nos dois sentidos, com rejeição de flutuação, submersão, deslocamento da raiz corporal e mutações mesmo quando o metadata permanece inalterado;
+- corredor da bola do contrato promovido com ajuste alpha mínimo por pose, uniforme, direção, rotação e altura da bola; o gate percorre as 30 sequências nos nove uniformes e nove instantes pós-chute, inclui os rastros visíveis e limita o overlap a `3%`;
 - pernas e bbox;
 - escala de pose;
 - chute com âncora do pé;
-- bola duplicada;
-- goleiro no gol;
+- silhueta única por ator, sem crossfade integral ou alpha residual;
+- bola duplicada, grudada ou atravessando a perna;
+- retomada sequencial da corrida após o chute;
+- goleiro no gol, 16 quadros diretos por direção e uma única silhueta por update;
 - bola na rede;
 - rede visível;
 - parallax sem seam;
 - z-order do gol;
 - partida completa;
 - orçamento visual de 60 FPS.
+
+`make visual-qa` recria a pasta de evidência, mantém o conjunto fechado de quatro vídeos e registra todos os PNG, MP4, CSV e JSON em inventário recursivo com hash/tamanho. `make visual-qa-check` também compara commit, estado limpo/sujo e fingerprint exato de código, assets, todos os `docs/*.md` e todos os `scripts/*.py`; depois repete a captura em diretório temporário e exige inventário idêntico. Qualquer mudança, ausência, arquivo extra ou replay não determinístico reprova sem regravar a foto.
 
 ## Processo Para Promover Novo Asset
 

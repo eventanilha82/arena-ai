@@ -26,5 +26,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "opencv-python-headless==4.11.0.86",
     "pyinstaller>=6.20.0",
 ]

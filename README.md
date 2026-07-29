@@ -10,7 +10,7 @@ O jogador escolhe duas seleções e decide entre simular um confronto ou simular
 - Seleção de confronto com as 48 seleções do fixture final da Copa 2026.
 - `SIMULAR CONFRONTO`: usa sorteio híbrido entre XGBoost e Poisson/Dixon-Coles para resultado em 90 minutos; o placar escolhido fica oculto até o apito final para manter suspense.
 - `SIMULAR COPA`: usa Monte Carlo com o mesmo sorteio estatístico influenciado para rodar grupos, melhores terceiros e mata-mata.
-- Cena cinematográfica de confronto: atacante em corrida, bola viva, parallax de estádio, gol 3D, goleiro saltando e rede estufando no lance de gol.
+- Cena cinematográfica de confronto: atacante em corrida, bola viva, parallax de estádio, gol 3D, goleiro saltando, rede estufando no gol, defesa antes da linha e chute para fora visível além da trave.
 - Movimento do atacante vinculado à leitura XGBoost + matriz de placar Poisson.
 - Bola, gols, placar e pressão guiados por probabilidades e xG do modelo.
 - HUD de confronto em camadas: placar ao vivo, probabilidades 1X2, sinais do modelo e possibilidades Poisson/DC; o placar sorteado só aparece como `PLACAR REVELADO` no 90'.
@@ -196,17 +196,22 @@ make runtime-cache
 make build-windows
 ```
 
-O alvo remoto empacota o workspace atual, envia para a VM por SSH, roda
-`uv sync --dev`, executa o QA definido por `ARENA_WIN_QA`, roda o PyInstaller no
-Windows e baixa o artefato para:
+O alvo remoto exige um worktree limpo, fixa commit/tree antes do QA, confirma
+que a identidade não mudou e empacota exatamente o SHA capturado com
+`git archive`. Depois envia o bundle e sua proveniência para a VM por SSH, roda
+`uv sync --dev`, executa o QA definido por `ARENA_WIN_QA` e roda o PyInstaller
+no Windows. O ZIP e o sidecar obrigatório do build são baixados para:
 
 ```text
 win/artifacts/ArenaAI-windows-latest.zip
+win/artifacts/build-result.json
 ```
 
 Depois o Makefile valida que o ZIP abre, contém `ArenaAI.exe` e inclui
 `runtime_prediction_cache.pkl`, usado para aquecer predições de confronto e para
-o modo turbo opcional da tela da Copa.
+o modo turbo opcional da tela da Copa. O sidecar vincula o hash do ZIP e do
+executável ao mesmo fingerprint de source usado pelo `.app`; um binário antigo,
+um sidecar ausente ou qualquer divergência de commit/tree reprova o release.
 
 Se estiver trabalhando diretamente em uma máquina Windows, rode:
 
@@ -215,9 +220,15 @@ make sync
 make build-windows
 ```
 
+Esse caminho também exige checkout Git limpo e constrói em uma extração
+temporária do SHA aprovado; `build-current` sem `.git` é reservado ao wrapper
+que fornece `RELEASE_SOURCE_PROVENANCE`.
+
 O build usa `make build-assets-qa` para montar `build/release_assets/` só com
 assets de runtime e pacote SOTA mínimo; `assets/sounds/candidates/`, docs e
-fontes brutas não entram no bundle. Guia completo da VM, bootstrap RDP/SSH,
+fontes brutas não entram no bundle. O staging e o ZIP Windows precisam conter
+todo o inventário declarado, inclusive os 54 sheets e os 16 quadros do goleiro por direção.
+Guia completo da VM, bootstrap RDP/SSH,
 variáveis e cuidados de segurança: [docs/BUILD.md](docs/BUILD.md).
 
 ## Controles
@@ -239,19 +250,17 @@ Documentação canônica consolidada de assets, áudio, fontes e licenças: [doc
 - `assets/generated/stadium_parallax_real.png`: estádio/campo realista usado no parallax do confronto.
 - `assets/generated/parallax_sources/imagen_turf_*.png`: sprites-fonte do tapete de campo gerados pelo `image_gen`.
 - `assets/generated/parallax/turf_*_strip.png`: recortes derivados dos sprites-fonte, preparados por `scripts/generate_parallax_turf.py` para o parallax contínuo do gramado.
-- `assets/generated/cinematic_sources/imagen_oracle_*.png`: sheets-fonte de jogadores gerados por `image_gen` com a única marca permitida, `ORACLE`, no centro da camisa; sem escudo no shorts, sem brasão, sem número e sem outras marcas.
 - Uniformes disponíveis: azul, azul claro/celeste, vermelho, vinho/bordô, branco, verde, amarelo/dourado, laranja e preto.
-- `assets/generated/cinematic/runner_*.png`: ciclo de corrida do atacante em quatro frames, recortado dos sheets `imagen_oracle_*` por uniforme.
-- `assets/generated/cinematic/keeper_anim_*.png`: animação do goleiro saltando no lance de gol.
-- `assets/generated/cinematic/goal_net_*.png`: camada traseira do sprite 3D da trave/rede.
-- `assets/generated/cinematic/goal_front_*.png`: camada frontal com postes/trave limpos, sem rede duplicada, desenhada por cima do lance depois de jogador, bola e goleiro; z-order oficial: `goal_back -> jogador/bola/goleiro -> goal_front/impact`.
-- `assets/generated/cinematic/goal_impact_*.png`: deformação da rede no ponto de impacto da bola.
-- `assets/generated/ball_sources/plain_ball_sheet_8frames.png`: sheet da bola gerado por `image_gen`.
-- `assets/generated/cinematic/*_idle.png`, `*_run1.png`, `*_dribble.png`, `*_kick.png`, `*_keeper.png`: sprites de posse, chute e empate.
+- `assets/generated/cinematic/runner*_smooth_*.png`: inventário final de 54 sheets, cobrindo 9 uniformes, 2 direções e 3 ações. Cada combinação possui 16 poses de corrida, 16 de chute e 8 de parada. Esquerda e direita são artes GPT Image independentes; `ORACLE` faz parte dos pixels originais da camisa, sem espelho, recoloração, composição de poses ou texto sobreposto.
+- `assets/generated/cinematic/runner_motion.json`: contrato runtime v8 com pivô, baseline, landmarks, compensação autoral de altura e política alpha-safe de contato entre pé e bola. Os sheets e o contrato são artefatos promovidos: o repositório não mantém geradores ou fontes intermediárias das POCs.
+- `assets/generated/cinematic/keeper_anim_{right,left}_{0..15}.png` e `keeper_motion.json`: 16 quadros finais por direção. O runtime escolhe um único quadro por update, ancora o pouso no gramado, mantém a pose derrotada após gol sofrido e usa a recuperação completa em defesa ou chute para fora.
+- `assets/generated/cinematic/poc7_runtime_contract.json`: contrato cinematográfico v5 promovido, com estado completo a 60 Hz para 30 sequências direcionais de gol, defesa e chute para fora.
+- `assets/generated/cinematic/poc7_net/`: 58 camadas finais protegidas por hash. Cada campanha de gol possui 70 estados traseiros a 30 Hz e contato frontal amostrado a 60 Hz, empacotados em atlas e selecionados sem crossfade.
+- `assets/generated/balls3d/ball_{0..31}.png`: 32 quadros finais da bola; o runtime seleciona um quadro nativo por update, sem crossfade.
 - `src/arena_ai/cinematic_uniforms.py`: define as 9 cores de uniforme, variações de bermuda e mapeamento para seleções.
 - `assets/generated/balls3d/*.png`: frames da bola.
 - `assets/generated/flags/*.png`: 48 bandeiras em sprite geradas por `image_gen`; a validação falha se alguma seleção esperada não tiver PNG.
-- `assets/asset_manifest.json`: manifesto dos assets ativos, globs gerados e allowlist de legados não usados.
+- `assets/asset_manifest.json`: manifesto canônico dos assets ativos, fontes ainda mantidas e cardinalidades exatas do payload de release.
 - `assets/fonts/Oxanium.ttf`: fonte OFL empacotada para uso direto no Pygame.
 - `assets/sounds/runtime_assets/`: sons efetivamente usados pelo jogo. O contrato operacional fica em `src/arena_ai/audio_manifest.py`; a governança, provenance, licenças e hashes ficam em `assets/sounds/audio_manifest.json`.
 - `assets/sounds/audio_manifest.json`: manifesto único de áudio aprovado. `assets/sounds/candidates/` é biblioteca de curadoria e nunca deve ser usado direto pelo código.
@@ -261,9 +270,13 @@ Documentação canônica consolidada de assets, áudio, fontes e licenças: [doc
 
 `make validate` compila o projeto e roda o gate essencial: smoke do modelo, relatório estatístico SOTA/KISS já gerado, manifesto/hash dos dados brutos com sanidade semântica, Monte Carlo fresco, inventário de sprites/som, manifesto de assets, contrato de áudio, layout da tela de confronto, pureza de render e áudio essencial. Ele fica leve para a iteração diária, mas reprova artefatos estatísticos stale. Quando mexer em modelo, pipeline, dados ou scripts de auditoria, rode `make mc-stability && make stats-qa && make validate`.
 
-`make aaa-qa` roda o gate pesado: fonte antiga `oracle_*`, sprite extra no runtime, jogador sem `ORACLE` no peito, jogador sem área de pernas suficiente, escala diferente do padrão visual de pose `192px`, chute sem usar a âncora real do pé, bola duplicada, chute perto demais do goleiro, goleiro fora do gol, bola fora da rede, rede pouco visível, overlay de `GOOOL!` cobrindo a zona da trave/rede, lances sem gol `save/wide`, fade de goleiro/trave, parallax sem scroll acumulado, parallax com faixas idênticas/seam/banda, arquivo de asset órfão fora da allowlist, áudio fora da ordem `kick -> whoosh -> net -> bass -> cheer -> reverb`, sync quantizado de chute/rede, cama de estádio preservada no impacto, tick da Copa consumido sem tocar, reveal antes dos ticks drenarem, render puro, determinismo visual, canais de crowd base/air/light/tension/chant, reação aleatória, duck de narração, camadas de gol, recuperação ordenada de áudio após stutter, uma partida completa de 45 segundos simulados até o placar final e orçamento visual de 60 FPS.
+`make aaa-qa` roda o gate pesado do renderer ativo: inventário final, `ORACLE` nativo e legível, matriz cinematográfica promovida, direção e limites do goleiro, contato alpha da bola, rede e z-order, sincronismo de áudio/placar, determinismo, partida completa, caches e orçamento de 60 FPS. CPU do processo é sempre bloqueante; wall-clock só bloqueia com `ARENA_AI_STRICT_WALL_CLOCK_QA=1` em host controlado, evitando classificar contenção do scheduler como regressão. O wordmark é medido nos pixels finais em 720 combinações de uniforme, direção e quadro de corrida/chute/parada.
 
-`make visual-qa` gera os frames em `artifacts/visual_qa/current/`, incluindo `contact_sheet.png`, para revisar a posse inicial, corrida/chute, bola na rede, gol invertido e empate final.
+`make cinematic-game-qa` valida o contrato promovido no `App`. A matriz contém 30 sequências: 18 campanhas de gol (`2 direções × 3 alturas × 3 medoids`) e 12 campanhas sem gol (`save/wide`, `2 direções × 3 alturas`). Os medoids de gol foram escolhidos offline entre 1.000 planos e carregam pesos inteiros que somam 10.000 por direção/altura; no jogo a escolha continua determinística para o mesmo lance. O gate rasteriza 150 checkpoints, percorre 2.502 amostras sequenciais pós-impacto e valida cadência, hashes, regiões de atlas e contato da rede; também prova ator/bola/goleiro/gol no framebuffer em oito casos, confirma as 16 poses autorais nas 18 combinações uniforme/direção, valida os 58 assets do preload assíncrono, executa seis timelines reais por `update -> draw -> áudio -> placar` e mede 2.430 contatos pós-chute (`30 sequências × 9 uniformes × 9 instantes`), sempre com sobreposição alpha máxima de 3%.
+
+`make cinematic-game-qa-capture` recria `artifacts/cinematic_game_qa/current/frames/` com os 150 checkpoints do renderer real e um manifesto schema 13. `make cinematic-game-qa-check` repete o gate ao vivo, valida hashes das fontes runtime e dos 179 itens cinematográficos finais (178 arquivos de mídia/metadata mais o contrato) e renderiza novamente os 150 frames em diretório temporário para comparação RGBA. O campo geral `runtime_assets` do manifesto possui 181 arquivos porque agrega três camadas de parallax e registra o contrato separadamente. O gate também confere cadências de rede (`30 Hz` traseira e contato limitado a `180 ms`), seleção de variante, direção e recuperação do goleiro, geometria, trajetória, materialização no framebuffer, ausência de I/O durante o lance, `flush` de áudio e transição exata do placar. O pan estéreo aplicado é provado por `audio-qa`; `aaa-qa` executa os dois gates. Não há aprovação baseada apenas em imagens antigas. Esses gates comprovam integridade e determinismo do contrato promovido; a aceitação estética final continua sendo uma revisão visual humana.
+
+`make visual-qa` gera `artifacts/visual_qa/current/` do zero: contact sheets com 16 quadros de corrida, 16 de chute e 8 de parada por uniforme/direção, os 16 quadros do goleiro em cada direção, vídeos mandante/visitante a 60 fps, close temporal em câmera lenta `2,5x` e CSV/JSON quadro a quadro. A captura segue até o repouso da bola na rede; `metadata.json` registra contagem, duração, hashes e inventário recursivo. `make visual-qa-check` reprova evidência stale, órfã, alterada ou não determinística.
 
 Fontes dos sons:
 

@@ -63,11 +63,19 @@ GOAL_AUDIO_SEQUENCE = ("kick", "whoosh", "net", "bass", "cheer", "reverb")
 KICK_SOUND_BAG = ("kick_grass_01.wav", "kick_grass_02.wav", "kick_grass_03.wav", "kick_grass_04.wav")
 WHOOSH_SOUND_BAG = ("ball_whoosh_01.wav", "ball_whoosh_02.wav")
 NET_SOUND_BAG = ("net_ripple_01.wav", "net_ripple_02.wav")
+SAVE_IMPACT_SOUND_BAG = ("kick_grass_04.wav",)
 GOAL_ROAR_SOUND_BAG = ("goal_roar_main.mp3", "goal_roar_pixabay_01.wav", "goal_roar_pixabay_02.wav")
 GOAL_EXPLOSION_SOUND_BAG = ("goal_explosion_01.wav", "goal_explosion_02.wav", "goal_explosion_03.wav")
 CROWD_REACTION_SOUND_BAG = ("crowd_attack_short.wav", "crowd_reaction_01.wav", "crowd_reaction_02.wav")
 NEAR_MISS_REACTION_SOUND_BAG = ("crowd_near_miss_01.wav", "crowd_attack_short.wav", "crowd_reaction_01.wav")
 CUP_REVEAL_CROWD_SOUND_BAG = ("crowd_attack_short.wav", "crowd_reaction_01.wav", "crowd_reaction_02.wav")
+GOAL_ONLY_SOUND_FILES = frozenset(asset.filename for asset in AUDIO_ASSETS if asset.bus == "goal") | frozenset(
+    (*NET_SOUND_BAG, "crowd_attack_rise.wav")
+)
+NON_GOAL_EVENT_AUDIO_ROUTES = {
+    "save": (("ball", SAVE_IMPACT_SOUND_BAG), ("crowd", CROWD_REACTION_SOUND_BAG)),
+    "near_miss": (("crowd", NEAR_MISS_REACTION_SOUND_BAG),),
+}
 CUP_PROGRESS_MARKERS = (25, 50, 75, 100)
 
 

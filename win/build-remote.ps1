@@ -41,11 +41,15 @@ function Resolve-Bash {
 
 $IncomingDir = Join-Path $WorkRoot "incoming"
 $SourceArchive = Join-Path $IncomingDir "arena-ai-source.tar.gz"
+$SourceProvenance = Join-Path $IncomingDir "release-source-provenance.json"
 $SourceDir = Join-Path $WorkRoot "source"
 $OutDir = Join-Path $WorkRoot "out"
 
 if (-not (Test-Path $SourceArchive)) {
     throw "Bundle de código não encontrado: $SourceArchive"
+}
+if (-not (Test-Path $SourceProvenance)) {
+    throw "Proveniência do source não encontrada: $SourceProvenance"
 }
 
 Write-Step "Preparando diretório de código"
@@ -57,6 +61,7 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 Write-Step "Extraindo código enviado"
 tar -xzf $SourceArchive -C $SourceDir
+Copy-Item -Path $SourceProvenance -Destination (Join-Path $SourceDir "release-source-provenance.json") -Force
 
 $env:Path = "$env:Path;C:\ProgramData\chocolatey\bin;$env:USERPROFILE\.local\bin;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin"
 $bash = Resolve-Bash
@@ -78,10 +83,10 @@ elseif ($Qa -eq "validate") {
     $commands += "make validate PYTHON=.venv/Scripts/python.exe"
 }
 elseif ($Qa -eq "aaa") {
-    $commands += "make aaa-qa PYTHON=.venv/Scripts/python.exe"
+    $commands += "make aaa-runtime-qa PYTHON=.venv/Scripts/python.exe"
 }
 
-$commands += "make build-windows PYTHON=.venv/Scripts/python.exe"
+$commands += "make build-current PYTHON=.venv/Scripts/python.exe RELEASE_SOURCE_PROVENANCE=release-source-provenance.json"
 $commandLine = $commands -join " && "
 
 Write-Step "Rodando build com QA=$Qa"
@@ -112,14 +117,18 @@ if (Test-Path $latestPath) {
 Compress-Archive -Path (Join-Path $distPath "*") -DestinationPath $artifactPath -Force
 Copy-Item -Path $artifactPath -Destination $latestPath -Force
 
-$result = [ordered]@{
-    artifact = $artifactPath
-    latest = $latestPath
-    qa = $Qa
-    built_at = (Get-Date).ToUniversalTime().ToString("o")
-    source = $SourceDir
+$python = Join-Path $SourceDir ".venv\Scripts\python.exe"
+$provenanceScript = Join-Path $SourceDir "scripts\release_provenance.py"
+$buildResult = Join-Path $OutDir "build-result.json"
+& $python $provenanceScript write-build `
+    --platform windows `
+    --artifact $latestPath `
+    --output $buildResult `
+    --source-provenance $SourceProvenance
+if ($LASTEXITCODE -ne 0) {
+    throw "Falha ao gerar proveniência do build Windows: exit code $LASTEXITCODE"
 }
-$result | ConvertTo-Json | Set-Content -Path (Join-Path $OutDir "build-result.json") -Encoding utf8
 
 Write-Host ""
 Write-Host "ARTIFACT=$latestPath" -ForegroundColor Green
+Write-Host "PROVENANCE=$buildResult" -ForegroundColor Green

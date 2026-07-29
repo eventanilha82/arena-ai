@@ -1,19 +1,36 @@
 from __future__ import annotations
 
+import json
+import hashlib
+import io
 import math
 import os
 import queue
 import random
 import sys
 import threading
+import time
 from bisect import bisect_left
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pygame
 
 from arena_ai.audio import AudioEngine, pre_init_mixer
 from arena_ai.audio_manifest import CUP_PROGRESS_MARKERS
+from arena_ai.cinematic_poc_runtime import (
+    POC_APPROVED_REFERENCE_VISIBLE_HEIGHT,
+    POC_BALL_CANVAS_SIZE,
+    POC_GROUND_Y,
+    POC_HEADER_HEIGHT,
+    POC_RUNNER_CANVAS_SIZE,
+    POC_RUNNER_ROOT,
+    PocSequence,
+    PocSequenceBank,
+    PocSequenceSample,
+    PocViewport,
+)
 from arena_ai.cinematic_uniforms import CINEMATIC_UNIFORMS, TEAM_UNIFORM_OVERRIDES
 from arena_ai.rendering import SurfaceCache, TextCache
 from arena_ai.ui import Button
@@ -45,39 +62,88 @@ ALGORITHMS = ["CONFRONTO"]
 SIMULATION_SECONDS = 45.0
 FINAL_ACTION_START = 0.76
 CINEMATIC_POSE_SIZE = 192
-CINEMATIC_PLAYER_SCALE = 1.06
-CINEMATIC_NEUTRAL_PLAYER_SCALE = 1.00
+CINEMATIC_PLAYER_SCALE = 0.90
+CINEMATIC_NEUTRAL_PLAYER_SCALE = 0.90
 CINEMATIC_KEEPER_SCALE = 0.84
+CINEMATIC_KEEPER_GROUND_OFFSET = 72.0
+CINEMATIC_GOAL_EDGE_INSET = 23
+CINEMATIC_GOAL_WIDTH = 442
+CINEMATIC_GOAL_HEIGHT = 244
+CINEMATIC_GOAL_BOTTOM_INSET = 74
+CINEMATIC_GOAL_LANE_SHIFT = 18
+CINEMATIC_GOAL_ENTRY_DEPTH = 148.0
+CINEMATIC_KEEPER_POC7_DIVE_OFFSET = 15.5
+CINEMATIC_GOAL_SOURCE_WIDTH = 1774.0
+CINEMATIC_GOAL_SOURCE_HEIGHT = 887.0
+CINEMATIC_GOAL_SOURCE_POST_X = (230.0, 1342.0)
+CINEMATIC_GOAL_SOURCE_POST_BOTTOM = 735.0
+CINEMATIC_NET_TARGET_DEPTH_MIN_RATIO = 0.16
+CINEMATIC_NET_TARGET_DEPTH_MAX_RATIO = 0.22
+CINEMATIC_GOAL_BALL_REST_DEPTH = 296.0
+CINEMATIC_GOAL_BALL_REST_DEPTH_VARIATION = 24
+CINEMATIC_SHOT_SPIN_DISTANCE_DIVISOR = 64.0
 CINEMATIC_BALL_SIZE = 38
 CINEMATIC_SHOT_BALL_SIZE = 32
 CINEMATIC_NET_BALL_SIZE = 30
+CINEMATIC_BALL_GROUND_RADIUS_RATIO = 0.43
+CINEMATIC_BALL_MATERIAL_FRAME_COUNT = 32
+CINEMATIC_BALL_MATERIAL_BLEND_STEPS = 1
+CINEMATIC_BALL_VELOCITY_SAMPLE_HZ = 120.0
+CINEMATIC_RUNNER_FRAME_COUNT = 16
+CINEMATIC_KICK_FRAME_COUNT = 16
+CINEMATIC_STOP_FRAME_COUNT = 8
+CINEMATIC_KEEPER_FRAME_COUNT = 16
 CINEMATIC_TURF_SPEED = 92.0
-SHOT_KICK_AT = 0.72
-SHOT_WHOOSH_AT = 0.79
+CINEMATIC_RUNNER_STRIDE_DISTANCE = 68.0
+CINEMATIC_TURF_FOREGROUND_PARALLAX = 0.78
+CINEMATIC_DRIBBLE_CONTROL_OFFSET = 52.0
+CINEMATIC_DRIBBLE_CONTACT_GAP = 0.8
+CINEMATIC_DRIBBLE_TOUCH_PHASE_OFFSET = 0.5
+CINEMATIC_DRIBBLE_TOUCH_PHASE_OFFSET_LEFT = 0.25
+CINEMATIC_DRIBBLE_BALL_EXCURSION_RIGHT = 17.0
+CINEMATIC_DRIBBLE_BALL_EXCURSION_LEFT = 17.5
+CINEMATIC_DRIBBLE_FOOT_RETREAT = 1.8
+CINEMATIC_DRIBBLE_PUSH_PEAK = 0.46
+CINEMATIC_DRIBBLE_MAX_GAP = 22.0
+CINEMATIC_KICK_CONTACT_GAP = -3.0
+CINEMATIC_LEFT_ATTACK_CONTACT_ADVANCE = 10.0
+CINEMATIC_BALL_CORRIDOR_START = 0.20
+CINEMATIC_KICK_APPROACH_START = 0.48
+CINEMATIC_KICK_APPROACH_DISTANCE = 34.0
+CINEMATIC_CONTACT_CATCHUP_MAX = 12.0
+CINEMATIC_SHOT_CONTACT_DISTANCE_RATIO = 0.402
+CINEMATIC_WIDE_POST_OFFSET = 16.5
+SHOT_KICK_AT = 0.80
+SHOT_WHOOSH_AT = 0.828
 SHOT_NET_AT = 0.955
-SHOT_NET_VISUAL_CONTACT_AT = 0.982
-SHOT_BASS_AT = SHOT_NET_VISUAL_CONTACT_AT
-SHOT_CHEER_AT = SHOT_NET_VISUAL_CONTACT_AT
-SHOT_REVERB_AT = 0.994
+SHOT_NET_VISUAL_CONTACT_AT = 0.995
+SHOT_NET_PENETRATION_RATIO = 1.0
 SHOT_KICK_AUDIO_AT = SHOT_KICK_AT - 0.006
 SHOT_WHOOSH_AUDIO_AT = SHOT_WHOOSH_AT - 0.006
-SHOT_NET_AUDIO_AT = SHOT_NET_VISUAL_CONTACT_AT - 0.008
-SHOT_BASS_AUDIO_AT = SHOT_NET_AUDIO_AT
-SHOT_CHEER_AUDIO_AT = SHOT_NET_AUDIO_AT
+SHOT_NET_AUDIO_AT = SHOT_NET_VISUAL_CONTACT_AT - 0.004
+SHOT_BASS_AUDIO_AT = SHOT_NET_VISUAL_CONTACT_AT - 0.001
+SHOT_CHEER_AUDIO_AT = SHOT_NET_VISUAL_CONTACT_AT + 0.002
+SHOT_REVERB_AT = SHOT_NET_VISUAL_CONTACT_AT + 0.004
 CHANCE_CONTACT_VISUAL_AT = SHOT_NET_AT
+WIDE_CONTACT_VISUAL_AT = CHANCE_CONTACT_VISUAL_AT + 0.003
 CHANCE_CONTACT_AUDIO_AT = CHANCE_CONTACT_VISUAL_AT - 0.008
-SHOT_PLANT_AT = 0.64
-SHOT_CONTACT_FREEZE_END = 0.75
-SHOT_RELEASE_END = 0.81
-SHOT_RECOVERY_AT = 0.99
-SHOT_FOLLOW_THROUGH_HOLD_END = 0.86
+SHOT_PLANT_AT = 0.70
+SHOT_CONTACT_FREEZE_END = 0.83
+SHOT_KICK_POSE_AT = SHOT_KICK_AT
+SHOT_RELEASE_END = 0.88
+SHOT_RECOVERY_AT = 1.010
+SHOT_STOP_BLEND_END = SHOT_RECOVERY_AT + 0.12
+SHOT_FOLLOW_THROUGH_HOLD_END = 1.001
+SHOT_RUN_TO_PLANT_AT = SHOT_PLANT_AT - 0.08
+SHOT_FOLLOW_THROUGH_AT = 0.90
+SHOT_RECOVERY_BLEND_AT = 0.94
 SHOT_GOAL_REVEAL_AT = 0.06
 SHOT_GOAL_FULL_AT = 0.20
 SHOT_KEEPER_REVEAL_AT = 0.14
 SHOT_KEEPER_FULL_AT = 0.32
 SHOT_KEEPER_READ_AT = 0.50
 SHOT_KEEPER_DIVE_AT = 0.74
-SHOT_NET_SETTLE_PROGRESS = 0.38
+SHOT_NET_SETTLE_PROGRESS = 0.535
 DRAW_NEUTRAL_START_PROGRESS = 0.958
 DRAW_NEUTRAL_RAMP = 0.036
 SHOT_PHASE_APPROACH = "approach"
@@ -88,18 +154,12 @@ SHOT_PHASE_FOLLOW_THROUGH = "follow_through"
 SHOT_PHASE_NET_IMPACT = "net_impact"
 SHOT_PHASE_RECOVERY = "recovery"
 GOAL_IMPACT_AUDIO_EVENTS = {"net", "bass", "cheer"}
-GOAL_EVENT_WINDOW_MINUTES = 5.0
-GOAL_PAYOFF_MINUTES = 3.25
+GOAL_EVENT_WINDOW_MINUTES = 6.0
+GOAL_PAYOFF_MINUTES = 4.6
 GOAL_MIN_SPACING_MINUTES = 11
-CHANCE_EVENT_WINDOW_MINUTES = 4.6
-CHANCE_PAYOFF_MINUTES = 2.2
+CHANCE_EVENT_WINDOW_MINUTES = 6.0
+CHANCE_PAYOFF_MINUTES = 4.6
 CHANCE_MIN_SPACING_MINUTES = 13
-RUNNER_FOOT_ANCHORS = (
-    (0.76, 0.78),
-    (0.72, 0.82),
-    (0.80, 0.78),
-    (0.74, 0.82),
-)
 KICK_FOOT_ANCHOR = (0.84, 0.67)
 UNIFORMS_BY_CODE = {uniform.code: uniform for uniform in CINEMATIC_UNIFORMS}
 TOURNAMENT_MONTE_CARLO_RUNS = max(1000, int(os.environ.get("ARENA_AI_TOURNAMENT_MC_RUNS", "1000")))
@@ -227,6 +287,18 @@ def smoothstep(value: float) -> float:
     return value * value * (3 - 2 * value)
 
 
+def cinematic_dribble_touch_phase_offset(direction: int) -> float:
+    return (
+        CINEMATIC_DRIBBLE_TOUCH_PHASE_OFFSET
+        if direction > 0
+        else CINEMATIC_DRIBBLE_TOUCH_PHASE_OFFSET_LEFT
+    )
+
+
+def cinematic_dribble_touch_phase(stride_phase: float, direction: int = 1) -> float:
+    return ((stride_phase - cinematic_dribble_touch_phase_offset(direction)) % 2.0) / 2.0
+
+
 def cubic_bezier(
     a: tuple[float, float],
     b: tuple[float, float],
@@ -333,6 +405,25 @@ class ShotProfile:
 
 
 @dataclass(frozen=True)
+class CinematicShotPlan:
+    key: tuple[int, int, str, str]
+    profile: ShotProfile
+    profile_band: str
+    target: tuple[float, float]
+    save_variant: str
+
+
+SHOT_PROFILE_BANDS = {
+    "alto firme": "high",
+    "angulo seco": "high",
+    "meia altura": "mid",
+    "central forte": "mid",
+    "baixo cruzado": "low",
+    "rasteiro forte": "low",
+}
+
+
+@dataclass(frozen=True)
 class BallKinematics:
     position: tuple[float, float]
     ground_position: tuple[float, float]
@@ -343,21 +434,33 @@ class BallKinematics:
     depth: float
 
 
+@dataclass(frozen=True)
+class DribbleKinematics:
+    control_position: tuple[float, float]
+    visible_foot_position: tuple[float, float]
+    ball: BallKinematics
+    touch_phase: float
+    contact_gap: float
+
+
 class AssetFactory:
     def __init__(self, profiles: list[TeamProfile]):
         self.profiles = profiles
-        self._cinematic_pose_cache: dict[tuple[str, bool], list[pygame.Surface]] = {}
         self._cinematic_runner_cache: dict[tuple[str, bool], list[pygame.Surface]] = {}
-        self._cinematic_keeper_cache: list[pygame.Surface] | None = None
-        self.cinematic_players: dict[str, list[pygame.Surface]] = {}
-        self.cinematic_players_left: dict[str, list[pygame.Surface]] = {}
+        self._cinematic_kick_cache: dict[tuple[str, bool], list[pygame.Surface]] = {}
+        self._cinematic_stop_cache: dict[tuple[str, bool], list[pygame.Surface]] = {}
+        self._cinematic_keeper_cache: dict[bool, list[pygame.Surface]] = {}
+        self.cinematic_runner_motion = self.load_cinematic_runner_motion()
+        self.cinematic_keeper_motion = self.load_cinematic_keeper_motion()
         self.cinematic_runners: dict[str, list[pygame.Surface]] = {}
         self.cinematic_runners_left: dict[str, list[pygame.Surface]] = {}
+        self.cinematic_kicks: dict[str, list[pygame.Surface]] = {}
+        self.cinematic_kicks_left: dict[str, list[pygame.Surface]] = {}
+        self.cinematic_stops: dict[str, list[pygame.Surface]] = {}
+        self.cinematic_stops_left: dict[str, list[pygame.Surface]] = {}
         self.cinematic_keepers: dict[str, pygame.Surface] = {}
         self.cinematic_keeper_frames: dict[str, list[pygame.Surface]] = {}
-        self.goal_net_frames: list[pygame.Surface] = []
-        self.goal_front_frames: list[pygame.Surface] = []
-        self.goal_impact_frames: list[pygame.Surface] = []
+        self.cinematic_keeper_frames_left: dict[str, list[pygame.Surface]] = {}
         self.flags: dict[str, pygame.Surface] = {}
         self.balls: list[pygame.Surface] = []
         self.field: pygame.Surface | None = None
@@ -367,6 +470,145 @@ class AssetFactory:
         self.fifa_images: dict[str, pygame.Surface] = {}
         self.generate_all()
 
+    def load_cinematic_runner_motion(self) -> dict[str, object]:
+        path = ASSETS / "generated" / "cinematic" / "runner_motion.json"
+        if not path.exists():
+            raise RuntimeError(f"missing grounded runner motion metadata: {path}")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            payload.get("version") != 8
+            or payload.get("artifact")
+            != "arena_runner_motion_contract"
+            or payload.get("status") != "promoted"
+            or payload.get("artwork_provenance")
+            != "gpt_image_authored_per_uniform_per_direction_per_action"
+            or payload.get("frame_count")
+            != CINEMATIC_RUNNER_FRAME_COUNT
+        ):
+            raise RuntimeError(f"invalid grounded runner motion metadata: {path}")
+        if payload.get("kick_frame_count") != CINEMATIC_KICK_FRAME_COUNT:
+            raise RuntimeError(f"invalid grounded runner kick metadata: {path}")
+        if payload.get("stop_frame_count") != CINEMATIC_STOP_FRAME_COUNT:
+            raise RuntimeError(f"invalid grounded runner stop metadata: {path}")
+        if payload.get("temporal_interpolation") != "none_gpt_image_authored_frames":
+            raise RuntimeError(f"invalid grounded runner interpolation metadata: {path}")
+        if payload.get("kick_temporal_interpolation") != "none_gpt_image_authored_frames":
+            raise RuntimeError(f"invalid grounded runner kick interpolation metadata: {path}")
+        if payload.get("left_runtime_derivation") != "separately_generated_gpt_image":
+            raise RuntimeError(f"invalid grounded runner direction derivation metadata: {path}")
+        if payload.get("wordmark_provenance") != "native_gpt_image_jersey_pixels_no_overlay":
+            raise RuntimeError(f"invalid grounded runner wordmark provenance: {path}")
+        clearance_contract = payload.get("ball_clearance_contract")
+        if (
+            not isinstance(clearance_contract, dict)
+            or clearance_contract.get("field") != "ball_clearance_offset_px"
+            or clearance_contract.get("monotonic_field") != "ball_corridor_offset_px"
+            or clearance_contract.get("run_approach_field")
+            != "ball_approach_corridor_offset_px"
+            or clearance_contract.get("covered_actions") != ["run", "kick"]
+            or clearance_contract.get("ball_rotation_count")
+            != CINEMATIC_BALL_MATERIAL_FRAME_COUNT
+            or float(clearance_contract.get("max_alpha_overlap_ratio", -1.0)) != 0.03
+            or clearance_contract.get("runtime_rounding_safety_px") != 3
+        ):
+            raise RuntimeError(f"invalid runner ball-clearance contract: {path}")
+        frame_key_indices = payload.get("frame_key_indices")
+        if not isinstance(frame_key_indices, list) or len(frame_key_indices) != CINEMATIC_RUNNER_FRAME_COUNT:
+            raise RuntimeError(f"invalid grounded runner gait timeline: {path}")
+        uniforms = payload.get("uniforms")
+        expected_codes = {uniform.code for uniform in CINEMATIC_UNIFORMS}
+        if not isinstance(uniforms, dict) or set(uniforms) != expected_codes:
+            raise RuntimeError(f"missing per-avatar runner metadata: {path}")
+        for code in expected_codes:
+            directions = uniforms[code].get("directions")
+            if not isinstance(directions, dict):
+                raise RuntimeError(f"missing {code} runner direction metadata: {path}")
+            for direction in ("right", "left"):
+                entry = directions.get(direction)
+                if (
+                    not isinstance(entry, dict)
+                    or len(entry.get("frames", [])) != CINEMATIC_RUNNER_FRAME_COUNT
+                    or len(entry.get("kick_frames", [])) != CINEMATIC_KICK_FRAME_COUNT
+                    or len(entry.get("stop_frames", [])) != CINEMATIC_STOP_FRAME_COUNT
+                    or not 0 <= int(entry.get("kick_contact_frame", -1)) < CINEMATIC_KICK_FRAME_COUNT
+                    or not isinstance(entry.get("kick_contact_gap_px"), (int, float))
+                    or not isinstance(
+                        entry.get("kick_contact_root_correction_px"),
+                        (int, float),
+                    )
+                    or not isinstance(
+                        entry.get("kick_entry_ball_corridor_offset_px"),
+                        (int, float),
+                    )
+                ):
+                    raise RuntimeError(f"incomplete {code} {direction} runner metadata: {path}")
+                clearance_frames = [
+                    *entry["frames"],
+                    *entry["kick_frames"],
+                ]
+                if any(
+                    not isinstance(frame.get("ball_clearance_offset_px"), (int, float))
+                    or float(frame["ball_clearance_offset_px"]) <= 0.0
+                    for frame in clearance_frames
+                ):
+                    raise RuntimeError(
+                        f"incomplete {code} {direction} ball-clearance metadata: {path}"
+                    )
+                if any(
+                    not isinstance(
+                        frame.get("ball_approach_corridor_offset_px"),
+                        (int, float),
+                    )
+                    or float(frame["ball_approach_corridor_offset_px"]) + 1e-6
+                    < float(frame["ball_clearance_offset_px"])
+                    for frame in entry["frames"]
+                ):
+                    raise RuntimeError(
+                        f"incomplete {code} {direction} run-approach corridor: {path}"
+                    )
+                previous_corridor = 0.0
+                for frame in entry["kick_frames"]:
+                    corridor = frame.get("ball_corridor_offset_px")
+                    if (
+                        not isinstance(corridor, (int, float))
+                        or float(corridor) + 1e-6
+                        < float(frame["ball_clearance_offset_px"])
+                        or float(corridor) + 1e-6 < previous_corridor
+                    ):
+                        raise RuntimeError(
+                            f"invalid {code} {direction} monotonic ball corridor: {path}"
+                        )
+                    previous_corridor = float(corridor)
+        return payload
+
+    def load_cinematic_keeper_motion(self) -> dict[str, object]:
+        path = ASSETS / "generated" / "cinematic" / "keeper_motion.json"
+        if not path.exists():
+            raise RuntimeError(f"missing goalkeeper motion metadata: {path}")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        runtime_frame_order = payload.get("runtime_frame_order")
+        directions = payload.get("directions")
+        if (
+            payload.get("version") != 4
+            or payload.get("artifact")
+            != "arena_keeper_motion_contract"
+            or payload.get("status") != "promoted"
+            or payload.get("artwork_provenance")
+            != "gpt_image_authored_directional_frames"
+            or payload.get("authored_frame_count") != 16
+            or payload.get("frame_count") != CINEMATIC_KEEPER_FRAME_COUNT
+            or not isinstance(runtime_frame_order, list)
+            or len(runtime_frame_order) != 16
+            or runtime_frame_order
+            != list(range(CINEMATIC_KEEPER_FRAME_COUNT))
+            or payload.get("temporal_interpolation") != "none_gpt_image_authored_frames"
+            or payload.get("left_runtime_derivation") != "separately_generated_gpt_image"
+            or not isinstance(directions, dict)
+            or set(directions) != {"right", "left"}
+        ):
+            raise RuntimeError(f"invalid goalkeeper motion metadata: {path}")
+        return payload
+
     def generate_all(self) -> None:
         flags_dir = ASSETS / "generated" / "flags"
         for index, profile in enumerate(self.profiles):
@@ -374,39 +616,36 @@ class AssetFactory:
             if not flag_path.exists():
                 raise RuntimeError(f"missing generated image_gen flag sprite: {flag_path}")
             self.flags[profile.code] = pygame.image.load(flag_path).convert_alpha()
-            cinematic_frames = self.load_cinematic_frames(profile)
-            cinematic_left_frames = self.load_cinematic_frames(profile, left=True)
             runner_frames = self.load_cinematic_runner_frames(profile)
             runner_left_frames = self.load_cinematic_runner_frames(profile, left=True)
+            kick_frames = self.load_cinematic_kick_frames(profile)
+            kick_left_frames = self.load_cinematic_kick_frames(profile, left=True)
+            stop_frames = self.load_cinematic_stop_frames(profile)
+            stop_left_frames = self.load_cinematic_stop_frames(profile, left=True)
             keeper_frames = self.load_cinematic_keeper_frames(profile)
-            if not cinematic_frames:
-                raise RuntimeError(f"missing generated cinematic pose sprites for {profile.code}")
-            if not cinematic_left_frames:
-                raise RuntimeError(f"missing generated left-facing cinematic pose sprites for {profile.code}")
+            keeper_left_frames = self.load_cinematic_keeper_frames(profile, left=True)
             if not runner_frames:
                 raise RuntimeError(f"missing generated cinematic runner sprites for {profile.code}")
             if not runner_left_frames:
                 raise RuntimeError(f"missing generated left-facing cinematic runner sprites for {profile.code}")
-            if not keeper_frames:
+            if not kick_frames or not kick_left_frames:
+                raise RuntimeError(f"missing generated cinematic kick sprites for {profile.code}")
+            if not stop_frames or not stop_left_frames:
+                raise RuntimeError(f"missing generated cinematic stop sprites for {profile.code}")
+            if not keeper_frames or not keeper_left_frames:
                 raise RuntimeError(f"missing generated cinematic goalkeeper animation for {profile.code}")
-            self.cinematic_players[profile.code] = cinematic_frames
-            self.cinematic_players_left[profile.code] = cinematic_left_frames
             self.cinematic_runners[profile.code] = runner_frames
             self.cinematic_runners_left[profile.code] = runner_left_frames
+            self.cinematic_kicks[profile.code] = kick_frames
+            self.cinematic_kicks_left[profile.code] = kick_left_frames
+            self.cinematic_stops[profile.code] = stop_frames
+            self.cinematic_stops_left[profile.code] = stop_left_frames
             self.cinematic_keeper_frames[profile.code] = keeper_frames
+            self.cinematic_keeper_frames_left[profile.code] = keeper_left_frames
             self.cinematic_keepers[profile.code] = keeper_frames[0]
         self.balls = self.load_ball_frames()
         if not self.balls:
             raise RuntimeError("missing generated ball sprites")
-        self.goal_net_frames = self.load_goal_net_frames()
-        if len(self.goal_net_frames) < 4:
-            raise RuntimeError("missing generated goal/net animation sprites")
-        self.goal_front_frames = self.load_goal_front_frames()
-        if len(self.goal_front_frames) < 4:
-            raise RuntimeError("missing generated goal front-post sprites")
-        self.goal_impact_frames = self.load_goal_impact_frames()
-        if len(self.goal_impact_frames) < 4:
-            raise RuntimeError("missing generated goal impact net sprites")
         self.stadium_bg = self.load_stadium_background((1520, 472))
         if not self.stadium_bg:
             raise RuntimeError("missing generated stadium parallax background")
@@ -414,7 +653,6 @@ class AssetFactory:
         self.turf_near_strip = self.load_turf_strip("turf_near_strip.png")
         if not self.turf_mid_strip or not self.turf_near_strip:
             raise RuntimeError("missing generated parallax turf strips")
-        self.field = self.load_3d_field((910, 490))
         self.fifa_images = self.load_fifa_external_images()
 
     def load_fifa_external_images(self) -> dict[str, pygame.Surface]:
@@ -439,19 +677,6 @@ class AssetFactory:
         result.blit(scaled, (0, 0), (x, y, size[0], size[1]))
         return result
 
-    def load_3d_field(self, size: tuple[int, int]) -> pygame.Surface | None:
-        path = ASSETS / "generated" / "field" / "match_field_3d.png"
-        if not path.exists():
-            return None
-        image = pygame.image.load(path).convert_alpha()
-        scale = max(size[0] / image.get_width(), size[1] / image.get_height())
-        scaled = pygame.transform.smoothscale(image, (int(image.get_width() * scale), int(image.get_height() * scale)))
-        x = max(0, (scaled.get_width() - size[0]) // 2)
-        y = max(0, (scaled.get_height() - size[1]) // 2)
-        result = pygame.Surface(size, pygame.SRCALPHA)
-        result.blit(scaled, (0, 0), (x, y, size[0], size[1]))
-        return result
-
     def cinematic_source_code(self, profile: TeamProfile) -> str:
         if profile.code in TEAM_UNIFORM_OVERRIDES:
             return TEAM_UNIFORM_OVERRIDES[profile.code]
@@ -462,20 +687,21 @@ class AssetFactory:
             key=lambda name: sum((int(kit[i]) - palette[name][i]) ** 2 for i in range(3)),
         )
 
-    def load_cinematic_frames(self, profile: TeamProfile, left: bool = False) -> list[pygame.Surface] | None:
-        code = self.cinematic_source_code(profile)
-        cache_key = (code, left)
-        if cache_key in self._cinematic_pose_cache:
-            return self._cinematic_pose_cache[cache_key]
-        poses = ["idle", "run1", "dribble", "kick"]
-        base = ASSETS / "generated" / "cinematic"
-        prefix = "left_" if left else ""
-        paths = [base / f"{prefix}{code}_{pose}.png" for pose in poses]
-        if all(path.exists() for path in paths):
-            frames = [pygame.image.load(path).convert_alpha() for path in paths]
-            self._cinematic_pose_cache[cache_key] = frames
-            return frames
-        return None
+    def cinematic_runner_frames_for_uniform(
+        self,
+        uniform_code: str,
+        *,
+        left: bool,
+    ) -> list[pygame.Surface]:
+        return self._cinematic_runner_cache[(uniform_code, left)]
+
+    def cinematic_kick_frames_for_uniform(
+        self,
+        uniform_code: str,
+        *,
+        left: bool,
+    ) -> list[pygame.Surface]:
+        return self._cinematic_kick_cache[(uniform_code, left)]
 
     def load_cinematic_runner_frames(self, profile: TeamProfile, left: bool = False) -> list[pygame.Surface] | None:
         code = self.cinematic_source_code(profile)
@@ -484,43 +710,105 @@ class AssetFactory:
             return self._cinematic_runner_cache[cache_key]
         base = ASSETS / "generated" / "cinematic"
         stem = "runner_left" if left else "runner"
-        paths = [base / f"{stem}_{code}_{index}.png" for index in range(4)]
-        if all(path.exists() for path in paths):
-            frames = [pygame.image.load(path).convert_alpha() for path in paths]
+        smooth_path = base / f"{stem}_smooth_{code}.png"
+        if smooth_path.exists():
+            sheet = pygame.image.load(smooth_path).convert_alpha()
+            frame_size = int(self.cinematic_runner_motion["frame_size"])
+            columns = int(self.cinematic_runner_motion["sheet_columns"])
+            rows = int(self.cinematic_runner_motion["sheet_rows"])
+            if columns * rows < CINEMATIC_RUNNER_FRAME_COUNT:
+                raise RuntimeError("smooth runner sheet layout cannot hold every frame")
+            if sheet.get_size() != (frame_size * columns, frame_size * rows):
+                raise RuntimeError(f"invalid smooth runner sheet: {smooth_path}={sheet.get_size()}")
+            frames = [
+                sheet.subsurface(
+                    pygame.Rect(
+                        (index % columns) * frame_size,
+                        (index // columns) * frame_size,
+                        frame_size,
+                        frame_size,
+                    )
+                ).copy()
+                for index in range(CINEMATIC_RUNNER_FRAME_COUNT)
+            ]
             self._cinematic_runner_cache[cache_key] = frames
             return frames
         return None
 
-    def load_cinematic_keeper_frames(self, profile: TeamProfile) -> list[pygame.Surface] | None:
-        if self._cinematic_keeper_cache is not None:
-            return self._cinematic_keeper_cache
+    def load_cinematic_kick_frames(self, profile: TeamProfile, left: bool = False) -> list[pygame.Surface] | None:
+        code = self.cinematic_source_code(profile)
+        cache_key = (code, left)
+        if cache_key in self._cinematic_kick_cache:
+            return self._cinematic_kick_cache[cache_key]
         base = ASSETS / "generated" / "cinematic"
-        paths = [base / f"keeper_anim_{index}.png" for index in range(4)]
+        stem = "runner_left_kick_smooth" if left else "runner_kick_smooth"
+        path = base / f"{stem}_{code}.png"
+        if not path.exists():
+            return None
+        sheet = pygame.image.load(path).convert_alpha()
+        frame_size = int(self.cinematic_runner_motion["frame_size"])
+        columns = int(self.cinematic_runner_motion["kick_sheet_columns"])
+        rows = int(self.cinematic_runner_motion["kick_sheet_rows"])
+        if columns * rows < CINEMATIC_KICK_FRAME_COUNT:
+            raise RuntimeError("smooth kick sheet layout cannot hold every frame")
+        if sheet.get_size() != (frame_size * columns, frame_size * rows):
+            raise RuntimeError(f"invalid smooth kick sheet: {path}={sheet.get_size()}")
+        frames = [
+            sheet.subsurface(
+                pygame.Rect(
+                    (index % columns) * frame_size,
+                    (index // columns) * frame_size,
+                    frame_size,
+                    frame_size,
+                )
+            ).copy()
+            for index in range(CINEMATIC_KICK_FRAME_COUNT)
+        ]
+        self._cinematic_kick_cache[cache_key] = frames
+        return frames
+
+    def load_cinematic_stop_frames(self, profile: TeamProfile, left: bool = False) -> list[pygame.Surface] | None:
+        code = self.cinematic_source_code(profile)
+        cache_key = (code, left)
+        if cache_key in self._cinematic_stop_cache:
+            return self._cinematic_stop_cache[cache_key]
+        base = ASSETS / "generated" / "cinematic"
+        stem = "runner_left_stop_smooth" if left else "runner_stop_smooth"
+        path = base / f"{stem}_{code}.png"
+        if not path.exists():
+            return None
+        sheet = pygame.image.load(path).convert_alpha()
+        frame_size = int(self.cinematic_runner_motion["frame_size"])
+        columns = int(self.cinematic_runner_motion["stop_sheet_columns"])
+        rows = int(self.cinematic_runner_motion["stop_sheet_rows"])
+        if columns * rows < CINEMATIC_STOP_FRAME_COUNT:
+            raise RuntimeError("smooth stop sheet layout cannot hold every frame")
+        if sheet.get_size() != (frame_size * columns, frame_size * rows):
+            raise RuntimeError(f"invalid smooth stop sheet: {path}={sheet.get_size()}")
+        frames = [
+            sheet.subsurface(
+                pygame.Rect(
+                    (index % columns) * frame_size,
+                    (index // columns) * frame_size,
+                    frame_size,
+                    frame_size,
+                )
+            ).copy()
+            for index in range(CINEMATIC_STOP_FRAME_COUNT)
+        ]
+        self._cinematic_stop_cache[cache_key] = frames
+        return frames
+
+    def load_cinematic_keeper_frames(self, profile: TeamProfile, left: bool = False) -> list[pygame.Surface] | None:
+        if left in self._cinematic_keeper_cache:
+            return self._cinematic_keeper_cache[left]
+        base = ASSETS / "generated" / "cinematic"
+        direction = "left" if left else "right"
+        paths = [base / f"keeper_anim_{direction}_{index}.png" for index in range(CINEMATIC_KEEPER_FRAME_COUNT)]
         if all(path.exists() for path in paths):
-            self._cinematic_keeper_cache = [pygame.image.load(path).convert_alpha() for path in paths]
-            return self._cinematic_keeper_cache
+            self._cinematic_keeper_cache[left] = [pygame.image.load(path).convert_alpha() for path in paths]
+            return self._cinematic_keeper_cache[left]
         return None
-
-    def load_goal_net_frames(self) -> list[pygame.Surface]:
-        base = ASSETS / "generated" / "cinematic"
-        paths = [base / f"goal_net_{index}.png" for index in range(4)]
-        if all(path.exists() for path in paths):
-            return [pygame.image.load(path).convert_alpha() for path in paths]
-        return []
-
-    def load_goal_front_frames(self) -> list[pygame.Surface]:
-        base = ASSETS / "generated" / "cinematic"
-        paths = [base / f"goal_front_{index}.png" for index in range(4)]
-        if all(path.exists() for path in paths):
-            return [pygame.image.load(path).convert_alpha() for path in paths]
-        return []
-
-    def load_goal_impact_frames(self) -> list[pygame.Surface]:
-        base = ASSETS / "generated" / "cinematic"
-        paths = [base / f"goal_impact_{index}.png" for index in range(4)]
-        if all(path.exists() for path in paths):
-            return [pygame.image.load(path).convert_alpha() for path in paths]
-        return []
 
     def load_turf_strip(self, filename: str) -> pygame.Surface | None:
         path = ASSETS / "generated" / "parallax" / filename
@@ -530,7 +818,10 @@ class AssetFactory:
 
     def load_ball_frames(self) -> list[pygame.Surface] | None:
         base = ASSETS / "generated" / "balls3d"
-        paths = [base / f"ball_{i}.png" for i in range(8)]
+        paths = [
+            base / f"ball_{i}.png"
+            for i in range(CINEMATIC_BALL_MATERIAL_FRAME_COUNT)
+        ]
         if not all(path.exists() for path in paths):
             return None
         return [pygame.image.load(path).convert_alpha() for path in paths]
@@ -700,12 +991,44 @@ class App:
         self.model = WorldCupModel()
         self.teams = self.model.profiles()
         self.assets = AssetFactory(self.teams)
+        self.poc_sequences = PocSequenceBank(
+            ASSETS
+            / "generated"
+            / "cinematic"
+            / "poc7_runtime_contract.json"
+        )
+        self.poc_layer_cache: dict[str, pygame.Surface] = {}
+        self.poc_layer_frame_cache: dict[
+            tuple[str, tuple[int, int, int, int]],
+            pygame.Surface,
+        ] = {}
+        self.poc_preload_generation = 0
+        self.poc_preload_cancel_event = threading.Event()
+        self.poc_preload_queue: queue.Queue[
+            tuple[object, ...]
+        ] = queue.Queue(maxsize=2)
+        self.poc_preload_thread: threading.Thread | None = None
+        self.poc_preload_threads: list[threading.Thread] = []
+        self.poc_preload_pending = 0
+        self.poc_preload_completed = 0
+        self.poc_preload_ready = True
+        self.poc_preload_error = ""
         self.turf_tile_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
         self.gradient_mask_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
         self.gradient_tile_cache: dict[tuple[int, int, int, int, int], pygame.Surface] = {}
-        self.goal_orientation_cache: dict[tuple[int, str], pygame.Surface] = {}
         self.surface_bbox_cache: dict[int, pygame.Rect] = {}
+        self.surface_alpha_centroid_cache: dict[int, tuple[float, float]] = {}
         self.surface_toe_anchor_cache: dict[tuple[int, int], tuple[float, float]] = {}
+        self.keeper_glove_offset_cache: dict[tuple[bool, str], tuple[float, float]] = {}
+        self.runner_reference_height_cache: dict[tuple[str, str], float] = {}
+        self.cinematic_poc_clearance_cache: dict[
+            tuple[object, ...],
+            float,
+        ] = {}
+        self.cinematic_ball_corridor_cache: dict[
+            tuple[object, ...],
+            tuple[tuple[float, ...], float],
+        ] = {}
         self.ball_net_path_cache: dict[
             tuple[float, ...],
             tuple[tuple[tuple[float, float], ...], tuple[float, ...], float],
@@ -719,7 +1042,6 @@ class App:
         self.roto_surface_cache = self.surface_cache.roto
         self.cinematic_overlay_cache: dict[tuple[object, ...], pygame.Surface] = {}
         self.prepare_turf_tile_cache()
-        self.prepare_goal_orientation_cache()
         self.title_bg = self.load_image("generated/title_stadium_ai.png", (WIDTH, HEIGHT))
         self.state = "menu"
         self.home_idx = self.team_index("BRA", 0)
@@ -728,6 +1050,9 @@ class App:
         self.t = 0.0
         self.ground_scroll = 0.0
         self.ground_scroll_velocity = 0.0
+        self.ground_travel_distance = 0.0
+        self.cinematic_render_dt = 1.0 / FPS
+        self.cinematic_attack_phase_anchors: dict[tuple[int, str, bool, str], float] = {}
         self.segment_started = -1
         self.goal_events: set[tuple[str, int, str]] = set()
         self.shot_events: set[tuple[str, int, str, str]] = set()
@@ -743,6 +1068,10 @@ class App:
         self.match_prediction: Prediction | None = None
         self.match_analysis: MatchAnalysis | None = None
         self.match_runtime_state_cache: dict[tuple[object, ...], MatchRuntimeState] = {}
+        self.cinematic_shot_plan_cache: dict[
+            tuple[int, int, str, str],
+            CinematicShotPlan,
+        ] = {}
         self.tournament_result: dict[str, object] | None = None
         self.champion_odds: list[tuple[str, int, float]] = []
         self.champion_odds_runs = TOURNAMENT_MONTE_CARLO_RUNS
@@ -823,6 +1152,22 @@ class App:
             self.surface_bbox_cache[cache_key] = cached
         return cached.copy()
 
+    def visible_alpha_centroid(self, image: pygame.Surface) -> tuple[float, float]:
+        cache_key = id(image)
+        cached = self.surface_alpha_centroid_cache.get(cache_key)
+        if cached is None:
+            alpha = pygame.surfarray.array_alpha(image)
+            xs, ys = np.nonzero(alpha > 48)
+            if len(xs):
+                cached = float(xs.mean()), float(ys.mean())
+            else:
+                cached = (
+                    image.get_width() * 0.5,
+                    image.get_height() * 0.5,
+                )
+            self.surface_alpha_centroid_cache[cache_key] = cached
+        return cached
+
     def prepare_turf_tile_cache(self) -> None:
         ground_size = (910, 220)
         for image, alpha in (
@@ -839,11 +1184,6 @@ class App:
             self.turf_tile_cache[(id(image), scaled_w, scaled_h, alpha)] = tile
         if self.assets.turf_near_strip:
             self.cached_gradient_turf_tile(self.assets.turf_near_strip, ground_size, 104, 1.65)
-
-    def prepare_goal_orientation_cache(self) -> None:
-        for frame in (*self.assets.goal_net_frames, *self.assets.goal_front_frames, *self.assets.goal_impact_frames):
-            self.orient_cinematic_goal_frame(frame, "left")
-            self.orient_cinematic_goal_frame(frame, "right")
 
     def draw_text(self, text: str, text_font: pygame.font.Font, color: tuple[int, int, int], x: int, y: int) -> None:
         self.screen.blit(self.text_cache.render(text_font, text, color), (x, y))
@@ -1163,7 +1503,7 @@ class App:
         home_score = 0
         away_score = 0
         for goal_minute, side in self.goal_schedule(pred):
-            visual_goal_minute = goal_minute - GOAL_EVENT_WINDOW_MINUTES + SHOT_NET_VISUAL_CONTACT_AT * GOAL_EVENT_WINDOW_MINUTES
+            visual_goal_minute = float(goal_minute)
             if minute + 0.01 < visual_goal_minute:
                 continue
             if side == "home":
@@ -1244,6 +1584,23 @@ class App:
         chances = tuple(self.build_chance_schedule(pred, goals))
         state = MatchRuntimeState(key=key, goals=goals, chances=chances)
         self.match_runtime_state_cache[key] = state
+        field = self.match_field_rect()
+        for minute, side in goals:
+            goal_side = self.cinematic_goal_side(side)
+            self.cinematic_shot_plan(
+                self.cinematic_goal_rect(field, goal_side),
+                minute,
+                side,
+                "goal",
+            )
+        for minute, side, outcome in chances:
+            goal_side = self.cinematic_goal_side(side)
+            self.cinematic_shot_plan(
+                self.cinematic_goal_rect(field, goal_side),
+                minute,
+                side,
+                outcome,
+            )
         return state
 
     def goal_schedule(self, pred: Prediction) -> list[tuple[int, str]]:
@@ -1329,7 +1686,7 @@ class App:
     def active_goal_event(self, pred: Prediction) -> tuple[int, str] | None:
         minute = self.match_minute_float()
         for goal_minute, side in self.goal_schedule(pred):
-            visual_goal_minute = goal_minute - GOAL_EVENT_WINDOW_MINUTES + SHOT_NET_VISUAL_CONTACT_AT * GOAL_EVENT_WINDOW_MINUTES
+            visual_goal_minute = float(goal_minute)
             if visual_goal_minute - 0.01 <= minute < goal_minute + GOAL_PAYOFF_MINUTES:
                 return goal_minute, side
         return None
@@ -1379,7 +1736,13 @@ class App:
         if not active_goal:
             return False
         goal_minute, _side = active_goal
-        shot_progress = clamp((self.match_minute_float() - (goal_minute - 5.0)) / 5.0)
+        shot_progress = clamp(
+            (
+                self.match_minute_float()
+                - (goal_minute - GOAL_EVENT_WINDOW_MINUTES)
+            )
+            / GOAL_EVENT_WINDOW_MINUTES
+        )
         return shot_progress >= 0.48
 
     def match_hud_state_key(self, cinematic_focus: bool = False) -> str:
@@ -1435,11 +1798,24 @@ class App:
         old_clip = self.screen.get_clip()
         self.screen.set_clip(rect)
         state = self.cinematic_scene_state(rect, pred)
-        self.draw_cinematic_background(rect, pred)
-        if not state.get("active_attack") and self.simulation_progress() < 0.88:
-            self.draw_model_flow(rect, pred, algo)
-        self.draw_cinematic_goal(rect, pred, state)
-        self.draw_cinematic_scene(rect, pred, state)
+        if state.get("poc_sequence"):
+            self.draw_cinematic_poc_sequence(rect, state)
+        else:
+            viewport = PocViewport.fit(rect)
+            self.draw_cinematic_poc_background(
+                rect,
+                viewport,
+                float(
+                    state.get(
+                        "poc_scroll",
+                        self.ground_scroll
+                        / max(1e-6, viewport.scale),
+                    )
+                ),
+            )
+            if not state.get("active_attack") and self.simulation_progress() < 0.88:
+                self.draw_model_flow(rect, pred, algo)
+            self.draw_cinematic_scene(rect, pred, state)
         self.draw_cinematic_goal_overlay(rect, pred)
         self.screen.set_clip(old_clip)
         possession = str(state.get("possession", "home"))
@@ -1521,26 +1897,88 @@ class App:
         return "left" if possession == "away" else "right"
 
     def cinematic_goal_rect(self, field: pygame.Rect, side: str) -> pygame.Rect:
+        bottom = field.bottom - CINEMATIC_GOAL_BOTTOM_INSET
         if side == "left":
-            return pygame.Rect(field.x + 76, field.y + 228, 180, 188)
-        return pygame.Rect(field.right - 256, field.y + 228, 180, 188)
+            return pygame.Rect(
+                field.x + CINEMATIC_GOAL_EDGE_INSET,
+                bottom - CINEMATIC_GOAL_HEIGHT,
+                CINEMATIC_GOAL_WIDTH,
+                CINEMATIC_GOAL_HEIGHT,
+            )
+        return pygame.Rect(
+            field.right - CINEMATIC_GOAL_EDGE_INSET - CINEMATIC_GOAL_WIDTH,
+            bottom - CINEMATIC_GOAL_HEIGHT,
+            CINEMATIC_GOAL_WIDTH,
+            CINEMATIC_GOAL_HEIGHT,
+        )
+
+    def cinematic_goal_layer_target_rect(
+        self,
+        goal: pygame.Rect,
+        side: str,
+        frame: pygame.Surface,
+    ) -> pygame.Rect:
+        mouth_ratio = (
+            CINEMATIC_GOAL_SOURCE_POST_X[1]
+            - CINEMATIC_GOAL_SOURCE_POST_X[0]
+        ) / CINEMATIC_GOAL_SOURCE_WIDTH
+        target_w = int(round(goal.w / mouth_ratio))
+        aspect = frame.get_width() / max(1, frame.get_height())
+        target_h = int(round(target_w / aspect))
+        if side == "right":
+            left_post_ratio = (
+                CINEMATIC_GOAL_SOURCE_POST_X[0]
+                / CINEMATIC_GOAL_SOURCE_WIDTH
+            )
+        else:
+            left_post_ratio = (
+                CINEMATIC_GOAL_SOURCE_WIDTH
+                - CINEMATIC_GOAL_SOURCE_POST_X[1]
+            ) / CINEMATIC_GOAL_SOURCE_WIDTH
+        target = pygame.Rect(0, 0, target_w, target_h)
+        target.x = int(round(goal.left - target_w * left_post_ratio))
+        target.y = int(
+            round(
+                goal.bottom
+                - target_h
+                * CINEMATIC_GOAL_SOURCE_POST_BOTTOM
+                / CINEMATIC_GOAL_SOURCE_HEIGHT
+            )
+        )
+        return target
+
+    @staticmethod
+    def cinematic_goal_entry_x(goal: pygame.Rect, direction: int) -> float:
+        return (
+            float(goal.centerx)
+            - float(direction) * CINEMATIC_GOAL_ENTRY_DEPTH
+        )
 
     def cinematic_camera_progress(self, pred: Prediction) -> float:
         active_attack = self.active_attack_event(pred)
-        possession = active_attack.side if active_attack else self.cinematic_possession_side(pred)
-        direction = 1 if possession != "away" else -1
         minute = self.match_minute_float()
         if active_attack:
             event_window = GOAL_EVENT_WINDOW_MINUTES if active_attack.is_goal else CHANCE_EVENT_WINDOW_MINUTES
             event_minute = active_attack.minute
             attack_progress = smoothstep(clamp((minute - (event_minute - event_window)) / event_window))
             cruise_progress = self.cinematic_cruise_camera_progress(pred, minute)
-            settle_after = GOAL_PAYOFF_MINUTES + 0.45 if active_attack.is_goal else CHANCE_PAYOFF_MINUTES
-            settle = smoothstep((minute - (event_minute + settle_after)) / 1.55)
-            progress = lerp(attack_progress, cruise_progress, settle)
+            attack_entry_progress = self.cinematic_cruise_camera_progress(pred, event_minute - event_window)
+            attack_target = 1.0 if active_attack.side == "home" else 0.0
+            settle_duration = 2.60
+            payoff_duration = (
+                GOAL_PAYOFF_MINUTES
+                if active_attack.is_goal
+                else CHANCE_PAYOFF_MINUTES
+            )
+            settle_after = max(0.0, payoff_duration - settle_duration)
+            settle = smoothstep(
+                (minute - (event_minute + settle_after)) / settle_duration
+            )
+            attack_camera = lerp(attack_entry_progress, attack_target, attack_progress)
+            progress = lerp(attack_camera, cruise_progress, settle)
         else:
             progress = self.cinematic_cruise_camera_progress(pred, minute)
-        return progress if direction > 0 else 1.0 - progress
+        return progress
 
     def cinematic_cruise_camera_progress(self, pred: Prediction, minute: float) -> float:
         schedule = self.goal_schedule(pred)
@@ -1569,21 +2007,43 @@ class App:
             event_minute = active_attack.minute
             shot_progress = clamp((minute - (event_minute - event_window)) / event_window)
             shot_speed = smoothstep(shot_progress)
-        run_speed = 0.42 + approach_speed * 0.58 + shot_speed * 0.52
+        run_speed = clamp(0.46 + approach_speed * 0.44 + shot_speed * 0.14, 0.46, 1.04)
         camera = self.cinematic_camera_progress(pred)
-        stride_phase = (self.t * (6.1 + run_speed * 1.8)) % 4.0
+        travel_distance = self.ground_travel_distance
+        stride_phase = (travel_distance / CINEMATIC_RUNNER_STRIDE_DISTANCE * 4.0) % 4.0
         desired_scroll_velocity = direction * CINEMATIC_TURF_SPEED * (0.64 + run_speed * 0.36)
         return {
             "direction": direction,
             "camera": camera,
             "run_speed": run_speed,
             "stride_phase": stride_phase,
+            "travel_distance": travel_distance,
             "ground_scroll": self.ground_scroll,
             "desired_scroll_velocity": desired_scroll_velocity,
         }
 
-    def cinematic_shot_profile(self, goal_rect: pygame.Rect, direction: int, goal_minute: int) -> ShotProfile:
-        seed = int(self.match_seed) * 1_000_003 + int(goal_minute) * 9_176 + (0 if direction > 0 else 4_699)
+    def cinematic_shot_plan(
+        self,
+        goal_rect: pygame.Rect,
+        event_minute: int,
+        side: str,
+        outcome: str,
+    ) -> CinematicShotPlan:
+        if side not in {"home", "away"}:
+            raise ValueError(f"invalid cinematic side: {side}")
+        if outcome not in {"goal", "save", "wide"}:
+            raise ValueError(f"invalid cinematic outcome: {outcome}")
+        key = (int(self.match_seed), int(event_minute), side, outcome)
+        cached = self.cinematic_shot_plan_cache.get(key)
+        if cached is not None:
+            return cached
+
+        direction = 1 if side == "home" else -1
+        seed = (
+            int(self.match_seed) * 1_000_003
+            + int(event_minute) * 9_176
+            + (0 if direction > 0 else 4_699)
+        )
         rng = random.Random(seed)
         profiles = (
             ("alto firme", -0.54, 48.0, 0.20, 31.0, 1.34, 40.0),
@@ -1602,18 +2062,24 @@ class App:
             goal_rect.y + CINEMATIC_SHOT_BALL_SIZE * 0.66,
             goal_rect.bottom - CINEMATIC_SHOT_BALL_SIZE * 0.66,
         )
-        target_x = goal_rect.right - depth + target_jitter_x if direction > 0 else goal_rect.left + depth - target_jitter_x
+        mouth_x = self.cinematic_goal_entry_x(goal_rect, direction)
+        depth_ratio = clamp((depth - 44.0) / (135.0 - 44.0))
+        target_depth = lerp(
+            goal_rect.w * CINEMATIC_NET_TARGET_DEPTH_MAX_RATIO,
+            goal_rect.w * CINEMATIC_NET_TARGET_DEPTH_MIN_RATIO,
+            depth_ratio,
+        ) + target_jitter_x * 0.5
+        target_x = mouth_x + direction * target_depth
         target_x = clamp(
             target_x,
             goal_rect.left + CINEMATIC_SHOT_BALL_SIZE * 0.66,
             goal_rect.right - CINEMATIC_SHOT_BALL_SIZE * 0.66,
         )
-        mouth_x = goal_rect.left + 2.0 if direction > 0 else goal_rect.right - 2.0
         mouth_y = target_y - rng.uniform(0.0, 5.0)
         entry = (mouth_x, mouth_y)
         mouth = (mouth_x, mouth_y)
         bend = direction * (bend_base * 9.0 + rng.uniform(-1.8, 1.8))
-        return ShotProfile(
+        profile = ShotProfile(
             zone=zone,
             target=(target_x, target_y),
             entry=entry,
@@ -1624,6 +2090,43 @@ class App:
             speed=speed_base,
             spin=spin + rng.uniform(-2.0, 3.0),
         )
+        save_variant = (
+            self.cinematic_save_variant(event_minute, side)
+            if outcome == "save"
+            else ""
+        )
+        target = profile.target
+        if outcome != "goal":
+            target = self.cinematic_chance_target_from_profile(
+                profile,
+                goal_rect,
+                direction,
+                outcome,
+                save_variant,
+            )
+        plan = CinematicShotPlan(
+            key=key,
+            profile=profile,
+            profile_band=SHOT_PROFILE_BANDS[profile.zone],
+            target=target,
+            save_variant=save_variant,
+        )
+        self.cinematic_shot_plan_cache[key] = plan
+        return plan
+
+    def cinematic_shot_profile(
+        self,
+        goal_rect: pygame.Rect,
+        direction: int,
+        goal_minute: int,
+    ) -> ShotProfile:
+        side = "home" if direction > 0 else "away"
+        return self.cinematic_shot_plan(
+            goal_rect,
+            goal_minute,
+            side,
+            "goal",
+        ).profile
 
     def cinematic_shot_target(self, goal_rect: pygame.Rect, direction: int, goal_minute: int) -> tuple[float, float]:
         return self.cinematic_shot_profile(goal_rect, direction, goal_minute).target
@@ -1631,18 +2134,188 @@ class App:
     def cinematic_net_path_table(
         self,
         entry: tuple[float, float],
-        control: tuple[float, float],
-        target: tuple[float, float],
+        control_a: tuple[float, float],
+        control_b: tuple[float, float],
+        rest: tuple[float, float],
     ) -> tuple[tuple[tuple[float, float], ...], tuple[float, ...], float]:
-        cache_key = tuple(round(value, 3) for point in (entry, control, target) for value in point)
+        cache_key = tuple(
+            round(value, 3)
+            for point in (entry, control_a, control_b, rest)
+            for value in point
+        )
         cached = self.ball_net_path_cache.get(cache_key)
         if cached is not None:
             return cached
         if len(self.ball_net_path_cache) >= 128:
             self.ball_net_path_cache.clear()
-        table = cubic_bezier_arc_table(entry, control, target, target)
+        table = cubic_bezier_arc_table(entry, control_a, control_b, rest)
         self.ball_net_path_cache[cache_key] = table
         return table
+
+    def cinematic_dribble_kinematics(
+        self,
+        actor_pos: tuple[float, float],
+        direction: int,
+        stride_phase: float,
+        time_value: float,
+        shot_progress: float = 0.0,
+        kick_contact_position: tuple[float, float] | None = None,
+        foot_position: tuple[float, float] | None = None,
+        visible_foot_position: tuple[float, float] | None = None,
+        contact_foot_position: tuple[float, float] | None = None,
+        travel_distance: float | None = None,
+        kick_contact_gap: float = CINEMATIC_KICK_CONTACT_GAP,
+        minimum_directed_ball_x: float | None = None,
+        planned_directed_ball_x: float | None = None,
+    ) -> DribbleKinematics:
+        shadow_y = float(actor_pos[1]) - 2.0
+        center_y = shadow_y - CINEMATIC_BALL_SIZE * CINEMATIC_BALL_GROUND_RADIUS_RATIO
+        contact_radius = CINEMATIC_BALL_SIZE * 0.46
+        touch_phase = cinematic_dribble_touch_phase(stride_phase, direction)
+        push_peak = CINEMATIC_DRIBBLE_PUSH_PEAK
+        if touch_phase <= push_peak:
+            free_roll = smoothstep(touch_phase / push_peak)
+        else:
+            free_roll = 1.0 - smoothstep((touch_phase - push_peak) / (1.0 - push_peak))
+        nominal_control_x = (
+            float(actor_pos[0])
+            + direction * (CINEMATIC_DRIBBLE_CONTROL_OFFSET - CINEMATIC_DRIBBLE_FOOT_RETREAT * free_roll)
+        )
+        visible_foot_x = (
+            nominal_control_x
+            if visible_foot_position is None
+            else float(visible_foot_position[0])
+        )
+        visible_foot_y = center_y if visible_foot_position is None else float(visible_foot_position[1])
+        control_x = nominal_control_x
+        control_y = center_y
+        excursion = (
+            CINEMATIC_DRIBBLE_BALL_EXCURSION_RIGHT
+            if direction > 0
+            else CINEMATIC_DRIBBLE_BALL_EXCURSION_LEFT
+        )
+        if kick_contact_position is not None and shot_progress > 0.0:
+            attack_cushion = lerp(1.0, 0.60, smoothstep(shot_progress / 0.12))
+            excursion *= attack_cushion
+        surface_lead = CINEMATIC_DRIBBLE_CONTACT_GAP + excursion * free_roll
+        contact_anchor_x = (
+            float(contact_foot_position[0])
+            if contact_foot_position is not None
+            else (float(foot_position[0]) if foot_position is not None else visible_foot_x)
+        )
+        touch_lock = smoothstep(1.0 - free_roll)
+        control_x = lerp(control_x, contact_anchor_x, touch_lock)
+        contact_foot_x = control_x
+
+        plant = 0.0
+        if kick_contact_position is not None:
+            plant_start = SHOT_PLANT_AT - 0.10
+            plant = smoothstep((shot_progress - plant_start) / max(0.001, SHOT_KICK_AT - plant_start))
+            target_control_x = float(kick_contact_position[0])
+            target_control_y = float(kick_contact_position[1])
+            control_x = lerp(control_x, target_control_x, plant)
+            control_y = lerp(control_y, target_control_y, plant)
+            visible_foot_x = lerp(visible_foot_x, target_control_x, plant)
+            visible_foot_y = lerp(visible_foot_y, target_control_y, plant)
+            contact_foot_x = lerp(contact_foot_x, target_control_x, plant)
+            surface_lead = lerp(surface_lead, kick_contact_gap, plant)
+
+        ball_x = control_x + direction * (contact_radius + surface_lead)
+        if (
+            kick_contact_position is not None
+            and shot_progress >= CINEMATIC_KICK_APPROACH_START
+        ):
+            target_ball_x = float(kick_contact_position[0]) + direction * (
+                contact_radius + kick_contact_gap
+            )
+            directed_target_x = direction * target_ball_x
+            approach = smoothstep(
+                (shot_progress - CINEMATIC_KICK_APPROACH_START)
+                / max(0.001, SHOT_KICK_AT - CINEMATIC_KICK_APPROACH_START)
+            )
+            monotonic_approach_x = lerp(
+                directed_target_x - CINEMATIC_KICK_APPROACH_DISTANCE,
+                directed_target_x,
+                approach,
+            )
+            directed_ball_x = monotonic_approach_x
+            if minimum_directed_ball_x is not None:
+                directed_ball_x = max(
+                    directed_ball_x,
+                    minimum_directed_ball_x,
+                )
+            ball_x = direction * directed_ball_x
+        elif minimum_directed_ball_x is not None:
+            directed_ball_x = max(
+                direction * ball_x,
+                minimum_directed_ball_x,
+            )
+            ball_x = direction * directed_ball_x
+        if planned_directed_ball_x is not None:
+            ball_x = direction * planned_directed_ball_x
+
+        contact_gap = direction * (ball_x - contact_foot_x) - contact_radius
+        forward_distance = (
+            (time_value * CINEMATIC_TURF_SPEED * 0.82 if travel_distance is None else travel_distance)
+            + direction * ball_x
+        )
+        rolling_diameter = max(12.0, CINEMATIC_BALL_SIZE * 0.86)
+        rotation = direction * forward_distance / (math.pi * rolling_diameter) * 360.0
+        ball = BallKinematics(
+            position=(ball_x, center_y),
+            ground_position=(ball_x, shadow_y),
+            phase="drible",
+            scale=CINEMATIC_BALL_SIZE,
+            squash=(1.0, 1.0),
+            rotation_degrees=rotation,
+            depth=0.0,
+        )
+        return DribbleKinematics(
+            control_position=(control_x, control_y),
+            visible_foot_position=(visible_foot_x, visible_foot_y),
+            ball=ball,
+            touch_phase=touch_phase,
+            contact_gap=contact_gap,
+        )
+
+    @staticmethod
+    def cinematic_ballistic_ground_motion(
+        start_y: float,
+        initial_velocity_y: float,
+        elapsed_seconds: float,
+        ground_center_y: float,
+        bounce_velocity: float,
+        gravity: float = 520.0,
+    ) -> tuple[float, str]:
+        start_y = min(start_y, ground_center_y)
+        discriminant = max(
+            0.0,
+            initial_velocity_y * initial_velocity_y
+            - 2.0 * gravity * (start_y - ground_center_y),
+        )
+        landing_time = (
+            -initial_velocity_y + math.sqrt(discriminant)
+        ) / gravity
+        if elapsed_seconds < landing_time:
+            y = (
+                start_y
+                + initial_velocity_y * elapsed_seconds
+                + 0.5 * gravity * elapsed_seconds * elapsed_seconds
+            )
+            return min(y, ground_center_y), "chute"
+
+        bounce_elapsed = elapsed_seconds - landing_time
+        for rebound in (bounce_velocity, bounce_velocity * 0.34):
+            bounce_duration = 2.0 * rebound / gravity
+            if bounce_elapsed <= bounce_duration:
+                y = (
+                    ground_center_y
+                    - rebound * bounce_elapsed
+                    + 0.5 * gravity * bounce_elapsed * bounce_elapsed
+                )
+                return min(y, ground_center_y), "quique"
+            bounce_elapsed -= bounce_duration
+        return ground_center_y, "rolagem"
 
     def cinematic_ball_for_progress(
         self,
@@ -1656,15 +2329,38 @@ class App:
         shot_profile: ShotProfile | None = None,
         ground_y: float | None = None,
         attack_kind: str = "goal",
+        release_position: tuple[float, float] | None = None,
+        release_rotation_degrees: float | None = None,
     ) -> BallKinematics:
         ground_y = float(ground_y if ground_y is not None else foot[1] + 52.0)
         contact_radius = CINEMATIC_BALL_SIZE * 0.46
-        release = (foot[0] + direction * (contact_radius + 0.6), foot[1] - 1.0)
+        shadow_ground_y = ground_y - 2.0
+        dribble_ground_center_y = (
+            shadow_ground_y
+            - CINEMATIC_BALL_SIZE * CINEMATIC_BALL_GROUND_RADIUS_RATIO
+        )
+        net_ground_center_y = (
+            shadow_ground_y
+            - CINEMATIC_NET_BALL_SIZE * CINEMATIC_BALL_GROUND_RADIUS_RATIO
+        )
+        release = release_position or (
+            foot[0] + direction * (contact_radius + 1.7),
+            dribble_ground_center_y,
+        )
         event_window = GOAL_EVENT_WINDOW_MINUTES if is_goal else CHANCE_EVENT_WINDOW_MINUTES
         kick_time_value = (
             goal_minute - event_window + SHOT_KICK_AT * event_window
         ) / 90.0 * SIMULATION_SECONDS
-        kick_rotation = direction * (kick_time_value * 12.0 + goal_minute * 0.31) * 18.0
+        rolling_diameter = max(12.0, CINEMATIC_BALL_SIZE * 0.86)
+        kick_rotation = (
+            release_rotation_degrees
+            if release_rotation_degrees is not None
+            else direction
+            * kick_time_value
+            * CINEMATIC_TURF_SPEED
+            / (math.pi * rolling_diameter)
+            * 360.0
+        )
         if shot_profile is None:
             shot_profile = ShotProfile(
                 zone="legado",
@@ -1677,55 +2373,150 @@ class App:
                 speed=1.0,
                 spin=34.0,
             )
+        profile_band = SHOT_PROFILE_BANDS.get(shot_profile.zone, "mid")
         if shot_progress <= SHOT_KICK_AT:
-            settle = smoothstep((shot_progress - (SHOT_PLANT_AT - 0.12)) / max(0.001, SHOT_KICK_AT - (SHOT_PLANT_AT - 0.12)))
-            dribble = 1.0 - settle
-            roll_phase = time_value * 12.0 + goal_minute * 0.31
-            roll = math.sin(roll_phase)
-            contact = abs(roll)
-            lead = contact_radius + 0.6 + 0.7 * contact + 0.25 * dribble
-            dribble_pos = (
-                foot[0] + direction * lead,
-                foot[1] + 1.0 - 2.0 * contact + math.sin(roll_phase * 0.5) * 0.6 * dribble,
-            )
-            position = (
-                    lerp(dribble_pos[0], release[0], settle),
-                    lerp(dribble_pos[1], release[1], settle),
+            rotation = (
+                release_rotation_degrees
+                if release_rotation_degrees is not None
+                else direction
+                * time_value
+                * CINEMATIC_TURF_SPEED
+                / (math.pi * rolling_diameter)
+                * 360.0
             )
             return BallKinematics(
-                position=position,
-                ground_position=(position[0], ground_y - 2.0),
+                position=release,
+                ground_position=(release[0], shadow_ground_y),
                 phase="drible",
                 scale=CINEMATIC_BALL_SIZE,
                 squash=(1.0, 1.0),
-                rotation_degrees=direction * (roll_phase * 18.0),
+                rotation_degrees=rotation,
                 depth=0.0,
             )
 
-        contact_progress = SHOT_NET_VISUAL_CONTACT_AT if is_goal else CHANCE_CONTACT_VISUAL_AT
+        contact_progress = (
+            SHOT_NET_AT
+            if is_goal
+            else WIDE_CONTACT_VISUAL_AT
+            if attack_kind == "wide"
+            else CHANCE_CONTACT_VISUAL_AT
+        )
         flight_duration = max(0.001, contact_progress - SHOT_KICK_AT)
         flight = clamp((shot_progress - SHOT_KICK_AT) / flight_duration)
+        speed_slope = (
+            1.05
+            if is_goal
+            else 0.56
+            if attack_kind == "save"
+            else 0.44
+        )
+        speed_ceiling = 1.24 if is_goal else 1.13
+        speed_ratio = clamp(
+            1.0 + (shot_profile.speed - 1.34) * speed_slope,
+            1.0,
+            speed_ceiling,
+        )
+        if is_goal:
+            speed_ratio *= 1.07
+        elif attack_kind == "save":
+            speed_ratio *= {
+                "high": 0.98,
+                "mid": 1.02,
+                "low": 1.06,
+            }[profile_band]
+        elif attack_kind == "wide":
+            speed_ratio *= 0.6295 * {
+                "high": 0.94,
+                "mid": 0.975,
+                "low": 0.998,
+            }[profile_band]
+        contact_speed_ratio = clamp(
+            0.94 + (shot_profile.speed - 1.34) * 0.20,
+            0.94,
+            0.985,
+        )
+        if attack_kind == "wide":
+            contact_speed_ratio *= 0.57
+        inverse_flight = 1.0 - flight
+        flight_motion = clamp(
+            flight * flight * (3.0 - 2.0 * flight)
+            + speed_ratio * flight * inverse_flight * inverse_flight
+            - contact_speed_ratio * flight * flight * inverse_flight
+        )
+        spin_degrees_per_pixel = (
+            shot_profile.spin / CINEMATIC_SHOT_SPIN_DISTANCE_DIVISOR
+        )
+        if attack_kind == "wide":
+            spin_degrees_per_pixel *= {
+                "high": 0.8675,
+                "mid": 0.875,
+                "low": 0.88,
+            }[profile_band]
         entry = shot_profile.entry if is_goal else target
         delta_x = entry[0] - release[0]
+        arc_distance_factor = (
+            0.040
+            if is_goal
+            else 0.050
+            if attack_kind == "wide"
+            else 0.052
+        )
         arc_height = clamp(
-            shot_profile.loft + abs(delta_x) * (0.040 if is_goal else 0.052),
+            shot_profile.loft + abs(delta_x) * arc_distance_factor,
             20.0,
             58.0,
         )
+        if is_goal:
+            control_a_factor = 0.408
+            control_b_factor = 0.458
+        elif attack_kind == "save":
+            control_a_factor = 0.43
+            control_b_factor = 0.37
+        else:
+            control_a_factor = 0.18
+            control_b_factor = 0.195
         control_a = (
-            release[0] + delta_x * 0.28,
+            release[0] + delta_x * control_a_factor,
             release[1] - arc_height,
         )
         control_b = (
-            entry[0] - delta_x * 0.52 + shot_profile.bend,
-            entry[1] - arc_height * 0.34 - shot_profile.dip,
+            entry[0] - delta_x * control_b_factor + shot_profile.bend,
+            entry[1] - arc_height * 0.60 - shot_profile.dip,
+        )
+        flight_path_table = self.cinematic_net_path_table(
+            release,
+            control_a,
+            control_b,
+            entry,
+        )
+        flight_cumulative = flight_path_table[1]
+        flight_table_position = flight_motion * (
+            len(flight_cumulative) - 1
+        )
+        flight_table_index = min(
+            len(flight_cumulative) - 2,
+            int(math.floor(flight_table_position)),
+        )
+        flight_table_blend = (
+            flight_table_position - flight_table_index
+        )
+        flight_path_distance = lerp(
+            flight_cumulative[flight_table_index],
+            flight_cumulative[flight_table_index + 1],
+            flight_table_blend,
         )
         if shot_progress < contact_progress:
-            position = cubic_bezier(release, control_a, control_b, entry, flight)
-            distance = math.dist(release, position)
+            position = cubic_bezier_arc_sample(
+                flight_path_table,
+                flight_motion,
+            )
             scale = int(round(lerp(CINEMATIC_BALL_SIZE, CINEMATIC_SHOT_BALL_SIZE, smoothstep(flight))))
-            visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
-            rotation = kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0
+            rotation = (
+                kick_rotation
+                + direction
+                * flight_path_distance
+                * spin_degrees_per_pixel
+            )
             return BallKinematics(
                 position=position,
                 ground_position=(position[0] - 7.0, ground_y - 2.0),
@@ -1733,77 +2524,398 @@ class App:
                 scale=scale,
                 squash=(1.0, 1.0),
                 rotation_degrees=rotation,
-                depth=smoothstep(flight),
+                depth=0.0,
             )
 
         if not is_goal:
             elapsed = max(0.0, shot_progress - contact_progress)
-            settle = clamp(elapsed / 0.16)
+            post_contact_seconds = elapsed * event_window / 90.0 * SIMULATION_SECONDS
+            profile_band = SHOT_PROFILE_BANDS.get(shot_profile.zone, "mid")
+            contact_rotation = (
+                kick_rotation
+                + direction
+                * flight_path_table[2]
+                * spin_degrees_per_pixel
+            )
+            initial_vertical_velocity = {
+                "high": -82.0,
+                "mid": -38.0,
+                "low": 8.0,
+            }[profile_band]
+            bounce_velocity = {
+                "high": 70.0,
+                "mid": 50.0,
+                "low": 30.0,
+            }[profile_band]
+            vertical_position, vertical_phase = self.cinematic_ballistic_ground_motion(
+                entry[1],
+                initial_vertical_velocity,
+                post_contact_seconds,
+                net_ground_center_y,
+                bounce_velocity,
+            )
             if attack_kind == "wide":
-                tangent = (entry[0] - control_b[0], entry[1] - control_b[1])
-                continuation = min(0.82, elapsed / flight_duration)
-                position = (
-                    entry[0] + 3.0 * tangent[0] * continuation,
-                    entry[1] + 3.0 * tangent[1] * continuation + 20.0 * continuation * continuation,
+                field = self.match_field_rect()
+                ball_radius = CINEMATIC_SHOT_BALL_SIZE * 0.5
+                visible_edge = (
+                    field.right - ball_radius - 6.0
+                    if direction > 0
+                    else field.left + ball_radius + 6.0
                 )
-                phase = "chute"
-                depth = 1.0
+                visible_run = max(0.0, direction * (visible_edge - entry[0]))
+                initial_horizontal_speed = 360.0 * speed_ratio
+                horizontal_deceleration = (
+                    initial_horizontal_speed * initial_horizontal_speed
+                    / max(2.0, 2.0 * visible_run)
+                )
+                stop_time = (
+                    initial_horizontal_speed / horizontal_deceleration
+                    if visible_run > 0.0
+                    else 0.0
+                )
+                movement_time = min(post_contact_seconds, stop_time)
+                continuation_x = min(
+                    visible_run,
+                    initial_horizontal_speed * movement_time
+                    - 0.5
+                    * horizontal_deceleration
+                    * movement_time
+                    * movement_time,
+                )
+                position = (
+                    entry[0] + direction * continuation_x,
+                    vertical_position,
+                )
+                phase = vertical_phase
+                depth = 0.0
+                post_contact_distance = math.dist(entry, position)
+                rotation = (
+                    contact_rotation
+                    + direction
+                    * post_contact_distance
+                    * spin_degrees_per_pixel
+                )
             else:
-                recoil = math.sin(math.pi * settle) * (1.0 - 0.34 * settle) * 34.0
-                position = (entry[0] - direction * recoil, entry[1] - recoil * 0.16)
-                phase = "chute" if settle < 0.76 else "neutro"
-                depth = 0.84
-            distance = math.dist(release, position)
-            scale = int(round(lerp(CINEMATIC_SHOT_BALL_SIZE, CINEMATIC_NET_BALL_SIZE, smoothstep(settle))))
-            visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
+                parry_speed = 165.0 * speed_ratio
+                parry_stop_time = 0.78
+                movement_time = min(post_contact_seconds, parry_stop_time)
+                parry_deceleration = parry_speed / parry_stop_time
+                parry = (
+                    parry_speed * movement_time
+                    - 0.5
+                    * parry_deceleration
+                    * movement_time
+                    * movement_time
+                )
+                position = (
+                    entry[0] - direction * parry,
+                    vertical_position,
+                )
+                phase = vertical_phase
+                depth = 0.0
+                post_contact_distance = math.dist(entry, position)
+                rotation = (
+                    contact_rotation
+                    - direction
+                    * post_contact_distance
+                    * spin_degrees_per_pixel
+                )
+            scale_progress = smoothstep(clamp(post_contact_seconds / 0.48))
+            scale = int(
+                round(
+                    lerp(
+                        CINEMATIC_SHOT_BALL_SIZE,
+                        CINEMATIC_NET_BALL_SIZE,
+                        scale_progress,
+                    )
+                )
+            )
             return BallKinematics(
                 position=position,
-                ground_position=(position[0] - 7.0, ground_y - 2.0),
+                ground_position=(position[0], ground_y - 2.0),
                 phase=phase,
                 scale=scale,
                 squash=(1.0, 1.0),
-                rotation_degrees=kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0,
+                rotation_degrees=rotation,
                 depth=depth,
             )
 
         entry_tangent = (entry[0] - control_b[0], entry[1] - control_b[1])
         entry_tangent_length = max(1e-6, math.hypot(*entry_tangent))
-        target_distance = max(1e-6, math.dist(entry, target))
-        handle_length = min(target_distance * 0.44, 46.0)
-        net_control_a = (
-            entry[0] + entry_tangent[0] / entry_tangent_length * handle_length,
-            entry[1] + entry_tangent[1] / entry_tangent_length * handle_length,
+        net_target = (
+            lerp(entry[0], target[0], SHOT_NET_PENETRATION_RATIO),
+            lerp(entry[1], target[1], SHOT_NET_PENETRATION_RATIO),
         )
-        net_path_table = self.cinematic_net_path_table(entry, net_control_a, target)
-        net_path_length = net_path_table[2]
-        entry_speed_progress = 3.0 * entry_tangent_length / flight_duration
-        net_duration = clamp(
-            2.0 * net_path_length / max(1e-6, entry_speed_progress),
-            0.08,
-            SHOT_NET_SETTLE_PROGRESS,
+        target_distance = max(1e-6, math.dist(entry, net_target))
+        target_vector = (
+            net_target[0] - entry[0],
+            net_target[1] - entry[1],
         )
-        net_progress = clamp((shot_progress - contact_progress) / net_duration)
-        distance_fraction = 1.0 - (1.0 - net_progress) ** 2
-        position = cubic_bezier_arc_sample(net_path_table, distance_fraction)
-        settled_after = max(0.0, shot_progress - (contact_progress + net_duration))
-        if settled_after > 0.0:
-            position = target
-        distance = math.dist(release, entry) + net_path_length * distance_fraction
-        scale = int(round(lerp(CINEMATIC_SHOT_BALL_SIZE, CINEMATIC_NET_BALL_SIZE, smoothstep(net_progress))))
-        visible_diameter = max(12.0, CINEMATIC_SHOT_BALL_SIZE * 0.86)
+        target_unit = (
+            target_vector[0] / target_distance,
+            target_vector[1] / target_distance,
+        )
+        entry_handle = min(target_distance * 0.38, 34.0)
+        target_handle = min(
+            target_distance * 0.28,
+            {
+                "high": 20.0,
+                "mid": 26.0,
+                "low": 21.0,
+            }[profile_band],
+        )
+        impact_control_a = (
+            entry[0]
+            + entry_tangent[0] / entry_tangent_length * entry_handle,
+            entry[1]
+            + entry_tangent[1] / entry_tangent_length * entry_handle,
+        )
+        impact_control_b = (
+            net_target[0] - target_unit[0] * target_handle,
+            net_target[1] - target_unit[1] * target_handle,
+        )
+        impact_path_table = self.cinematic_net_path_table(
+            entry,
+            impact_control_a,
+            impact_control_b,
+            net_target,
+        )
+        impact_duration = max(
+            0.001,
+            SHOT_NET_VISUAL_CONTACT_AT - SHOT_NET_AT,
+        )
+        impact_progress = clamp(
+            (shot_progress - SHOT_NET_AT) / impact_duration
+        )
+        impact_ease_bias = {
+            "high": 0.12,
+            "mid": -0.14,
+            "low": 0.08,
+        }[profile_band]
+        impact_distance_fraction = clamp(
+            impact_progress
+            + impact_ease_bias
+            * impact_progress
+            * (1.0 - impact_progress)
+        )
+        if shot_progress <= SHOT_NET_VISUAL_CONTACT_AT:
+            position = cubic_bezier_arc_sample(
+                impact_path_table,
+                impact_distance_fraction,
+            )
+            distance = (
+                flight_path_table[2]
+                + impact_path_table[2] * impact_distance_fraction
+            )
+            return BallKinematics(
+                position=position,
+                ground_position=(position[0] - 7.0, ground_y - 2.0),
+                phase="rede",
+                scale=int(
+                    round(
+                        lerp(
+                            CINEMATIC_SHOT_BALL_SIZE,
+                            CINEMATIC_NET_BALL_SIZE,
+                            smoothstep(impact_progress),
+                        )
+                    )
+                ),
+                squash=(1.0, 1.0),
+                rotation_degrees=(
+                    kick_rotation
+                    + direction
+                    * distance
+                    * spin_degrees_per_pixel
+                ),
+                depth=smoothstep(impact_progress),
+            )
+
+        rest_depth_from_mouth = (
+            CINEMATIC_GOAL_BALL_REST_DEPTH
+            + float(
+                (
+                    int(self.match_seed) * 17
+                    + int(goal_minute) * 13
+                )
+                % (CINEMATIC_GOAL_BALL_REST_DEPTH_VARIATION + 1)
+            )
+        )
+        rest_target_x = (
+            shot_profile.mouth[0]
+            + direction * rest_depth_from_mouth
+        )
+        rest_depth = max(
+            1.0,
+            direction * (rest_target_x - net_target[0]),
+        )
+        settle_progress = clamp(
+            (shot_progress - SHOT_NET_VISUAL_CONTACT_AT)
+            / SHOT_NET_SETTLE_PROGRESS
+        )
+        post_contact_seconds = (
+            max(0.0, shot_progress - SHOT_NET_VISUAL_CONTACT_AT)
+            * event_window
+            / 90.0
+            * SIMULATION_SECONDS
+        )
+        penetration_seconds = {
+            "high": 0.15,
+            "mid": 0.13,
+            "low": 0.11,
+        }[profile_band]
+        event_duration_seconds = (
+            event_window / 90.0 * SIMULATION_SECONDS
+        )
+        impact_duration_seconds = max(
+            1e-6,
+            impact_duration * event_duration_seconds,
+        )
+        impact_exit_speed_px_s = (
+            impact_path_table[2] * 0.74
+            / impact_duration_seconds
+        )
+        capture_duration = (
+            2.0
+            * rest_depth
+            / max(1.0, impact_exit_speed_px_s)
+        )
+        capture_progress = clamp(
+            post_contact_seconds / max(1e-6, capture_duration)
+        )
+        capture_progress_sq = capture_progress * capture_progress
+        capture_progress_cu = capture_progress_sq * capture_progress
+        captured_depth = (
+            (
+                capture_progress_cu
+                - 2.0 * capture_progress_sq
+                + capture_progress
+            )
+            * impact_exit_speed_px_s
+            * capture_duration
+            + (
+                -2.0 * capture_progress_cu
+                + 3.0 * capture_progress_sq
+            )
+            * rest_depth
+        )
+
+        drop_start = penetration_seconds + {
+            "high": 0.16,
+            "mid": 0.10,
+            "low": 0.12,
+        }[profile_band]
+        drop_elapsed = max(0.0, post_contact_seconds - drop_start)
+        drop_gravity = {
+            "high": 426.0,
+            "mid": 484.0,
+            "low": 541.0,
+        }[profile_band]
+        drop_terminal_speed = {
+            "high": 170.0,
+            "mid": 178.0,
+            "low": 156.0,
+        }[profile_band]
+        terminal_time = drop_terminal_speed / drop_gravity
+        if drop_elapsed <= terminal_time:
+            drop_distance = (
+                0.5
+                * drop_gravity
+                * drop_elapsed
+                * drop_elapsed
+            )
+        else:
+            terminal_distance = (
+                0.5
+                * drop_gravity
+                * terminal_time
+                * terminal_time
+            )
+            drop_distance = (
+                terminal_distance
+                + drop_terminal_speed
+                * (drop_elapsed - terminal_time)
+            )
+        position = (
+            net_target[0] + direction * captured_depth,
+            min(net_ground_center_y, net_target[1] + drop_distance),
+        )
+        distance = (
+            flight_path_table[2]
+            + impact_path_table[2]
+            + captured_depth
+            + max(0.0, position[1] - net_target[1])
+        )
+        scale = CINEMATIC_NET_BALL_SIZE
         return BallKinematics(
             position=position,
             ground_position=(position[0] - 7.0, ground_y - 2.0),
-            phase="rede",
+            phase="rede" if settle_progress < 0.72 else "rolagem_rede",
             scale=scale,
             squash=(1.0, 1.0),
-            rotation_degrees=kick_rotation + direction * distance / (math.pi * visible_diameter) * 360.0,
+            rotation_degrees=(
+                kick_rotation
+                + direction
+                * distance
+                * spin_degrees_per_pixel
+            ),
             depth=1.0,
         )
 
     def cinematic_save_variant(self, chance_minute: int, side: str) -> str:
         seed = int(self.match_seed) + int(chance_minute) * 31 + (17 if side == "away" else 0)
         return "stand" if seed % 2 == 0 else "dive"
+
+    def cinematic_chance_target_from_profile(
+        self,
+        profile: ShotProfile,
+        goal_rect: pygame.Rect,
+        direction: int,
+        kind: str,
+        save_variant: str = "",
+    ) -> tuple[float, float]:
+        band = SHOT_PROFILE_BANDS.get(profile.zone, "mid")
+        if kind == "wide":
+            outside_x = (
+                goal_rect.right + CINEMATIC_WIDE_POST_OFFSET
+                if direction > 0
+                else goal_rect.left - CINEMATIC_WIDE_POST_OFFSET
+            )
+            target_y = {
+                "high": goal_rect.top - 12.0,
+                "mid": goal_rect.centery - 4.0,
+                "low": goal_rect.bottom - 24.0,
+            }[band]
+            return outside_x, target_y
+        if kind == "save":
+            goal_line_x = self.cinematic_goal_entry_x(goal_rect, direction)
+            contact_x = goal_line_x - direction * (CINEMATIC_SHOT_BALL_SIZE * 0.5 + 4.0)
+            contact_y = {
+                "high": goal_rect.centery - 42.0,
+                "mid": goal_rect.centery - 6.0,
+                "low": goal_rect.centery + 24.0,
+            }[band]
+            return contact_x, contact_y
+        raise ValueError(f"invalid cinematic chance outcome: {kind}")
+
+    def cinematic_keeper_glove_offset(
+        self,
+        flip: bool,
+        keeper_action: str,
+    ) -> tuple[float, float]:
+        key = (bool(flip), keeper_action)
+        cached = self.keeper_glove_offset_cache.get(key)
+        if cached is not None:
+            return cached
+
+        # Measured from the authored 16-frame keeper sheets after runtime scale.
+        # The directional sheets are independently authored, so their offsets
+        # intentionally are not mirrored constants.
+        if keeper_action == "stand_save":
+            offset = (-55.0, 21.0) if flip else (55.0, 34.0)
+        else:
+            offset = (-69.0, -26.0) if flip else (94.0, -20.0)
+        self.keeper_glove_offset_cache[key] = offset
+        return offset
 
     def cinematic_chance_target(
         self,
@@ -1813,14 +2925,242 @@ class App:
         kind: str,
         save_variant: str = "",
     ) -> tuple[float, float]:
-        base = self.cinematic_shot_target(goal_rect, direction, chance_minute)
-        if kind == "wide":
-            return base[0] + direction * 110, base[1] + (22 if base[1] <= goal_rect.centery else -22)
-        if kind == "save" and save_variant == "stand":
-            return goal_rect.centerx + direction * 28, goal_rect.centery + 18
-        if kind == "save":
-            return goal_rect.centerx + direction * 94, goal_rect.centery + 2
-        return goal_rect.centerx + direction * 34, goal_rect.centery + (28 if base[1] >= goal_rect.centery else -30)
+        side = "home" if direction > 0 else "away"
+        plan = self.cinematic_shot_plan(
+            goal_rect,
+            chance_minute,
+            side,
+            kind,
+        )
+        if kind == "save" and save_variant and save_variant != plan.save_variant:
+            return self.cinematic_chance_target_from_profile(
+                plan.profile,
+                goal_rect,
+                direction,
+                kind,
+                save_variant,
+            )
+        return plan.target
+
+    def cinematic_poc_scene_state(
+        self,
+        field: pygame.Rect,
+        active_attack: CinematicAttackEvent,
+        raw_shot_progress: float,
+    ) -> dict[str, object]:
+        sequence = self.cinematic_poc_sequence_for_event(active_attack)
+        profile = sequence.profile
+        if self.poc_sequences is None:
+            raise RuntimeError("approved POC 7 runtime contract is unavailable")
+        attack_direction = sequence.attack_direction
+        event_window = (
+            GOAL_EVENT_WINDOW_MINUTES
+            if active_attack.is_goal
+            else CHANCE_EVENT_WINDOW_MINUTES
+        )
+        event_seconds = event_window / 90.0 * SIMULATION_SECONDS
+        elapsed = self.poc_sequences.event_elapsed(
+            raw_shot_progress,
+            sequence,
+            event_seconds,
+        )
+        sample = self.poc_sequences.sample(sequence, elapsed)
+        viewport = PocViewport.fit(field)
+        possession_team = (
+            self.home
+            if active_attack.side == "home"
+            else self.away
+        )
+        actor_x = self.cinematic_poc_actor_x(
+            sequence,
+            sample,
+            possession_team,
+        )
+        ball_x = self.cinematic_poc_ball_x(
+            sequence,
+            sample,
+            possession_team,
+            viewport,
+        )
+        actor_pos = viewport.point(
+            actor_x,
+            sample.actor_ground_y,
+        )
+        ball_pos = viewport.point(ball_x, sample.ball_y)
+        ball_ground_pos = viewport.point(
+            ball_x,
+            sample.ball_ground_y,
+        )
+        previous_sample = self.poc_sequences.previous_sample(
+            sequence,
+            elapsed,
+            1.0 / self.poc_sequences.sample_hz,
+        )
+        previous_ball_x = self.cinematic_poc_ball_x(
+            sequence,
+            previous_sample,
+            possession_team,
+            viewport,
+        )
+        previous_ball_pos = viewport.point(
+            previous_ball_x,
+            previous_sample.ball_y,
+        )
+        velocity_seconds = max(
+            1.0 / self.poc_sequences.sample_hz,
+            elapsed - previous_sample.elapsed,
+        )
+        ball_velocity = (
+            (ball_pos[0] - previous_ball_pos[0])
+            / velocity_seconds,
+            (ball_pos[1] - previous_ball_pos[1])
+            / velocity_seconds,
+        )
+        impact_sample = self.poc_sequences.sample(
+            sequence,
+            sequence.impact_seconds,
+        )
+        impact_ball_x = self.cinematic_poc_ball_x(
+            sequence,
+            impact_sample,
+            possession_team,
+            viewport,
+        )
+        shot_target = viewport.point(
+            impact_ball_x,
+            impact_sample.ball_y,
+        )
+        keeper_pos = viewport.point(sample.keeper_x, sample.keeper_y)
+        goal_rect = pygame.Rect(
+            *viewport.rect(
+                sample.goal_x,
+                sample.goal_y,
+                sample.goal_w,
+                sample.goal_h,
+            )
+        )
+        actor_start_x = -150.0 if attack_direction == "right" else 1430.0
+        travel_direction = 1.0 if attack_direction == "right" else -1.0
+        scroll = (
+            abs(sample.actor_x - actor_start_x)
+            * travel_direction
+        )
+        phase_index = max(
+            0,
+            min(
+                len(self.poc_sequences.ball_phase_labels) - 1,
+                sample.ball_phase,
+            ),
+        )
+        return {
+            "neutral": False,
+            "poc_sequence": True,
+            "poc_viewport": viewport,
+            "poc_contract_sequence": sequence,
+            "poc_contract_sample": sample,
+            "poc_elapsed": elapsed,
+            "poc_profile": profile,
+            "poc_actor_x": actor_x,
+            "poc_ball_x": ball_x,
+            "poc_scroll": scroll,
+            "possession": active_attack.side,
+            "active_attack": active_attack,
+            "active_goal": (
+                (active_attack.minute, active_attack.side)
+                if active_attack.is_goal
+                else None
+            ),
+            "attack_kind": active_attack.kind,
+            "goal_side": sequence.goal_side,
+            "goal_rect": goal_rect,
+            "actor_pos": actor_pos,
+            "ball_pos": ball_pos,
+            "ball_prev_pos": previous_ball_pos,
+            "ball_velocity_px_s": ball_velocity,
+            "ball_ground_pos": ball_ground_pos,
+            "ball_phase": self.poc_sequences.ball_phase_labels[phase_index],
+            "ball_depth": clamp(
+                sample.ball_trajectory_progress
+            ),
+            "ball_rotation_degrees": sample.ball_rotation,
+            "ball_scale": max(
+                1,
+                round(
+                    POC_BALL_CANVAS_SIZE * viewport.scale
+                ),
+            ),
+            "ball_squash": (1.0, 1.0),
+            "keeper_pos": keeper_pos,
+            "shot_progress": clamp(raw_shot_progress),
+            "raw_shot_progress": raw_shot_progress,
+            "net_progress": sample.net_strength,
+            "shot_profile_band": profile,
+            "shot_target": shot_target,
+            "goal_impact_pos": shot_target,
+            "rendered_player_kind": (
+                "runner"
+                if sample.actor_source == 0
+                else "kick"
+            ),
+            "runner_pose": {
+                "frame_index": sample.actor_frame,
+                "render_frame_index": (
+                    self.cinematic_poc_actor_material(
+                        sequence,
+                        sample,
+                        possession_team,
+                    )[1]
+                ),
+                "target_size": (
+                    max(
+                        1,
+                        round(
+                            POC_RUNNER_CANVAS_SIZE
+                            * viewport.scale
+                        ),
+                    ),
+                )
+                * 2,
+            },
+        }
+
+    def cinematic_poc_sequence_for_event(
+        self,
+        active_attack: CinematicAttackEvent,
+    ) -> PocSequence:
+        if self.poc_sequences is None:
+            raise RuntimeError("approved POC 7 runtime contract is unavailable")
+        attack_direction = (
+            "right"
+            if active_attack.side == "home"
+            else "left"
+        )
+        profile = self.poc_sequences.select_profile(
+            self.match_seed,
+            active_attack.minute,
+            active_attack.side,
+            active_attack.kind,
+        )
+        return self.poc_sequences.select_sequence(
+            attack_direction=attack_direction,
+            profile=profile,
+            outcome=active_attack.kind,
+            match_seed=self.match_seed,
+            event_minute=active_attack.minute,
+            side=active_attack.side,
+        )
+
+    def cinematic_poc_audio_thresholds(
+        self,
+        active_attack: CinematicAttackEvent,
+    ) -> dict[str, float]:
+        sequence = self.cinematic_poc_sequence_for_event(
+            active_attack,
+        )
+        return {
+            name: seconds / sequence.impact_seconds
+            for name, seconds in sequence.audio_cues
+        }
 
     def cinematic_scene_state(
         self,
@@ -1838,20 +3178,27 @@ class App:
         goal_side = self.cinematic_goal_side(scoring_side)
         goal_rect = self.cinematic_goal_rect(field, goal_side)
         direction = 1 if scoring_side != "away" else -1
+        poc_viewport = PocViewport.fit(field)
+        poc_ground_y = poc_viewport.point(
+            0.0,
+            POC_GROUND_Y,
+        )[1]
         shot_progress = 0.0
         raw_shot_progress = 0.0
         if active_attack:
             event_window = GOAL_EVENT_WINDOW_MINUTES if active_attack.is_goal else CHANCE_EVENT_WINDOW_MINUTES
             raw_shot_progress = (minute - (goal_minute - event_window)) / event_window
             shot_progress = clamp(raw_shot_progress)
+            return self.cinematic_poc_scene_state(
+                field,
+                active_attack,
+                raw_shot_progress,
+            )
 
         if neutral:
             neutral_progress = smoothstep((self.simulation_progress() - DRAW_NEUTRAL_START_PROGRESS) / DRAW_NEUTRAL_RAMP)
-            neutral_reveal = max(
-                smoothstep((neutral_progress - 0.04) / 0.38),
-                smoothstep(neutral_progress / 0.16) * 0.74,
-            )
-            ground_y = field.bottom - 54
+            neutral_reveal = smoothstep((neutral_progress - 0.04) / 0.38)
+            ground_y = poc_ground_y
             entry = smoothstep(neutral_progress / 0.52)
             approach = 1.0 - entry
             home_final_x = field.centerx - 158
@@ -1865,10 +3212,21 @@ class App:
                 ground_y,
             )
             ball_roll = smoothstep(neutral_progress / 0.66)
+            ball_start_x = field.centerx - 18.0
+            ball_x = lerp(ball_start_x, float(field.centerx), ball_roll)
+            ball_y = ground_y - 2.0 - CINEMATIC_BALL_SIZE * CINEMATIC_BALL_GROUND_RADIUS_RATIO
             ball_pos = (
-                lerp(field.centerx - 18, field.centerx, ball_roll) + math.sin(self.t * 2.2) * 0.8 * approach,
-                ground_y - CINEMATIC_BALL_SIZE * 0.43 + abs(math.sin(self.t * 6.0)) * 0.9 * approach,
+                ball_x,
+                ball_y,
             )
+            previous_simulation_progress = clamp(max(0.0, self.t - 1.0 / FPS) / SIMULATION_SECONDS)
+            previous_neutral_progress = smoothstep(
+                (previous_simulation_progress - DRAW_NEUTRAL_START_PROGRESS) / DRAW_NEUTRAL_RAMP
+            )
+            previous_ball_roll = smoothstep(previous_neutral_progress / 0.66)
+            previous_ball_x = lerp(ball_start_x, float(field.centerx), previous_ball_roll)
+            ball_prev_pos = (previous_ball_x, ball_y)
+            rolling_diameter = max(12.0, CINEMATIC_BALL_SIZE * 0.86)
             return {
                 "neutral": True,
                 "possession": possession,
@@ -1886,16 +3244,17 @@ class App:
                 "run_speed": 0.34 + approach * 0.30,
                 "neutral_progress": neutral_progress,
                 "neutral_reveal": neutral_reveal,
-                "ball_prev_pos": (ball_pos[0] - 1, ball_pos[1]),
-                "ball_velocity_px_s": (0.0, 0.0),
-                "ball_ground_pos": (ball_pos[0] - 7.0, ground_y - 2.0),
+                "ball_prev_pos": ball_prev_pos,
+                "ball_velocity_px_s": ((ball_x - previous_ball_x) * FPS, 0.0),
+                "ball_ground_pos": (ball_x, ground_y - 2.0),
                 "ball_depth": 0.0,
-                "ball_rotation_degrees": self.t * 90.0 * approach,
+                "ball_rotation_degrees": (ball_x - ball_start_x) / (math.pi * rolling_diameter) * 360.0,
                 "ball_phase": "neutro",
                 "ball_scale": CINEMATIC_BALL_SIZE,
                 "ball_squash": (1.0, 1.0),
                 "keeper_phase": 0.0,
                 "net_progress": 0.0,
+                "shot_profile_band": "",
                 "goal_impact_pos": ball_pos,
                 "active_goal": active_goal,
                 "active_attack": active_attack,
@@ -1904,155 +3263,517 @@ class App:
 
         motion = self.cinematic_motion_state(pred)
         lane = math.sin(self.t * 0.7 + (0.0 if scoring_side == "home" else 2.1)) * 8
-        start_x = field.x + 304 if direction > 0 else field.right - 304
         schedule = self.goal_schedule(pred)
         if schedule:
             first_attack_start = max(6.0, float(schedule[0][0]) - GOAL_EVENT_WINDOW_MINUTES)
         else:
             chance_schedule = self.chance_schedule(pred)
             first_attack_start = max(6.0, float(chance_schedule[0][0]) - CHANCE_EVENT_WINDOW_MINUTES) if chance_schedule else 60.0
-        run_progress = smoothstep(clamp(minute / first_attack_start))
-        screen_anchor = field.centerx - direction * 108
-        cruise_x = lerp(start_x, screen_anchor, run_progress)
-        if run_progress > 0.98:
-            cruise_x += math.sin(self.t * 1.15) * 5 * direction
-        shot_contact_x = field.centerx + direction * 46
+        scoring_team = self.home if scoring_side == "home" else self.away
+        runner_uniform_code = self.assets.cinematic_source_code(scoring_team)
+        _kick_contact_frame, kick_contact_gap = self.cinematic_kick_contact_policy(
+            runner_uniform_code,
+            direction,
+        )
+        goal_lane_shift = CINEMATIC_GOAL_LANE_SHIFT
+        mouth_x = self.cinematic_goal_entry_x(goal_rect, direction)
+        shot_contact_x = (
+            mouth_x
+            - direction * field.w * CINEMATIC_SHOT_CONTACT_DISTANCE_RATIO
+        )
         shot_actor_x = shot_contact_x - direction * 68
+        contact_alignment_pose = self.cinematic_kick_pose(
+            (shot_actor_x, poc_ground_y),
+            direction,
+            SHOT_KICK_AT,
+            {"uniform_code": runner_uniform_code},
+        )
+        if contact_alignment_pose is None:
+            raise RuntimeError("cinematic kick alignment pose is unavailable")
+        contact_foot_x, _contact_foot_y = self.cinematic_kick_contact_anchor(
+            contact_alignment_pose,
+            runner_uniform_code,
+            direction,
+            kick_contact_gap,
+        )
+        shot_actor_x += shot_contact_x - float(contact_foot_x)
+        if direction < 0:
+            shot_actor_x -= CINEMATIC_LEFT_ATTACK_CONTACT_ADVANCE
+        run_progress = smoothstep(clamp(minute / first_attack_start))
+        start_x = field.x + 120 if direction > 0 else field.right - 120
+        screen_anchor = shot_actor_x - direction * (92 - goal_lane_shift)
+        safe_root_x = (
+            field.x + 60.0
+            if direction > 0
+            else field.right - 55.0
+        )
+        sequence_shift = (
+            max(0.0, safe_root_x - screen_anchor)
+            if direction > 0
+            else min(0.0, safe_root_x - screen_anchor)
+        )
+        screen_anchor += sequence_shift
+        cruise_x = lerp(start_x, screen_anchor, run_progress)
         run_x = cruise_x
-        run_y = field.bottom - 54
+        run_y = poc_ground_y
         if active_attack:
-            approach = smoothstep(clamp(shot_progress / 0.54))
+            approach = smoothstep(clamp(shot_progress / 0.58))
             run_x = lerp(screen_anchor, shot_actor_x, approach)
-            run_y = field.bottom - 54
+            run_y = poc_ground_y
         settled = self.simulation_progress() >= 0.985 and not active_attack
         if settled:
             run_x = screen_anchor
-            run_y = field.bottom - 54
+            run_y = poc_ground_y
         actor_pos = (run_x, run_y)
+        stride_phase = float(motion["stride_phase"])
+        keeper_ground_y = float(actor_pos[1])
+        keeper_landing_root_y = keeper_ground_y - CINEMATIC_KEEPER_GROUND_OFFSET
 
         keeper_base_x = goal_rect.centerx
         keeper_base_y = goal_rect.centery + 24 + math.sin(self.t * 1.8) * 2
         keeper_x, keeper_y = keeper_base_x, keeper_base_y
         keeper_phase = 0.0
         keeper_flip = direction < 0
-        shot_profile = self.cinematic_shot_profile(goal_rect, direction, goal_minute)
-        target = shot_profile.target
-        save_variant = ""
-        if active_attack and not active_attack.is_goal:
-            if active_attack.kind == "save":
-                save_variant = self.cinematic_save_variant(goal_minute, active_attack.side)
-            target = self.cinematic_chance_target(goal_rect, direction, goal_minute, active_attack.kind, save_variant)
+        outcome = active_attack.kind if active_attack else "goal"
+        shot_plan = self.cinematic_shot_plan(
+            goal_rect,
+            goal_minute,
+            scoring_side,
+            outcome,
+        )
+        shot_profile = shot_plan.profile
+        target = shot_plan.target
+        save_variant = shot_plan.save_variant
+        keeper_action = (
+            f"{save_variant}_save"
+            if save_variant
+            else "wide_dive"
+            if active_attack and active_attack.kind == "wide"
+            else ""
+        )
         if active_attack:
             read = smoothstep((shot_progress - SHOT_KEEPER_READ_AT) / max(0.001, SHOT_KEEPER_DIVE_AT - SHOT_KEEPER_READ_AT))
             dive = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.28)
-            target_y_bias = clamp((target[1] - goal_rect.centery) / 80.0, -1.0, 1.0)
             target_dx = target[0] - goal_rect.centerx
             target_side = 1 if target_dx >= 0 else -1
             keeper_flip = target_side < 0
             lateral_intensity = clamp(abs(target_dx) / 54.0)
-            if active_attack.kind == "save" and save_variant == "stand":
-                catch = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.20)
-                keeper_target_x = goal_rect.centerx + target_side * clamp(abs(target_dx) * 0.44 + 8.0, 8.0, 24.0)
-                keeper_x = lerp(keeper_base_x, keeper_target_x, clamp(0.58 * read + 0.42 * catch))
-                keeper_y = keeper_base_y + target_y_bias * 14 * read - 8 * math.sin(catch * math.pi)
-                keeper_phase = max(read * 0.62, catch * 0.48)
-            elif active_attack.kind == "save" and save_variant == "dive":
+            if active_attack.kind == "save":
+                glove_offset = self.cinematic_keeper_glove_offset(
+                    keeper_flip,
+                    keeper_action,
+                )
+                keeper_target_x = target[0] - glove_offset[0]
+                keeper_target_y = target[1] - glove_offset[1]
+                reach = smoothstep(
+                    (raw_shot_progress - SHOT_KEEPER_DIVE_AT)
+                    / max(0.001, CHANCE_CONTACT_VISUAL_AT - SHOT_KEEPER_DIVE_AT)
+                )
+                recovery_duration = 0.09 if save_variant == "stand" else 0.30
+                recovery = smoothstep(
+                    (raw_shot_progress - (CHANCE_CONTACT_VISUAL_AT + 0.055))
+                    / recovery_duration
+                )
+                motion_amount = reach * (1.0 - recovery)
+                keeper_x = lerp(keeper_base_x, keeper_target_x, motion_amount)
+                keeper_y = lerp(keeper_base_y, keeper_target_y, motion_amount)
+                if save_variant == "stand":
+                    keeper_y -= 4.0 * math.sin(math.pi * reach) * (1.0 - recovery)
+                    keeper_phase = max(read * 0.58, reach * 0.52) * (1.0 - recovery)
+                else:
+                    keeper_y -= 8.0 * math.sin(math.pi * reach) * (1.0 - recovery)
+                    keeper_phase = max(read * 0.5, reach * 0.88) * (1.0 - recovery)
+            elif active_attack.kind == "wide":
+                recovery = smoothstep(
+                    (raw_shot_progress - (CHANCE_CONTACT_VISUAL_AT + 0.045))
+                    / 0.32
+                )
+                reach = smoothstep(
+                    (raw_shot_progress - SHOT_KEEPER_DIVE_AT)
+                    / max(0.001, CHANCE_CONTACT_VISUAL_AT - SHOT_KEEPER_DIVE_AT)
+                )
+                motion_amount = clamp(0.18 * read + 0.82 * reach) * (1.0 - recovery)
                 keeper_target_x = goal_rect.centerx + target_side * 46.0
-                keeper_target_y = target[1] + 7.0
-                keeper_x = lerp(keeper_base_x, keeper_target_x, clamp(0.22 * read + 0.78 * dive))
-                keeper_y = lerp(keeper_base_y, keeper_target_y, clamp(0.30 * read + 0.70 * dive))
-                keeper_y -= 10 * math.sin(dive * math.pi)
-                keeper_phase = max(read * 0.5, dive * 0.82)
+                keeper_target_y = clamp(
+                    target[1],
+                    goal_rect.centery - 46.0,
+                    goal_rect.centery + 44.0,
+                )
+                keeper_x = lerp(keeper_base_x, keeper_target_x, motion_amount)
+                keeper_y = lerp(keeper_base_y, keeper_target_y, motion_amount)
+                keeper_y -= 10.0 * math.sin(reach * math.pi) * (1.0 - recovery)
+                keeper_phase = max(read * 0.45, reach * 0.76) * (1.0 - recovery)
             else:
-                leap = math.sin(dive * math.pi)
-                keeper_reach_x = clamp(abs(target_dx) * 0.72 + 8.0, 10.0, 58.0)
-                keeper_target_x = goal_rect.centerx + target_side * keeper_reach_x
-                keeper_x = lerp(keeper_base_x, keeper_target_x, clamp(0.22 * read + 0.78 * dive))
-                leap_height = lerp(16.0, 52.0, lateral_intensity)
-                recovery = smoothstep((raw_shot_progress - (SHOT_NET_VISUAL_CONTACT_AT + 0.02)) / 0.18)
-                keeper_y = keeper_base_y + target_y_bias * 28 * read - leap_height * leap + 18 * recovery
+                # The authored 16-frame body arc carries the dive. Profiles only
+                # move its root toward the POC7 grounded lane.
+                # POC7 authors the defeated goalkeeper against the attack lane:
+                # rightward attacks use the left sequence and vice versa.
+                dive_horizontal_side = -direction
+                keeper_flip = dive_horizontal_side < 0
+                keeper_target_x = (
+                    goal_rect.centerx
+                    + direction
+                    * CINEMATIC_KEEPER_POC7_DIVE_OFFSET
+                )
+                goal_keeper_vertical_offset = {
+                    "high": 22.0,
+                    "mid": -24.0,
+                    "low": -8.0,
+                }[shot_plan.profile_band]
+                keeper_target_y = (
+                    goal_rect.centery
+                    + 4.0
+                    + goal_keeper_vertical_offset
+                )
+                motion_amount = clamp(0.22 * read + 0.78 * dive)
+                keeper_x = lerp(keeper_base_x, keeper_target_x, motion_amount)
+                keeper_y = lerp(
+                    keeper_base_y,
+                    keeper_target_y,
+                    motion_amount,
+                )
                 keeper_phase = max(read * 0.5, dive * (0.55 + 0.45 * lateral_intensity))
-        keeper_margin = 146
+        keeper_margin = 110 if active_goal and not keeper_action else 80
         keeper_x = clamp(keeper_x, field.x + keeper_margin, field.right - keeper_margin)
-        keeper_y = clamp(keeper_y, field.y + keeper_margin, field.bottom - keeper_margin)
+        keeper_y = clamp(
+            keeper_y,
+            field.y + keeper_margin,
+            keeper_landing_root_y,
+        )
         keeper_pos = (keeper_x, keeper_y)
 
-        scoring_team = self.home if scoring_side == "home" else self.away
         flip_actor = direction < 0
-        kick_window, stride = self.cinematic_stride_state(shot_progress, float(motion["stride_phase"]))
-        pose_frames_for_side = self.assets.cinematic_players_left[scoring_team.code] if flip_actor else self.assets.cinematic_players[scoring_team.code]
-        runner_frames_for_side = self.assets.cinematic_runners_left[scoring_team.code] if flip_actor else self.assets.cinematic_runners[scoring_team.code]
-        anchor_frame = pose_frames_for_side[3] if kick_window else runner_frames_for_side[stride]
-        anchor_target = self.cinematic_actor_target_size(anchor_frame, CINEMATIC_PLAYER_SCALE)
-        kick_frame = pose_frames_for_side[3]
-        kick_target = self.cinematic_actor_target_size(kick_frame, CINEMATIC_PLAYER_SCALE)
-        kick_anchor = self.cinematic_toe_anchor(kick_frame, direction)
-        kick_contact_foot = self.cinematic_actor_anchor_screen(
-            (shot_actor_x, field.bottom - 54),
-            kick_target,
-            kick_anchor,
-            False,
-            kick_frame,
-        )
-        effective_run_speed = 0.0 if settled else float(motion["run_speed"])
-        planted_x = self.cinematic_planted_x(actor_pos[0], stride, kick_window, direction, effective_run_speed)
-        visual_anchor = self.cinematic_toe_anchor(anchor_frame, direction) if kick_window else RUNNER_FOOT_ANCHORS[stride]
-        visual_foot = self.cinematic_actor_anchor_screen(
-            (planted_x, actor_pos[1]),
-            anchor_target,
-            visual_anchor,
-            flip_actor if not kick_window else False,
-            anchor_frame,
-        )
-        foot = visual_foot
-        if active_attack and shot_progress <= SHOT_KICK_AT:
-            settle_to_kick = smoothstep((shot_progress - SHOT_PLANT_AT) / max(0.001, SHOT_KICK_AT - SHOT_PLANT_AT))
-            roll_cycle = math.sin(shot_progress * 38.0 + self.match_seed * 0.01)
-            dribble_foot = (
-                actor_pos[0] + direction * (50 + roll_cycle * 4),
-                actor_pos[1] - 42 + math.cos(shot_progress * 32.0) * 2,
+        runner_event_seconds = None
+        runner_event_start_phase = None
+        if active_attack:
+            runner_event_window = (
+                GOAL_EVENT_WINDOW_MINUTES if active_attack.is_goal else CHANCE_EVENT_WINDOW_MINUTES
             )
-            foot = (
-                lerp(dribble_foot[0], kick_contact_foot[0], settle_to_kick),
-                lerp(dribble_foot[1], kick_contact_foot[1], settle_to_kick),
+            runner_event_seconds = runner_event_window / 90.0 * SIMULATION_SECONDS
+            runner_event_key = (
+                active_attack.minute,
+                active_attack.side,
+                active_attack.is_goal,
+                active_attack.kind,
             )
-        elif active_attack:
-            foot = kick_contact_foot
+            runner_event_start_phase = self.cinematic_attack_phase_anchors.get(runner_event_key)
+        contact_catchup = 0.0
+        if active_attack and runner_event_seconds is not None:
+            contact_catchup = self.cinematic_attack_contact_catchup(
+                float(actor_pos[1]),
+                direction,
+                runner_uniform_code,
+                float(screen_anchor),
+                float(shot_actor_x),
+                float(runner_event_seconds),
+                runner_event_start_phase,
+            )
+        runner_pose = self.cinematic_runner_pose(
+            actor_pos,
+            direction,
+            raw_shot_progress if active_attack else 0.0,
+            stride_phase,
+            float(motion["run_speed"]),
+            event_seconds=runner_event_seconds,
+            event_start_phase=runner_event_start_phase,
+            uniform_code=runner_uniform_code,
+        )
+        runner_pose["contact_catchup_px"] = contact_catchup
+        kick_entry_pose = self.cinematic_runner_pose(
+            actor_pos,
+            direction,
+            SHOT_RUN_TO_PLANT_AT if active_attack else 0.0,
+            stride_phase,
+            float(motion["run_speed"]),
+            event_seconds=runner_event_seconds,
+            event_start_phase=runner_event_start_phase,
+            uniform_code=runner_uniform_code,
+        )
+        kick_entry_pose["contact_catchup_px"] = contact_catchup
+        contact_kick_pose = self.cinematic_kick_pose(
+            (shot_actor_x, poc_ground_y),
+            direction,
+            SHOT_KICK_AT,
+            kick_entry_pose,
+        )
+        if contact_kick_pose is None:
+            raise RuntimeError("cinematic kick contact pose is unavailable")
+        kick_foot_x, kick_foot_y = self.cinematic_kick_contact_anchor(
+            contact_kick_pose,
+            runner_uniform_code,
+            direction,
+            kick_contact_gap,
+        )
+        frame_size = float(self.assets.cinematic_runner_motion["frame_size"])
+        kick_scale = float(contact_kick_pose["target_size"][0]) / frame_size  # type: ignore[index]
+        kick_contact_y_offset = float(self.assets.cinematic_runner_motion.get("kick_contact_y_offset_px", 0.0))
+        kick_contact_foot = (
+            float(kick_foot_x),
+            float(kick_foot_y) - kick_contact_y_offset * kick_scale,
+        )
+        current_kick_pose = (
+            self.cinematic_kick_pose(actor_pos, direction, raw_shot_progress, kick_entry_pose)
+            if active_attack
+            else None
+        )
+        minimum_directed_ball_x = (
+            self.cinematic_ball_clearance_directed_x(
+                current_kick_pose,
+                runner_uniform_code,
+                direction,
+                "kick_physical",
+            )
+            if current_kick_pose is not None
+            else None
+        )
+        contact_minimum_directed_ball_x = (
+            self.cinematic_ball_clearance_directed_x(
+                contact_kick_pose,
+                runner_uniform_code,
+                direction,
+                "kick_physical",
+            )
+        )
+        corridor_args: tuple[object, ...] | None = None
+        if (
+            active_attack
+            and runner_event_seconds is not None
+            and raw_shot_progress >= CINEMATIC_BALL_CORRIDOR_START
+        ):
+            corridor_args = (
+                float(actor_pos[1]),
+                direction,
+                runner_uniform_code,
+                float(screen_anchor),
+                float(shot_actor_x),
+                float(runner_event_seconds),
+                runner_event_start_phase,
+            )
+            minimum_directed_ball_x = self.cinematic_attack_ball_path_x(
+                raw_shot_progress,
+                *corridor_args,
+            )
+            contact_minimum_directed_ball_x = (
+                self.cinematic_attack_ball_path_x(
+                    SHOT_KICK_AT,
+                    *corridor_args,
+                )
+            )
+        planned_directed_ball_x = (
+            minimum_directed_ball_x
+            if corridor_args is not None
+            else None
+        )
+        minimum_dribble_ball_x = (
+            None
+            if corridor_args is not None
+            else minimum_directed_ball_x
+        )
+        visible_dribble_foot = runner_pose["dribble_foot_pos"]
+        smoothed_dribble_control = runner_pose["dribble_control_pos"]
+        dribble_contact_anchor = runner_pose["dribble_contact_pos"]
+        controlled_stride_phase = float(runner_pose["controlled_phase"])
+        dribble = self.cinematic_dribble_kinematics(
+            actor_pos,
+            direction,
+            controlled_stride_phase,
+            self.t,
+            shot_progress=shot_progress if active_attack else 0.0,
+            kick_contact_position=kick_contact_foot if active_attack else None,
+            foot_position=smoothed_dribble_control,  # type: ignore[arg-type]
+            visible_foot_position=visible_dribble_foot,  # type: ignore[arg-type]
+            contact_foot_position=dribble_contact_anchor,  # type: ignore[arg-type]
+            travel_distance=float(motion["travel_distance"]),
+            kick_contact_gap=kick_contact_gap,
+            minimum_directed_ball_x=minimum_dribble_ball_x,
+            planned_directed_ball_x=planned_directed_ball_x,
+        )
+        foot = dribble.control_position
         if active_attack:
             event_window = GOAL_EVENT_WINDOW_MINUTES if active_attack.is_goal else CHANCE_EVENT_WINDOW_MINUTES
             event_seconds = event_window / 90.0 * SIMULATION_SECONDS
             trajectory_progress = raw_shot_progress
-            kinematics = self.cinematic_ball_for_progress(
-                foot,
-                target,
-                direction,
-                trajectory_progress,
-                self.t,
-                goal_minute,
-                is_goal=active_attack.is_goal,
-                shot_profile=shot_profile if active_attack.is_goal else None,
-                ground_y=actor_pos[1],
-                attack_kind=active_attack.kind,
+            sample_dt = 1.0 / FPS
+            sample_progress = sample_dt / max(1e-6, event_seconds)
+            kick_time = (
+                goal_minute - event_window + SHOT_KICK_AT * event_window
+            ) / 90.0 * SIMULATION_SECONDS
+            kick_travel_distance = max(
+                0.0,
+                float(motion["travel_distance"])
+                - abs(self.ground_scroll_velocity)
+                * CINEMATIC_TURF_FOREGROUND_PARALLAX
+                * max(0.0, self.t - kick_time),
             )
-            sample_progress = 1.0 / max(1.0, event_seconds * FPS)
-            previous_kinematics = self.cinematic_ball_for_progress(
-                foot,
-                target,
+            kick_stride_phase = (kick_travel_distance / CINEMATIC_RUNNER_STRIDE_DISTANCE * 4.0) % 4.0
+            release_dribble = self.cinematic_dribble_kinematics(
+                (shot_actor_x, actor_pos[1]),
                 direction,
-                trajectory_progress - sample_progress,
-                max(0.0, self.t - 1.0 / FPS),
-                goal_minute,
-                is_goal=active_attack.is_goal,
-                shot_profile=shot_profile if active_attack.is_goal else None,
-                ground_y=actor_pos[1],
-                attack_kind=active_attack.kind,
+                kick_stride_phase,
+                kick_time,
+                shot_progress=SHOT_KICK_AT,
+                kick_contact_position=kick_contact_foot,
+                travel_distance=kick_travel_distance,
+                kick_contact_gap=kick_contact_gap,
+                minimum_directed_ball_x=(
+                    None
+                    if corridor_args is not None
+                    else contact_minimum_directed_ball_x
+                ),
+                planned_directed_ball_x=(
+                    contact_minimum_directed_ball_x
+                    if corridor_args is not None
+                    else None
+                ),
             )
+            if trajectory_progress <= SHOT_KICK_AT + 1e-9:
+                kinematics = dribble.ball
+                previous_minimum_directed_ball_x = (
+                    minimum_directed_ball_x
+                    if corridor_args is None
+                    else None
+                )
+                previous_planned_directed_ball_x = None
+                if (
+                    corridor_args is not None
+                    and trajectory_progress - sample_progress
+                    >= CINEMATIC_BALL_CORRIDOR_START
+                ):
+                    previous_planned_directed_ball_x = (
+                        self.cinematic_attack_ball_path_x(
+                            trajectory_progress - sample_progress,
+                            *corridor_args,
+                        )
+                    )
+                previous_dribble = self.cinematic_dribble_kinematics(
+                    actor_pos,
+                    direction,
+                    controlled_stride_phase - (
+                        CINEMATIC_TURF_SPEED * 0.82
+                        / CINEMATIC_RUNNER_STRIDE_DISTANCE
+                        * 4.0
+                        * sample_dt
+                    ),
+                    max(0.0, self.t - sample_dt),
+                    shot_progress=trajectory_progress - sample_progress,
+                    kick_contact_position=kick_contact_foot,
+                    foot_position=smoothed_dribble_control,  # type: ignore[arg-type]
+                    visible_foot_position=visible_dribble_foot,  # type: ignore[arg-type]
+                    contact_foot_position=dribble_contact_anchor,  # type: ignore[arg-type]
+                    travel_distance=max(
+                        0.0,
+                        float(motion["travel_distance"])
+                        - abs(self.ground_scroll_velocity)
+                        * CINEMATIC_TURF_FOREGROUND_PARALLAX
+                        * sample_dt,
+                    ),
+                    kick_contact_gap=kick_contact_gap,
+                    minimum_directed_ball_x=previous_minimum_directed_ball_x,
+                    planned_directed_ball_x=previous_planned_directed_ball_x,
+                )
+                previous_kinematics = previous_dribble.ball
+            else:
+                foot = release_dribble.control_position
+                kinematics = self.cinematic_ball_for_progress(
+                    foot,
+                    target,
+                    direction,
+                    trajectory_progress,
+                    self.t,
+                    goal_minute,
+                    is_goal=active_attack.is_goal,
+                    shot_profile=shot_profile,
+                    ground_y=actor_pos[1],
+                    attack_kind=active_attack.kind,
+                    release_position=release_dribble.ball.position,
+                    release_rotation_degrees=release_dribble.ball.rotation_degrees,
+                )
+                previous_kinematics = self.cinematic_ball_for_progress(
+                    foot,
+                    target,
+                    direction,
+                    trajectory_progress - sample_progress,
+                    max(0.0, self.t - sample_dt),
+                    goal_minute,
+                    is_goal=active_attack.is_goal,
+                    shot_profile=shot_profile,
+                    ground_y=actor_pos[1],
+                    attack_kind=active_attack.kind,
+                    release_position=release_dribble.ball.position,
+                    release_rotation_degrees=release_dribble.ball.rotation_degrees,
+                )
             ball_pos = kinematics.position
             ball_prev_pos = previous_kinematics.position
             ball_velocity = (
-                (ball_pos[0] - ball_prev_pos[0]) * FPS,
-                (ball_pos[1] - ball_prev_pos[1]) * FPS,
+                (ball_pos[0] - ball_prev_pos[0]) / sample_dt,
+                (ball_pos[1] - ball_prev_pos[1]) / sample_dt,
             )
+            if trajectory_progress > SHOT_KICK_AT + 1e-9:
+                velocity_dt = 1.0 / CINEMATIC_BALL_VELOCITY_SAMPLE_HZ
+                velocity_progress = velocity_dt / max(1e-6, event_seconds)
+                before_progress = max(
+                    SHOT_KICK_AT,
+                    trajectory_progress - velocity_progress,
+                )
+                after_progress = trajectory_progress + velocity_progress
+                before_time = self.t - (
+                    trajectory_progress - before_progress
+                ) * event_seconds
+                after_time = self.t + (
+                    after_progress - trajectory_progress
+                ) * event_seconds
+                before_velocity_sample = self.cinematic_ball_for_progress(
+                    foot,
+                    target,
+                    direction,
+                    before_progress,
+                    before_time,
+                    goal_minute,
+                    is_goal=active_attack.is_goal,
+                    shot_profile=shot_profile,
+                    ground_y=actor_pos[1],
+                    attack_kind=active_attack.kind,
+                    release_position=release_dribble.ball.position,
+                    release_rotation_degrees=release_dribble.ball.rotation_degrees,
+                )
+                after_velocity_sample = self.cinematic_ball_for_progress(
+                    foot,
+                    target,
+                    direction,
+                    after_progress,
+                    after_time,
+                    goal_minute,
+                    is_goal=active_attack.is_goal,
+                    shot_profile=shot_profile,
+                    ground_y=actor_pos[1],
+                    attack_kind=active_attack.kind,
+                    release_position=release_dribble.ball.position,
+                    release_rotation_degrees=release_dribble.ball.rotation_degrees,
+                )
+                velocity_span = max(
+                    1e-6,
+                    (after_progress - before_progress) * event_seconds,
+                )
+                ball_velocity = (
+                    (
+                        after_velocity_sample.position[0]
+                        - before_velocity_sample.position[0]
+                    )
+                    / velocity_span,
+                    (
+                        after_velocity_sample.position[1]
+                        - before_velocity_sample.position[1]
+                    )
+                    / velocity_span,
+                )
+                release_velocity_blend = smoothstep(
+                    (trajectory_progress - SHOT_KICK_AT)
+                    / max(1e-6, sample_progress)
+                )
+                ball_velocity = (
+                    ball_velocity[0] * release_velocity_blend,
+                    ball_velocity[1] * release_velocity_blend,
+                )
             ball_ground_pos = kinematics.ground_position
             ball_phase = kinematics.phase
             ball_scale = kinematics.scale
@@ -2060,60 +3781,160 @@ class App:
             ball_rotation = kinematics.rotation_degrees
             ball_depth = kinematics.depth
         else:
-            ball_pos = (
-                foot[0] + math.sin(self.t * 7.5) * 7,
-                foot[1] + math.cos(self.t * 8.0) * 5,
+            sample_dt = 1.0 / FPS
+            kinematics = dribble.ball
+            previous_dribble = self.cinematic_dribble_kinematics(
+                actor_pos,
+                direction,
+                controlled_stride_phase - (
+                    CINEMATIC_TURF_SPEED * 0.82
+                    / CINEMATIC_RUNNER_STRIDE_DISTANCE
+                    * 4.0
+                    * sample_dt
+                ),
+                max(0.0, self.t - sample_dt),
+                foot_position=smoothed_dribble_control,  # type: ignore[arg-type]
+                visible_foot_position=visible_dribble_foot,  # type: ignore[arg-type]
+                contact_foot_position=dribble_contact_anchor,  # type: ignore[arg-type]
+                travel_distance=max(
+                    0.0,
+                    float(motion["travel_distance"])
+                    - abs(self.ground_scroll_velocity)
+                    * CINEMATIC_TURF_FOREGROUND_PARALLAX
+                    * sample_dt,
+                ),
             )
-            ball_prev_pos = (ball_pos[0] - direction * 6, ball_pos[1])
-            ball_phase = "drible"
-            ball_scale = CINEMATIC_BALL_SIZE
-            ball_squash = (1.0, 1.0)
-            ball_velocity = ((ball_pos[0] - ball_prev_pos[0]) * FPS, (ball_pos[1] - ball_prev_pos[1]) * FPS)
-            ball_ground_pos = (ball_pos[0] - 7.0, actor_pos[1] - 2.0)
-            ball_rotation = direction * (abs(self.ground_scroll) * 0.42 + self.t * 52.0)
-            ball_depth = 0.0
+            ball_pos = kinematics.position
+            ball_prev_pos = previous_dribble.ball.position
+            ball_phase = kinematics.phase
+            ball_scale = kinematics.scale
+            ball_squash = kinematics.squash
+            ball_velocity = (
+                (ball_pos[0] - ball_prev_pos[0]) / sample_dt,
+                (ball_pos[1] - ball_prev_pos[1]) / sample_dt,
+            )
+            ball_ground_pos = kinematics.ground_position
+            ball_rotation = kinematics.rotation_degrees
+            ball_depth = kinematics.depth
             if settled:
-                ball_pos = (foot[0] + direction * 14, foot[1] + 2)
+                ball_pos = dribble.ball.position
                 ball_prev_pos = ball_pos
                 ball_phase = "neutro"
                 ball_velocity = (0.0, 0.0)
                 ball_rotation = 0.0
         net_progress = 0.0
         net_decay = 0.0
-        net_ripple_start = SHOT_NET_VISUAL_CONTACT_AT - 0.004
+        net_ripple_start = SHOT_NET_VISUAL_CONTACT_AT
         if active_goal and raw_shot_progress >= net_ripple_start:
             contact_elapsed = max(0.0, raw_shot_progress - net_ripple_start)
-            impact = smoothstep(contact_elapsed / 0.016)
-            net_decay = 1.0 - 0.74 * smoothstep((contact_elapsed - 0.07) / 0.48)
-            elastic = 1.0 + 0.07 * math.sin(contact_elapsed * 24.0) * (1.0 - smoothstep((contact_elapsed - 0.03) / 0.32))
-            net_progress = clamp((0.18 + 0.82 * impact) * net_decay * elastic)
+            impact_duration = 0.018
+            impact = smoothstep(contact_elapsed / impact_duration)
+            net_decay = 1.0 - smoothstep(
+                (contact_elapsed - impact_duration) / 0.56
+            )
+            net_progress = clamp(impact * net_decay)
 
         keeper_glove_pos = None
         chance_near_post_pos = None
         if active_attack and active_attack.kind == "save" and save_variant:
-            glove_side = 1 if target[0] >= goal_rect.centerx else -1
-            if save_variant == "stand":
-                keeper_glove_pos = (keeper_x, keeper_y + 5.0)
-            else:
-                keeper_glove_pos = (keeper_x + glove_side * 60.0, keeper_y - 2.0)
+            glove_offset = self.cinematic_keeper_glove_offset(
+                keeper_flip,
+                keeper_action,
+            )
+            keeper_glove_pos = (
+                keeper_x + glove_offset[0],
+                keeper_y + glove_offset[1],
+            )
         elif active_attack and active_attack.kind == "wide":
             post_x = goal_rect.right if direction > 0 else goal_rect.left
             chance_near_post_pos = (float(post_x), float(target[1]))
 
+        keeper_dive = bool(
+            active_goal
+            or keeper_action in {"dive_save", "wide_dive"}
+        )
+        keeper_frame_first, keeper_frame_following, keeper_frame_blend = self.cinematic_keeper_frame_blend(
+            keeper_dive,
+            raw_shot_progress if active_attack else 0.0,
+            CINEMATIC_KEEPER_FRAME_COUNT,
+            keeper_action,
+        )
+        landmark_ball_foot_gap = direction * (
+            float(ball_pos[0]) - float(dribble.visible_foot_position[0])
+        ) - CINEMATIC_BALL_SIZE * 0.46
+        stop_progress = smoothstep(
+            (raw_shot_progress - SHOT_RECOVERY_AT)
+            / max(0.001, SHOT_STOP_BLEND_END - SHOT_RECOVERY_AT)
+        )
+        stop_render_frame = min(
+            CINEMATIC_STOP_FRAME_COUNT - 1,
+            int(round(stop_progress * (CINEMATIC_STOP_FRAME_COUNT - 1))),
+        )
+        render_runner_pose = runner_pose
+
         state: dict[str, object] = {
             "neutral": False,
+            "poc_scroll": (
+                float(motion["ground_scroll"])
+                / max(1e-6, poc_viewport.scale)
+            ),
             "possession": possession,
             "goal_side": goal_side,
             "goal_rect": goal_rect,
             "shot_phase": self.shot_phase(shot_progress),
             "ball_pos": ball_pos,
             "kick_pos": foot,
+            "rendered_kick_foot_pos": kick_contact_foot,
             "actor_pos": actor_pos,
             "keeper_pos": keeper_pos,
+            "keeper_ground_y": keeper_ground_y,
             "shot_progress": shot_progress,
             "raw_shot_progress": raw_shot_progress,
-            "stride_phase": 0.0 if settled else motion["stride_phase"],
+            "stride_phase": 0.0 if settled else stride_phase,
             "run_speed": 0.0 if settled else motion["run_speed"],
+            "dribble_touch_phase": dribble.touch_phase,
+            "dribble_touch_slot": runner_pose["dribble_touch_slot"],
+            "landmark_dribble_contact_gap_px": dribble.contact_gap,
+            "dribble_contact_gap_px": dribble.contact_gap,
+            "runner_frame": runner_pose["frame_index"],
+            "runner_next_frame": runner_pose["next_frame_index"],
+            "runner_frame_blend": runner_pose["frame_blend"],
+            "runner_render_frame": runner_pose["render_frame_index"],
+            "runner_controlled_phase": runner_pose["controlled_phase"],
+            "runner_root_offset_x": runner_pose["root_offset_x"],
+            "pelvis_pos": runner_pose["pelvis_pos"],
+            "support_foot_pos": runner_pose["support_foot_pos"],
+            "dribble_foot_pos": visible_dribble_foot,
+            "dribble_control_pos": smoothed_dribble_control,
+            "dribble_contact_anchor_pos": dribble_contact_anchor,
+            "support_phase": runner_pose["support"],
+            "support_transition": runner_pose["support_transition"],
+            "support_weight": runner_pose["support_weight"],
+            "runner_flight": runner_pose["flight"],
+            "sole_ground_gap_px": runner_pose["sole_ground_gap"],
+            "landmark_ball_foot_gap_px": landmark_ball_foot_gap,
+            "visible_ball_foot_gap_px": landmark_ball_foot_gap,
+            "runner_pose": render_runner_pose,
+            "kick_entry_pose": kick_entry_pose,
+            "kick_pose": current_kick_pose,
+            "stop_render_frame": stop_render_frame,
+            "rendered_player_kind": (
+                "stop"
+                if settled or (active_attack and raw_shot_progress >= SHOT_RECOVERY_AT)
+                else "kick"
+                if current_kick_pose is not None
+                else "run"
+            ),
+            "rendered_support_foot_pos": (
+                actor_pos
+                if settled or (active_attack and raw_shot_progress >= SHOT_RECOVERY_AT)
+                else current_kick_pose["support_foot_pos"]
+                if current_kick_pose is not None
+                else runner_pose["support_foot_pos"]
+            ),
+            "rendered_pelvis_pos": (
+                current_kick_pose["pelvis_pos"] if current_kick_pose is not None else runner_pose["pelvis_pos"]
+            ),
             "ball_prev_pos": ball_prev_pos,
             "ball_velocity_px_s": ball_velocity,
             "ball_ground_pos": ball_ground_pos,
@@ -2124,19 +3945,26 @@ class App:
             "ball_squash": ball_squash,
             "keeper_phase": keeper_phase,
             "keeper_flip": keeper_flip,
+            "keeper_frame_first": keeper_frame_first,
+            "keeper_frame_following": keeper_frame_following,
+            "keeper_frame_blend": keeper_frame_blend,
+            "keeper_render_frame": (
+                keeper_frame_first if keeper_frame_blend < 0.5 else keeper_frame_following
+            ),
             "net_progress": net_progress,
             "net_decay": net_decay,
             "net_ripple_decay": net_decay,
             "goal_impact_pos": ball_pos if active_goal and ball_phase == "rede" else target,
             "shot_target": target,
-            "shot_profile": shot_profile if active_attack and active_attack.is_goal else None,
+            "shot_profile": shot_profile if active_attack else None,
+            "shot_profile_band": shot_plan.profile_band if active_attack else "",
             "keeper_glove_pos": keeper_glove_pos,
             "chance_near_post_pos": chance_near_post_pos,
             "active_goal": active_goal,
             "active_attack": active_attack,
             "attack_kind": active_attack.kind if active_attack else "",
             "save_variant": save_variant,
-            "keeper_action": f"{save_variant}_save" if save_variant else "",
+            "keeper_action": keeper_action,
             "settled": settled,
         }
         history_context: tuple[object, ...] = (
@@ -2150,8 +3978,8 @@ class App:
             self.away.code,
         )
         history_key = (*history_context, round(self.t, 6))
-        if active_attack and raw_shot_progress <= SHOT_KICK_AT and _include_previous_frame:
-            previous_time = max(0.0, self.t - 1.0 / FPS)
+        if _include_previous_frame and (not active_attack or raw_shot_progress <= SHOT_KICK_POSE_AT):
+            previous_time = max(0.0, self.t - sample_dt)
             previous_key = (*history_context, round(previous_time, 6))
             previous_sample = self.cinematic_ball_history_cache.get(previous_key)
             exact_previous = None
@@ -2175,8 +4003,8 @@ class App:
             if exact_previous is not None:
                 state["ball_prev_pos"] = exact_previous
                 state["ball_velocity_px_s"] = (
-                    (float(ball_pos[0]) - exact_previous[0]) * FPS,
-                    (float(ball_pos[1]) - exact_previous[1]) * FPS,
+                    (float(ball_pos[0]) - exact_previous[0]) / sample_dt,
+                    (float(ball_pos[1]) - exact_previous[1]) / sample_dt,
                 )
         self.cinematic_ball_history_cache[history_key] = (
             active_attack,
@@ -2311,7 +4139,7 @@ class App:
             self.draw_tiled_surface_gradient(
                 self.assets.turf_near_strip,
                 ground,
-                scroll * 0.78,
+                scroll * CINEMATIC_TURF_FOREGROUND_PARALLAX,
                 104,
             )
         shade_key = ("cinematic_ground_shade", ground.w, ground.h)
@@ -2324,235 +4152,1264 @@ class App:
             self.cinematic_overlay_cache[shade_key] = bottom_shade
         self.screen.blit(bottom_shade, ground.topleft)
 
-    def draw_cinematic_goal(self, field: pygame.Rect, pred: Prediction, state: dict[str, object] | None = None) -> None:
-        if state is None:
-            state = self.cinematic_scene_state(field, pred)
-        shot_progress = float(state["shot_progress"])
-        active_attack = state.get("active_attack")
-        chance_scene = bool(active_attack) and not state.get("active_goal")
-        if not (state.get("active_goal") or chance_scene) or shot_progress < SHOT_GOAL_REVEAL_AT:
-            return
-        goal_alpha = self.cinematic_goal_alpha(shot_progress)
-        if goal_alpha <= 0:
-            return
-        for side in (str(state["goal_side"]),):
-            goal = self.cinematic_goal_rect(field, side)
-            ripple = float(state.get("net_progress", 0.0)) if state.get("active_goal") else 0.0
-            self.draw_cinematic_goal_3d(goal, side, ripple, state.get("goal_impact_pos"), front_only=False, alpha=goal_alpha)
+    def draw_cinematic_poc_sequence(
+        self,
+        field: pygame.Rect,
+        state: dict[str, object],
+    ) -> None:
+        sequence = state.get("poc_contract_sequence")
+        sample = state.get("poc_contract_sample")
+        viewport = state.get("poc_viewport")
+        if (
+            not isinstance(sequence, PocSequence)
+            or not isinstance(sample, PocSequenceSample)
+            or not isinstance(viewport, PocViewport)
+        ):
+            raise RuntimeError("invalid approved POC 7 runtime state")
 
-    def cinematic_goal_alpha(self, shot_progress: float) -> int:
-        reveal = smoothstep((shot_progress - SHOT_GOAL_REVEAL_AT) / max(0.001, SHOT_GOAL_FULL_AT - SHOT_GOAL_REVEAL_AT))
-        return int(round(255 * reveal))
-
-    def cinematic_keeper_alpha(self, shot_progress: float) -> int:
-        reveal = smoothstep(
-            (shot_progress - SHOT_KEEPER_REVEAL_AT)
-            / max(0.001, SHOT_KEEPER_FULL_AT - SHOT_KEEPER_REVEAL_AT)
+        self.draw_cinematic_poc_background(
+            field,
+            viewport,
+            float(state["poc_scroll"]),
         )
-        alpha = int(round(255 * reveal))
-        if shot_progress >= SHOT_PLANT_AT:
-            alpha = max(alpha, 236)
-        if shot_progress >= SHOT_KICK_AT:
-            alpha = 255
-        return alpha
-
-    def draw_cinematic_goal_3d(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        impact_pos: object | None = None,
-        front_only: bool = False,
-        alpha: int = 255,
-    ) -> None:
-        if front_only:
-            self.draw_cinematic_goal_front(goal, side, ripple, impact_pos, alpha=alpha)
-            return
-
-        self.draw_cinematic_goal_layer(goal, side, ripple, self.assets.goal_net_frames, as_front=False, alpha=alpha)
-
-    def draw_cinematic_goal_layer(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        frames: list[pygame.Surface],
-        as_front: bool,
-        alpha: int = 255,
-    ) -> None:
-        if not frames:
-            return
-        frame_float = clamp(ripple) * (len(frames) - 1)
-        frame_index = int(math.floor(frame_float))
-        next_index = min(len(frames) - 1, frame_index + 1)
-        frame_blend = frame_float - frame_index
-        frame = self.orient_cinematic_goal_frame(frames[frame_index], side)
-        next_frame = self.orient_cinematic_goal_frame(frames[next_index], side)
-        aspect = frame.get_width() / max(1, frame.get_height())
-        direction = -1 if side == "left" else 1
-        wave = math.sin(clamp(ripple) * math.pi)
-        scale_pulse = wave * (0.034 if not as_front else 0.006)
-        target_h = int(round((goal.h * (1.22 + scale_pulse)) / 2) * 2)
-        target_w = int(target_h * aspect)
-        target = pygame.Rect(0, 0, target_w, target_h)
-        target.midbottom = goal.midbottom
-        target.move_ip(-18 if side == "right" else 18, -4)
-        if ripple > 0.02 and not as_front:
-            target.move_ip(int(direction * wave * 7.0), int(wave * 2.6))
-
-        if not as_front:
-            shadow = pygame.Rect(0, 0, int(target.w * 0.82), 18)
-            shadow.center = (target.centerx, target.bottom - 6)
-            self.draw_soft_shadow(shadow, 58)
-        base_alpha = int((245 if as_front else 168) * clamp(alpha / 255.0))
-        layer = self.cached_smoothscale(frame, target.size)
-        if frame_blend > 0.01 and next_index != frame_index:
-            layer = self.cached_alpha(layer, int(base_alpha * (1.0 - frame_blend)), step=16)
-        elif base_alpha < 255:
-            layer = self.cached_alpha(layer, base_alpha, step=16)
-        self.screen.blit(layer, target)
-        if frame_blend > 0.01 and next_index != frame_index:
-            next_layer = self.cached_alpha(
-                self.cached_smoothscale(next_frame, target.size),
-                int(base_alpha * frame_blend),
-                step=16,
+        self.draw_cinematic_poc_goal_layer(
+            state,
+            front=False,
+        )
+        if self.cinematic_poc_ball_shadow_is_visible(
+            sequence,
+            sample,
+        ):
+            self.draw_cinematic_poc_shadow(
+                viewport,
+                sample.ball_shadow_x
+                + float(state["poc_ball_x"])
+                - sample.ball_x,
+                sample.ball_shadow_y,
+                sample.ball_shadow_w,
+                sample.ball_shadow_h,
+                sample.ball_shadow_alpha,
             )
-            self.screen.blit(next_layer, target)
-
-    def draw_cinematic_goal_front(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        impact_pos: object | None = None,
-        alpha: int = 255,
-    ) -> None:
-        self.draw_cinematic_goal_front_posts(goal, side, ripple, alpha)
-        self.draw_cinematic_goal_impact(goal, side, ripple, impact_pos, alpha)
-
-    def draw_cinematic_goal_front_posts(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        alpha: int = 255,
-    ) -> None:
-        if self.assets.goal_front_frames:
-            self.draw_cinematic_goal_layer(goal, side, ripple, self.assets.goal_front_frames, as_front=True, alpha=alpha)
-
-    def draw_cinematic_goal_ball_occlusion(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        ball_pos: object | None,
-        alpha: int = 255,
-    ) -> None:
-        if not self.assets.goal_front_frames or ripple <= 0.04 or not isinstance(ball_pos, tuple):
-            return
-        ball_x, ball_y = ball_pos  # type: ignore[misc]
-        clip = pygame.Rect(0, 0, 96, 82)
-        clip.center = (int(ball_x), int(ball_y))
-        clip = clip.clip(goal.inflate(104, 88))
-        if clip.w <= 0 or clip.h <= 0:
-            return
-        old_clip = self.screen.get_clip()
-        self.screen.set_clip(clip)
-        self.draw_cinematic_goal_front_posts(goal, side, ripple, alpha=int(alpha * 0.64))
-        self.screen.set_clip(old_clip)
-
-    def draw_cinematic_goal_impact(
-        self,
-        goal: pygame.Rect,
-        side: str,
-        ripple: float,
-        impact_pos: object | None,
-        alpha: int = 255,
-    ) -> None:
-        if not self.assets.goal_impact_frames or ripple <= 0.02 or not isinstance(impact_pos, tuple):
-            return
-        frame_float = clamp(ripple) * (len(self.assets.goal_impact_frames) - 1)
-        frame_index = min(len(self.assets.goal_impact_frames) - 1, int(math.floor(frame_float)))
-        frame = self.orient_cinematic_goal_frame(self.assets.goal_impact_frames[frame_index], side)
-        pulse = math.sin(clamp(ripple) * math.pi)
-        target_w = int(goal.w * (0.26 + 0.018 * pulse))
-        target_h = int(target_w * frame.get_height() / max(1, frame.get_width()))
-        impact_x, impact_y = impact_pos  # type: ignore[misc]
-        rect = pygame.Rect(0, 0, target_w, target_h)
-        rect.center = (
-            int(clamp(float(impact_x), goal.x + 32, goal.right - 32)),
-            int(clamp(float(impact_y), goal.y + 28, goal.bottom - 34)),
+        self.draw_cinematic_poc_actor(state)
+        if sample.ball_after_keeper:
+            self.draw_cinematic_poc_keeper(state)
+            self.draw_cinematic_poc_ball(state)
+        else:
+            self.draw_cinematic_poc_ball(state)
+            self.draw_cinematic_poc_keeper(state)
+        self.draw_cinematic_poc_goal_layer(
+            state,
+            front=True,
         )
-        layer = self.cached_smoothscale(frame, rect.size)
-        reveal = smoothstep((ripple - 0.03) / 0.22)
-        layer = self.cached_alpha(
-            layer,
-            int(92 * reveal * (0.72 + 0.28 * pulse) * clamp(alpha / 255.0)),
-            step=12,
+
+    def draw_cinematic_poc_background(
+        self,
+        field: pygame.Rect,
+        viewport: PocViewport,
+        scroll: float,
+    ) -> None:
+        pygame.draw.rect(self.screen, BG, field)
+        content_left = round(viewport.content_x)
+        content_width = max(1, round(1280.0 * viewport.scale))
+        content_bottom = round(
+            viewport.point(0.0, 760.0)[1]
         )
-        self.screen.blit(layer, rect)
+        stadium_top = round(
+            viewport.point(0.0, POC_HEADER_HEIGHT)[1]
+        )
+        stadium_bottom = round(
+            viewport.point(0.0, 354.0)[1]
+        )
+        stadium = pygame.Rect(
+            content_left,
+            stadium_top,
+            content_width,
+            max(1, stadium_bottom - stadium_top),
+        )
+        if self.assets.stadium_bg is None:
+            pygame.draw.rect(self.screen, (7, 19, 24), stadium)
+        else:
+            source = self.assets.stadium_bg
+            canonical_key = (
+                "poc7_stadium_canonical",
+                id(source),
+            )
+            canonical = self.cinematic_overlay_cache.get(
+                canonical_key
+            )
+            if canonical is None:
+                canonical = pygame.transform.smoothscale(
+                    source,
+                    (1280, 278),
+                ).convert()
+                self.cinematic_overlay_cache[
+                    canonical_key
+                ] = canonical
+            layer_size = (
+                max(1, round(1280.0 * viewport.scale)),
+                max(1, round(278.0 * viewport.scale)),
+            )
+            layer = self.cached_smoothscale(
+                canonical,
+                layer_size,
+            )
+            offset = scroll * 0.15 * viewport.scale
+            start_x = stadium.x - int(offset % layer.get_width())
+            old_clip = self.screen.get_clip()
+            self.screen.set_clip(
+                old_clip.clip(stadium)
+                if old_clip
+                else stadium
+            )
+            x = start_x
+            while x < stadium.right:
+                self.screen.blit(layer, (x, stadium.y))
+                x += layer.get_width()
+            self.screen.set_clip(old_clip)
 
-    def cached_goal_impact_burst(self, side: str, ripple: float, alpha: int) -> pygame.Surface:
-        ripple_key = int(round(clamp(ripple) * 28))
-        alpha_key = int(round(clamp(alpha / 255.0) * 16))
-        cache_key = ("goal_impact_burst", side, ripple_key, alpha_key)
-        burst = self.cinematic_overlay_cache.get(cache_key)
-        if burst is not None:
-            return burst
-
-        burst = pygame.Surface((188, 132), pygame.SRCALPHA)
-        local = (94, 66)
-        ripple_value = ripple_key / 28.0
-        pulse = math.sin(clamp(ripple_value) * math.pi)
-        reveal = smoothstep((ripple_value - 0.03) / 0.22)
-        burst_strength = reveal * (0.08 + 0.24 * pulse) * (alpha_key / 16.0)
-        direction = -1 if side == "left" else 1
-        if burst_strength > 0.03:
-            impact_alpha = int((118 + 28 * reveal) * (alpha_key / 16.0))
-            for index, radius in enumerate((24, 42)):
-                line_alpha = int((88 - index * 18) * burst_strength)
-                offset = int(direction * pulse * (index + 1) * 2)
-                pygame.draw.ellipse(
-                    burst,
-                    (232, 247, 255, line_alpha),
-                    pygame.Rect(local[0] - radius + offset, local[1] - int(radius * 0.54), radius * 2, int(radius * 1.08)),
-                    2,
-                )
-            for index in range(5):
-                y = local[1] - 24 + index * 12
-                elastic = math.sin(ripple_value * math.pi * 1.45 + index * 0.72) * 4 * burst_strength
-                start = (local[0] - 56, int(y))
-                end = (local[0] + 56 + int(direction * elastic), int(y + elastic * 0.16))
-                pygame.draw.line(burst, (240, 250, 255, int(80 * burst_strength)), start, end, 1)
-            for index in range(5):
-                x = local[0] - 44 + index * 22
-                elastic = math.sin(ripple_value * math.pi * 1.6 + index * 0.55) * 3 * burst_strength
-                start = (int(x + elastic), local[1] - 28)
-                end = (int(x - elastic * 0.35), local[1] + 32)
-                pygame.draw.line(burst, (232, 248, 252, int(68 * burst_strength)), start, end, 1)
-            for offset in (-12, 12):
+        horizon_height = max(1, round(118.0 * viewport.scale))
+        horizon_key = (
+            "poc7_horizon",
+            content_width,
+            horizon_height,
+        )
+        horizon = self.cinematic_overlay_cache.get(horizon_key)
+        if horizon is None:
+            horizon = pygame.Surface(
+                (content_width, horizon_height),
+                pygame.SRCALPHA,
+            )
+            for y in range(horizon_height):
+                amount = y / max(1, horizon_height - 1)
+                alpha = int(118 * (1.0 - amount))
                 pygame.draw.line(
-                    burst,
-                    (255, 255, 245, int(impact_alpha * 0.24)),
-                    (local[0] - 26, local[1] + offset),
-                    (local[0] + 26 + int(direction * pulse * 3), local[1] + offset + int(pulse * 2)),
-                    1,
+                    horizon,
+                    (3, 13, 17, alpha),
+                    (0, y),
+                    (content_width, y),
                 )
-            flash_radius = int(8 + 9 * burst_strength)
-            pygame.draw.circle(burst, (255, 255, 235, int(impact_alpha * 0.22)), local, max(3, flash_radius // 4), 0)
-            pygame.draw.circle(burst, (255, 255, 255, int(impact_alpha * 0.30)), local, flash_radius, 1)
-        self.cinematic_overlay_cache[cache_key] = burst
-        return burst
+            self.cinematic_overlay_cache[horizon_key] = horizon
+        horizon_y = round(
+            viewport.point(0.0, 354.0 - 76.0)[1]
+        )
+        self.screen.blit(horizon, (content_left, horizon_y))
 
-    def orient_cinematic_goal_frame(self, frame: pygame.Surface, side: str) -> pygame.Surface:
-        # The generated goal sprite faces right by default. A right-side goal must
-        # face the attacker coming from midfield, so it needs the horizontal flip.
-        cache_key = (id(frame), side)
-        oriented = self.goal_orientation_cache.get(cache_key)
-        if oriented is None:
-            oriented = pygame.transform.flip(frame, True, False).convert_alpha() if side == "right" else frame
-            self.goal_orientation_cache[cache_key] = oriented
-        return oriented
+        ground = pygame.Rect(
+            content_left,
+            stadium_bottom,
+            content_width,
+            max(1, content_bottom - stadium_bottom),
+        )
+        pygame.draw.rect(self.screen, (15, 83, 43), ground)
+        if self.assets.turf_mid_strip is not None:
+            self.draw_tiled_surface(
+                self.assets.turf_mid_strip,
+                ground,
+                scroll * 0.60 * viewport.scale,
+                228,
+            )
+        if self.assets.turf_near_strip is not None:
+            self.draw_tiled_surface_gradient(
+                self.assets.turf_near_strip,
+                ground,
+                scroll * viewport.scale,
+                118,
+            )
+
+        shade_key = (
+            "poc7_field_shade",
+            ground.w,
+            ground.h,
+        )
+        field_shade = self.cinematic_overlay_cache.get(shade_key)
+        if field_shade is None:
+            field_shade = pygame.Surface(
+                ground.size,
+                pygame.SRCALPHA,
+            )
+            for y in range(ground.h):
+                amount = y / max(1, ground.h - 1)
+                pygame.draw.line(
+                    field_shade,
+                    (0, 0, 0, int(8 + 40 * amount * amount)),
+                    (0, y),
+                    (ground.w, y),
+                )
+            self.cinematic_overlay_cache[shade_key] = field_shade
+        self.screen.blit(field_shade, ground.topleft)
+
+        marker_spacing = 320.0
+        marker_offset = (scroll % marker_spacing) * viewport.scale
+        scaled_spacing = marker_spacing * viewport.scale
+        marker_y = ground.y + round(26.0 * viewport.scale)
+        marker_slant = round(84.0 * viewport.scale)
+        marker_width = max(1, round(2.0 * viewport.scale))
+        marker_count = math.ceil(ground.w / scaled_spacing) + 3
+        for index in range(-1, marker_count):
+            x = (
+                ground.x
+                + round(index * scaled_spacing - marker_offset)
+            )
+            pygame.draw.line(
+                self.screen,
+                (223, 239, 215, 44),
+                (x, marker_y),
+                (x - marker_slant, ground.bottom),
+                marker_width,
+            )
+
+    def draw_cinematic_poc_shadow(
+        self,
+        viewport: PocViewport,
+        center_x: float,
+        center_y: float,
+        width: float,
+        height: float,
+        alpha: float,
+    ) -> None:
+        if width <= 0.0 or height <= 0.0 or alpha <= 0.0:
+            return
+        center = viewport.point(center_x, center_y)
+        size = viewport.size(width, height)
+        shadow = pygame.Rect(0, 0, *size)
+        shadow.center = (
+            round(center[0]),
+            round(center[1]),
+        )
+        self.draw_soft_shadow(
+            shadow,
+            max(0, min(255, round(alpha))),
+        )
+
+    def cinematic_poc_actor_material(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+        team: TeamProfile,
+    ) -> tuple[pygame.Surface, int, dict[str, object], float]:
+        left = sequence.attack_direction == "left"
+        direction_name = "left" if left else "right"
+        uniform_code = self.assets.cinematic_source_code(team)
+        uniforms = self.assets.cinematic_runner_motion["uniforms"]
+        uniform = uniforms.get(
+            uniform_code,
+            uniforms["gold"],
+        )
+        direction_payload = uniform["directions"][direction_name]
+        poc_frame = (
+            self.poc_sequences.actor_frame_position(
+                sequence,
+                sample.elapsed,
+            )
+            if self.poc_sequences is not None
+            else float(sample.actor_frame)
+        )
+        if sample.actor_source == 0:
+            frames = self.assets.cinematic_runner_frames_for_uniform(
+                uniform_code,
+                left=left,
+            )
+            frame_index = max(
+                0,
+                min(
+                    len(frames) - 1,
+                    int(math.floor((poc_frame % 8.0) * 2.0)),
+                ),
+            )
+            metadata = direction_payload["frames"][frame_index]
+        else:
+            frames = self.assets.cinematic_kick_frames_for_uniform(
+                uniform_code,
+                left=left,
+            )
+            contact_frame = int(
+                direction_payload["kick_contact_frame"]
+            )
+            poc_frame = max(0.0, min(7.0, poc_frame))
+            if poc_frame <= 4:
+                frame_position = (
+                    poc_frame / 4.0 * contact_frame
+                )
+            else:
+                frame_position = (
+                    contact_frame
+                    + (poc_frame - 4) / 3.0
+                    * (len(frames) - 1 - contact_frame)
+                )
+            frame_index = max(
+                0,
+                min(
+                    len(frames) - 1,
+                    int(math.floor(frame_position + 1e-3)),
+                ),
+            )
+            metadata = direction_payload["kick_frames"][frame_index]
+        reference_height = self.cinematic_runner_reference_height(
+            uniform_code,
+            -1 if left else 1,
+        )
+        actor_scale = (
+            POC_APPROVED_REFERENCE_VISIBLE_HEIGHT
+            / max(1.0, reference_height)
+        )
+        return frames[frame_index], frame_index, metadata, actor_scale
+
+    def cinematic_poc_actor_x(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+        team: TeamProfile,
+    ) -> float:
+        if sample.actor_source == 0:
+            return sample.actor_x
+        _frame, _index, metadata, actor_scale = (
+            self.cinematic_poc_actor_material(
+                sequence,
+                sample,
+                team,
+            )
+        )
+        direction = (
+            1.0
+            if sequence.attack_direction == "right"
+            else -1.0
+        )
+        direction_name = (
+            "right"
+            if direction > 0
+            else "left"
+        )
+        uniform_code = self.assets.cinematic_source_code(team)
+        uniforms = self.assets.cinematic_runner_motion["uniforms"]
+        direction_payload = uniforms.get(
+            uniform_code,
+            uniforms["gold"],
+        )["directions"][direction_name]
+        correction = float(
+            direction_payload["kick_contact_root_correction_px"]
+        )
+        corridor = float(metadata["ball_corridor_offset_px"])
+        clearance = float(metadata["ball_clearance_offset_px"])
+        available = max(0.0, corridor - clearance)
+        poc_frame = max(
+            0.0,
+            min(
+                7.0,
+                (
+                    self.poc_sequences.actor_frame_position(
+                        sequence,
+                        sample.elapsed,
+                    )
+                    if self.poc_sequences is not None
+                    else float(sample.actor_frame)
+                ),
+            ),
+        )
+        if poc_frame <= 4.0:
+            weight = smoothstep((poc_frame - 1.0) / 3.0)
+        else:
+            weight = 1.0 - smoothstep((poc_frame - 4.0) / 3.0)
+        return (
+            sample.actor_x
+            + direction
+            * min(correction, available)
+            * actor_scale
+            * weight
+        )
+
+    def cinematic_poc_pre_release_ball_x(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+        team: TeamProfile,
+        *,
+        safety_offset: float = 2.0,
+    ) -> float:
+        _frame, _index, metadata, actor_scale = (
+            self.cinematic_poc_actor_material(
+                sequence,
+                sample,
+                team,
+            )
+        )
+        if sample.actor_source == 0:
+            offset = float(
+                metadata["ball_approach_corridor_offset_px"]
+            )
+        else:
+            offset = float(metadata["ball_corridor_offset_px"])
+        offset += safety_offset
+        direction = (
+            1.0
+            if sequence.attack_direction == "right"
+            else -1.0
+        )
+        minimum_directed_x = (
+            direction * sample.actor_x
+            + offset * actor_scale
+        )
+        return direction * max(
+            direction * sample.ball_x,
+            minimum_directed_x,
+        )
+
+    def cinematic_poc_ball_x(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+        team: TeamProfile,
+        viewport: PocViewport | None = None,
+        clearance_sample: PocSequenceSample | None = None,
+    ) -> float:
+        if self.poc_sequences is None:
+            return sample.ball_x
+        if sample.elapsed <= sequence.release_seconds:
+            adjusted = self.cinematic_poc_pre_release_ball_x(
+                sequence,
+                sample,
+                team,
+            )
+        else:
+            release_sample = self.poc_sequences.sample(
+                sequence,
+                sequence.release_seconds,
+            )
+            adjusted_release = self.cinematic_poc_pre_release_ball_x(
+                sequence,
+                release_sample,
+                team,
+            )
+            release_delta = adjusted_release - release_sample.ball_x
+            flight_progress = clamp(
+                (sample.elapsed - sequence.release_seconds)
+                / max(
+                    1e-6,
+                    sequence.impact_seconds - sequence.release_seconds,
+                )
+            )
+            adjusted = (
+                sample.ball_x
+                + release_delta * (1.0 - smoothstep(flight_progress))
+            )
+        active_actor_sample = clearance_sample or sample
+        if viewport is not None and active_actor_sample.actor_visible:
+            direction = (
+                1.0
+                if sequence.attack_direction == "right"
+                else -1.0
+            )
+            actor_x = self.cinematic_poc_actor_x(
+                sequence,
+                active_actor_sample,
+                team,
+            )
+            clearance = self.cinematic_poc_required_ball_clearance_offset(
+                sequence,
+                active_actor_sample,
+                sample,
+                team,
+                viewport,
+            )
+            adjusted = direction * max(
+                direction * adjusted,
+                direction * actor_x + clearance,
+            )
+        return adjusted
+
+    def cinematic_poc_required_ball_clearance_offset(
+        self,
+        sequence: PocSequence,
+        actor_sample: PocSequenceSample,
+        ball_sample: PocSequenceSample,
+        team: TeamProfile,
+        viewport: PocViewport,
+    ) -> float:
+        frame, frame_index, _metadata, actor_scale = (
+            self.cinematic_poc_actor_material(
+                sequence,
+                actor_sample,
+                team,
+            )
+        )
+        direction = (
+            1
+            if sequence.attack_direction == "right"
+            else -1
+        )
+        scaled_actor = max(
+            1,
+            round(
+                POC_RUNNER_CANVAS_SIZE
+                * actor_scale
+                * viewport.scale
+            ),
+        )
+        scaled_ball = max(
+            1,
+            round(POC_BALL_CANVAS_SIZE * viewport.scale),
+        )
+        ball_frame_count = len(self.assets.balls)
+        ball_frame_index = (
+            int(
+                (ball_sample.ball_rotation % 360.0)
+                / 360.0
+                * ball_frame_count
+            )
+            % ball_frame_count
+        )
+        relative_ball_y = round(
+            (
+                ball_sample.ball_y
+                - actor_sample.actor_ground_y
+            )
+            * viewport.scale
+        )
+        cache_key = (
+            id(frame),
+            frame_index,
+            scaled_actor,
+            scaled_ball,
+            ball_frame_index,
+            relative_ball_y,
+            direction,
+        )
+        cached = self.cinematic_poc_clearance_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        if len(self.cinematic_poc_clearance_cache) >= 4096:
+            self.cinematic_poc_clearance_cache.clear()
+
+        actor = self.cached_smoothscale(
+            frame,
+            (scaled_actor, scaled_actor),
+        )
+        ball = self.cached_cinematic_ball_material(
+            scaled_ball,
+            ball_sample.ball_rotation,
+        )
+        actor_mask = pygame.mask.from_surface(actor, 30)
+        ball_mask = pygame.mask.from_surface(ball, 30)
+        ball_area = max(1, ball_mask.count())
+        actor_scale_screen = actor_scale * viewport.scale
+        actor_rect = pygame.Rect(
+            round(-POC_RUNNER_ROOT[0] * actor_scale_screen),
+            round(-POC_RUNNER_ROOT[1] * actor_scale_screen),
+            scaled_actor,
+            scaled_actor,
+        )
+        last_unsafe = -1
+        max_offset = scaled_actor + scaled_ball
+        for offset in range(max_offset + 1):
+            ball_rect = ball.get_rect(
+                center=(direction * offset, relative_ball_y)
+            )
+            overlap = actor_mask.overlap_area(
+                ball_mask,
+                (
+                    ball_rect.x - actor_rect.x,
+                    ball_rect.y - actor_rect.y,
+                ),
+            )
+            if overlap / ball_area > 0.03:
+                last_unsafe = offset
+        rounding_safety = 3
+        required_screen_offset = max(
+            0,
+            last_unsafe + 1 + rounding_safety,
+        )
+        required = required_screen_offset / max(
+            1e-6,
+            viewport.scale,
+        )
+        self.cinematic_poc_clearance_cache[cache_key] = required
+        return required
+
+    def draw_cinematic_poc_actor(
+        self,
+        state: dict[str, object],
+    ) -> None:
+        sequence = state["poc_contract_sequence"]
+        sample = state["poc_contract_sample"]
+        viewport = state["poc_viewport"]
+        if (
+            not isinstance(sequence, PocSequence)
+            or not isinstance(sample, PocSequenceSample)
+            or not isinstance(viewport, PocViewport)
+            or not sample.actor_visible
+        ):
+            return
+        team = (
+            self.home
+            if str(state["possession"]) == "home"
+            else self.away
+        )
+        frame, _frame_index, _metadata, actor_scale = (
+            self.cinematic_poc_actor_material(
+                sequence,
+                sample,
+                team,
+            )
+        )
+        actor_scale *= viewport.scale
+        target = (
+            max(1, round(POC_RUNNER_CANVAS_SIZE * actor_scale)),
+            max(1, round(POC_RUNNER_CANVAS_SIZE * actor_scale)),
+        )
+        actor_x = float(state["poc_actor_x"])
+        root = viewport.point(
+            actor_x,
+            sample.actor_ground_y,
+        )
+        rect = pygame.Rect(
+            round(root[0] - POC_RUNNER_ROOT[0] * actor_scale),
+            round(root[1] - POC_RUNNER_ROOT[1] * actor_scale),
+            *target,
+        )
+        self.draw_cinematic_poc_shadow(
+            viewport,
+            sample.actor_shadow_x
+            + (actor_x - sample.actor_x),
+            sample.actor_shadow_y,
+            sample.actor_shadow_w,
+            sample.actor_shadow_h,
+            sample.actor_shadow_alpha,
+        )
+        self.screen.blit(
+            self.cached_smoothscale(frame, target),
+            rect,
+        )
+
+    def cinematic_poc_ball_shadow_is_visible(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+    ) -> bool:
+        if not sample.ball_visible:
+            return False
+        phase = (
+            self.poc_sequences.ball_phase_labels[sample.ball_phase]
+            if self.poc_sequences is not None
+            else ""
+        )
+        return (
+            sequence.outcome != "goal"
+            or sample.elapsed < sequence.line_seconds
+            or phase == "goal_settled"
+        )
+
+    def cinematic_poc_ball_layers(
+        self,
+        sequence: PocSequence,
+        sample: PocSequenceSample,
+        elapsed: float,
+        team: TeamProfile,
+    ) -> tuple[tuple[PocSequenceSample, int], ...]:
+        del team
+        layers: list[tuple[PocSequenceSample, int]] = []
+        phase = (
+            self.poc_sequences.ball_phase_labels[sample.ball_phase]
+            if self.poc_sequences is not None
+            else ""
+        )
+        if phase == "shot" and self.poc_sequences is not None:
+            for offset_seconds, alpha in (
+                (1.0 / 60.0, 24),
+                (1.0 / 120.0, 64),
+            ):
+                trail_sample = self.poc_sequences.sample(
+                    sequence,
+                    max(
+                        sequence.release_seconds,
+                        elapsed - offset_seconds,
+                    ),
+                )
+                trail_phase = self.poc_sequences.ball_phase_labels[
+                    trail_sample.ball_phase
+                ]
+                if trail_sample.ball_visible and trail_phase == "shot":
+                    layers.append((trail_sample, alpha))
+        layers.append((sample, 255))
+        return tuple(layers)
+
+    def draw_cinematic_poc_ball(
+        self,
+        state: dict[str, object],
+    ) -> None:
+        sequence = state["poc_contract_sequence"]
+        sample = state["poc_contract_sample"]
+        viewport = state["poc_viewport"]
+        elapsed = float(state["poc_elapsed"])
+        if (
+            not isinstance(sequence, PocSequence)
+            or not isinstance(sample, PocSequenceSample)
+            or not isinstance(viewport, PocViewport)
+            or not sample.ball_visible
+        ):
+            return
+        size = max(
+            1,
+            round(POC_BALL_CANVAS_SIZE * viewport.scale),
+        )
+        team = (
+            self.home
+            if str(state["possession"]) == "home"
+            else self.away
+        )
+        for layer_sample, alpha in self.cinematic_poc_ball_layers(
+            sequence,
+            sample,
+            elapsed,
+            team,
+        ):
+            ball = self.cached_cinematic_ball_material(
+                size,
+                layer_sample.ball_rotation,
+            )
+            if alpha < 255:
+                ball = ball.copy()
+                ball.set_alpha(alpha)
+            ball_x = self.cinematic_poc_ball_x(
+                sequence,
+                layer_sample,
+                team,
+                viewport,
+                sample,
+            )
+            center = viewport.point(
+                ball_x,
+                layer_sample.ball_y,
+            )
+            self.screen.blit(
+                ball,
+                ball.get_rect(
+                    center=(
+                        round(center[0]),
+                        round(center[1]),
+                    )
+                ),
+            )
+
+    def draw_cinematic_poc_keeper(
+        self,
+        state: dict[str, object],
+    ) -> None:
+        sequence = state["poc_contract_sequence"]
+        sample = state["poc_contract_sample"]
+        viewport = state["poc_viewport"]
+        if (
+            not isinstance(sequence, PocSequence)
+            or not isinstance(sample, PocSequenceSample)
+            or not isinstance(viewport, PocViewport)
+        ):
+            return
+        keeper_team = (
+            self.away
+            if str(state["possession"]) == "home"
+            else self.home
+        )
+        if sequence.keeper_direction == "left":
+            frames = self.assets.cinematic_keeper_frames_left[
+                keeper_team.code
+            ]
+        else:
+            frames = self.assets.cinematic_keeper_frames[
+                keeper_team.code
+            ]
+        frame_index = max(
+            0,
+            min(len(frames) - 1, sample.keeper_frame),
+        )
+        self.draw_cinematic_poc_shadow(
+            viewport,
+            sample.keeper_shadow_x,
+            sample.keeper_shadow_y,
+            sample.keeper_shadow_w,
+            sample.keeper_shadow_h,
+            sample.keeper_shadow_alpha,
+        )
+        target = viewport.size(340.0, 340.0)
+        top_left = viewport.point(
+            sample.keeper_x,
+            sample.keeper_y,
+        )
+        self.screen.blit(
+            self.cached_smoothscale(frames[frame_index], target),
+            (round(top_left[0]), round(top_left[1])),
+        )
+
+    def draw_cinematic_poc_goal_layer(
+        self,
+        state: dict[str, object],
+        *,
+        front: bool,
+    ) -> None:
+        sequence = state["poc_contract_sequence"]
+        sample = state["poc_contract_sample"]
+        goal_rect = state["goal_rect"]
+        if (
+            not isinstance(sequence, PocSequence)
+            or not isinstance(sample, PocSequenceSample)
+            or not isinstance(goal_rect, pygame.Rect)
+        ):
+            return
+        if self.poc_sequences is None:
+            return
+
+        if front:
+            contact_frame = (
+                self.poc_sequences.nearest_net_contact_frame(
+                    sequence,
+                    sample.elapsed,
+                )
+            )
+            if (
+                contact_frame is not None
+                and sample.elapsed >= sequence.impact_seconds
+            ):
+                contact = self.load_cinematic_poc_atlas_frame(
+                    contact_frame.front_contact,
+                    contact_frame.front_contact_sha256,
+                    contact_frame.front_contact_source_rect,
+                )
+                contact_rect = self.cinematic_poc_goal_subrect(
+                    goal_rect,
+                    contact_frame.front_contact_rect,
+                )
+                self.screen.blit(
+                    self.cached_smoothscale(
+                        contact,
+                        contact_rect.size,
+                    ),
+                    contact_rect,
+                )
+            front_asset = self.poc_sequences.goal_front_layers[
+                sequence.goal_side
+            ]
+            front_layer = self.load_cinematic_poc_layer(
+                front_asset.file,
+                front_asset.sha256,
+            )
+            self.screen.blit(
+                self.cached_smoothscale(
+                    front_layer,
+                    goal_rect.size,
+                ),
+                goal_rect,
+            )
+            return
+
+        if (
+            sequence.outcome != "goal"
+            or sample.elapsed < sequence.impact_seconds
+        ):
+            base_asset = self.poc_sequences.goal_base_layers[
+                sequence.goal_side
+            ]
+            base_layer = self.load_cinematic_poc_layer(
+                base_asset.file,
+                base_asset.sha256,
+            )
+            self.screen.blit(
+                self.cached_smoothscale(
+                    base_layer,
+                    goal_rect.size,
+                ),
+                goal_rect,
+            )
+            return
+
+        if (
+            sequence.net_static_back is None
+            or sequence.net_static_back_sha256 is None
+        ):
+            raise RuntimeError(
+                f"missing approved POC net back: {sequence.key}"
+            )
+        static_back = self.load_cinematic_poc_layer(
+            sequence.net_static_back,
+            sequence.net_static_back_sha256,
+        )
+        self.screen.blit(
+            self.cached_smoothscale(
+                static_back,
+                goal_rect.size,
+            ),
+            goal_rect,
+        )
+        keyframe = self.poc_sequences.nearest_net_keyframe(
+            sequence,
+            sample.elapsed,
+        )
+        if keyframe is None:
+            return
+        roi = self.load_cinematic_poc_atlas_frame(
+            keyframe.back_roi,
+            keyframe.back_roi_sha256,
+            keyframe.back_roi_source_rect,
+        )
+        roi_rect = self.cinematic_poc_goal_subrect(
+            goal_rect,
+            keyframe.back_roi_rect,
+        )
+        self.screen.blit(
+            self.cached_smoothscale(
+                roi,
+                roi_rect.size,
+            ),
+            roi_rect,
+        )
+
+    @staticmethod
+    def cinematic_poc_goal_subrect(
+        goal_rect: pygame.Rect,
+        source_rect: tuple[int, int, int, int],
+    ) -> pygame.Rect:
+        scale_x = goal_rect.w / 993.0
+        scale_y = goal_rect.h / 497.0
+        x, y, width, height = source_rect
+        return pygame.Rect(
+            goal_rect.x + round(x * scale_x),
+            goal_rect.y + round(y * scale_y),
+            max(1, round(width * scale_x)),
+            max(1, round(height * scale_y)),
+        )
+
+    def load_cinematic_poc_layer(
+        self,
+        relative_path: str,
+        expected_sha256: str,
+    ) -> pygame.Surface:
+        cached = self.poc_layer_cache.get(relative_path)
+        if cached is not None:
+            return cached
+        path = self.cinematic_poc_asset_path(relative_path)
+        if not path.exists():
+            raise RuntimeError(
+                f"missing approved POC layer: {relative_path}"
+            )
+        actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual_sha256 != expected_sha256:
+            raise RuntimeError(
+                f"approved POC layer drift: {relative_path}"
+            )
+        surface = pygame.image.load(path).convert_alpha()
+        self.poc_layer_cache[relative_path] = surface
+        return surface
+
+    @staticmethod
+    def cinematic_poc_asset_path(relative_path: str) -> Path:
+        path = (ROOT / relative_path).resolve()
+        allowed_root = (
+            ROOT
+            / "assets"
+            / "generated"
+            / "cinematic"
+            / "poc7_net"
+        ).resolve()
+        if allowed_root not in path.parents:
+            raise RuntimeError(
+                f"invalid approved POC layer path: {relative_path}"
+            )
+        return path
+
+    def load_cinematic_poc_atlas_frame(
+        self,
+        relative_path: str,
+        expected_sha256: str,
+        source_rect: tuple[int, int, int, int],
+    ) -> pygame.Surface:
+        key = (relative_path, source_rect)
+        cached = self.poc_layer_frame_cache.get(key)
+        if cached is not None:
+            return cached
+        atlas = self.load_cinematic_poc_layer(
+            relative_path,
+            expected_sha256,
+        )
+        rect = pygame.Rect(source_rect)
+        if not atlas.get_rect().contains(rect):
+            raise RuntimeError(
+                f"invalid approved POC atlas rect: {relative_path} {source_rect}"
+            )
+        frame = atlas.subsurface(rect)
+        self.poc_layer_frame_cache[key] = frame
+        return frame
+
+    def preload_cinematic_poc_sequence(
+        self,
+        sequence: PocSequence,
+    ) -> None:
+        if self.poc_sequences is None:
+            return
+        base = self.poc_sequences.goal_base_layers[
+            sequence.goal_side
+        ]
+        front = self.poc_sequences.goal_front_layers[
+            sequence.goal_side
+        ]
+        self.load_cinematic_poc_layer(base.file, base.sha256)
+        self.load_cinematic_poc_layer(front.file, front.sha256)
+        if sequence.outcome != "goal":
+            return
+        if (
+            sequence.net_static_back is None
+            or sequence.net_static_back_sha256 is None
+        ):
+            raise RuntimeError(
+                f"missing approved POC net preload: {sequence.key}"
+            )
+        self.load_cinematic_poc_layer(
+            sequence.net_static_back,
+            sequence.net_static_back_sha256,
+        )
+        assets = {
+            (
+                keyframe.back_roi,
+                keyframe.back_roi_sha256,
+            )
+            for keyframe in sequence.net_keyframes
+        }
+        assets.update(
+            (
+                contact_frame.front_contact,
+                contact_frame.front_contact_sha256,
+            )
+            for contact_frame in sequence.net_contact_frames
+        )
+        for relative_path, expected_sha256 in assets:
+            self.load_cinematic_poc_layer(
+                relative_path,
+                expected_sha256,
+            )
+
+    def cinematic_poc_preload_assets(
+        self,
+        sequences: tuple[PocSequence, ...],
+    ) -> tuple[tuple[str, str], ...]:
+        if self.poc_sequences is None:
+            return ()
+        assets: dict[str, str] = {}
+
+        def register(
+            relative_path: str | None,
+            expected_sha256: str | None,
+        ) -> None:
+            if relative_path is None or expected_sha256 is None:
+                return
+            previous = assets.get(relative_path)
+            if previous is not None and previous != expected_sha256:
+                raise RuntimeError(
+                    f"conflicting approved POC hash: {relative_path}"
+                )
+            assets[relative_path] = expected_sha256
+
+        for sequence in sequences:
+            base = self.poc_sequences.goal_base_layers[
+                sequence.goal_side
+            ]
+            front = self.poc_sequences.goal_front_layers[
+                sequence.goal_side
+            ]
+            register(base.file, base.sha256)
+            register(front.file, front.sha256)
+            if sequence.outcome != "goal":
+                continue
+            register(
+                sequence.net_static_back,
+                sequence.net_static_back_sha256,
+            )
+            for keyframe in sequence.net_keyframes:
+                register(
+                    keyframe.back_roi,
+                    keyframe.back_roi_sha256,
+                )
+            for contact_frame in sequence.net_contact_frames:
+                register(
+                    contact_frame.front_contact,
+                    contact_frame.front_contact_sha256,
+                )
+        return tuple(sorted(assets.items()))
+
+    def cinematic_poc_sequences_for_match(
+        self,
+        runtime: MatchRuntimeState,
+    ) -> tuple[PocSequence, ...]:
+        if self.poc_sequences is None:
+            return ()
+        events = (
+            *(
+                CinematicAttackEvent(
+                    minute,
+                    side,
+                    True,
+                    "goal",
+                )
+                for minute, side in runtime.goals
+            ),
+            *(
+                CinematicAttackEvent(
+                    minute,
+                    side,
+                    False,
+                    outcome,
+                )
+                for minute, side, outcome in runtime.chances
+            ),
+        )
+        unique: dict[str, PocSequence] = {}
+        for event in events:
+            sequence = self.cinematic_poc_sequence_for_event(event)
+            unique[sequence.key] = sequence
+        return tuple(unique[key] for key in sorted(unique))
+
+    def cancel_cinematic_poc_preload(self) -> None:
+        self.poc_preload_generation += 1
+        self.poc_preload_cancel_event.set()
+        self.poc_preload_threads = [
+            thread
+            for thread in self.poc_preload_threads
+            if thread.is_alive()
+        ]
+        self.poc_preload_ready = True
+        self.poc_preload_pending = 0
+        self.poc_preload_completed = 0
+        self.poc_preload_error = ""
+
+    def start_cinematic_poc_preload(
+        self,
+        sequences: tuple[PocSequence, ...],
+    ) -> None:
+        self.cancel_cinematic_poc_preload()
+        assets = self.cinematic_poc_preload_assets(sequences)
+        if not assets:
+            return
+        generation = self.poc_preload_generation
+        cancel_event = threading.Event()
+        preload_queue: queue.Queue[
+            tuple[object, ...]
+        ] = queue.Queue(maxsize=2)
+        self.poc_preload_cancel_event = cancel_event
+        self.poc_preload_queue = preload_queue
+        self.poc_preload_pending = len(assets)
+        self.poc_preload_completed = 0
+        self.poc_preload_ready = False
+
+        def publish(item: tuple[object, ...]) -> bool:
+            while not cancel_event.is_set():
+                try:
+                    preload_queue.put(item, timeout=0.05)
+                    return True
+                except queue.Full:
+                    continue
+            return False
+
+        def worker() -> None:
+            try:
+                for relative_path, expected_sha256 in assets:
+                    if cancel_event.is_set():
+                        return
+                    path = self.cinematic_poc_asset_path(
+                        relative_path
+                    )
+                    data = path.read_bytes()
+                    actual_sha256 = hashlib.sha256(data).hexdigest()
+                    if actual_sha256 != expected_sha256:
+                        raise RuntimeError(
+                            "approved POC layer drift: "
+                            f"{relative_path}"
+                        )
+                    surface = pygame.image.load(
+                        io.BytesIO(data),
+                        path.name,
+                    )
+                    if not publish(
+                        (
+                            "asset",
+                            generation,
+                            relative_path,
+                            surface,
+                        )
+                    ):
+                        return
+                publish(("done", generation))
+            except Exception as exc:
+                publish(("error", generation, str(exc)))
+
+        preload_thread = threading.Thread(
+            target=worker,
+            name="arena-ai-cinematic-preload",
+            daemon=True,
+        )
+        self.poc_preload_thread = preload_thread
+        self.poc_preload_threads.append(preload_thread)
+        preload_thread.start()
+
+    def shutdown_cinematic_poc_preloads(
+        self,
+        *,
+        timeout: float = 0.5,
+    ) -> bool:
+        threads = tuple(self.poc_preload_threads)
+        self.cancel_cinematic_poc_preload()
+        deadline = time.perf_counter() + max(0.0, timeout)
+        for thread in threads:
+            if not thread.is_alive():
+                continue
+            thread.join(timeout=max(0.0, deadline - time.perf_counter()))
+        self.poc_preload_threads = [
+            thread
+            for thread in threads
+            if thread.is_alive()
+        ]
+        self.poc_preload_thread = (
+            self.poc_preload_threads[-1]
+            if self.poc_preload_threads
+            else None
+        )
+        return not self.poc_preload_threads
+
+    def drain_cinematic_poc_preload(
+        self,
+        *,
+        max_assets: int = 1,
+    ) -> None:
+        converted = 0
+        while converted < max_assets:
+            try:
+                item = self.poc_preload_queue.get_nowait()
+            except queue.Empty:
+                break
+            if len(item) < 2:
+                continue
+            kind = str(item[0])
+            generation = int(item[1])
+            if generation != self.poc_preload_generation:
+                continue
+            if kind == "asset":
+                relative_path = str(item[2])
+                surface = item[3]
+                if not isinstance(surface, pygame.Surface):
+                    raise RuntimeError(
+                        "invalid decoded POC preload surface"
+                    )
+                self.poc_layer_cache[relative_path] = (
+                    surface.convert_alpha()
+                )
+                self.poc_preload_completed += 1
+                converted += 1
+            elif kind == "done":
+                self.poc_preload_ready = (
+                    self.poc_preload_completed
+                    == self.poc_preload_pending
+                )
+                if not self.poc_preload_ready:
+                    raise RuntimeError(
+                        "incomplete approved POC preload"
+                    )
+            elif kind == "error":
+                self.poc_preload_error = str(item[2])
+                self.poc_preload_ready = False
+                raise RuntimeError(self.poc_preload_error)
 
     def draw_cinematic_scene(self, field: pygame.Rect, pred: Prediction, state: dict[str, object] | None = None) -> None:
         if state is None:
@@ -2563,11 +5420,8 @@ class App:
 
         possession = str(state["possession"])
         team = self.home if possession == "home" else self.away
-        keeper_team = self.away if possession == "home" else self.home
         direction = 1 if possession == "home" else -1
         shot_progress = float(state["shot_progress"])
-        raw_shot_progress = float(state.get("raw_shot_progress", shot_progress))
-        active_attack = bool(state.get("active_attack"))
         self.draw_cinematic_runner(
             team,
             state["actor_pos"],
@@ -2576,79 +5430,25 @@ class App:
             stride_phase=float(state.get("stride_phase", 0.0)),
             run_speed=float(state.get("run_speed", 1.0)),
             settled=bool(state.get("settled", False)),
+            runner_pose=state.get("runner_pose") if isinstance(state.get("runner_pose"), dict) else None,
         )
-        if active_attack:
-            self.draw_cinematic_kick_impact(state["kick_pos"], direction, shot_progress)
-        scoring_attack = bool(state.get("active_goal"))
-        goal = state["goal_rect"]
-        goal_side = str(state["goal_side"])
-        goal_alpha = self.cinematic_goal_alpha(shot_progress) if active_attack and isinstance(goal, pygame.Rect) else 0
-        show_goal_front = active_attack and isinstance(goal, pygame.Rect) and goal_alpha > 0
 
         ball_squash = state.get("ball_squash", (1.0, 1.0))
         if not isinstance(ball_squash, tuple):
             ball_squash = (1.0, 1.0)
-
-        def render_ball() -> None:
-            self.draw_cinematic_ball(
-                state["ball_pos"],
-                active_goal=scoring_attack,
-                shot_progress=shot_progress,
-                scale=int(state.get("ball_scale", CINEMATIC_SHOT_BALL_SIZE if scoring_attack and shot_progress > SHOT_KICK_AT else CINEMATIC_BALL_SIZE)),
-                direction=direction,
-                prev_pos=state.get("ball_prev_pos"),
-                ground_pos=state.get("ball_ground_pos"),
-                velocity=state.get("ball_velocity_px_s"),
-                rotation_degrees=float(state.get("ball_rotation_degrees", 0.0)),
-                squash=(float(ball_squash[0]), float(ball_squash[1])),
-                phase=str(state.get("ball_phase", "drible")),
-            )
-
-        ball_behind_keeper = active_attack and (
-            (
-                str(state.get("attack_kind", "")) == "save"
-                and CHANCE_CONTACT_VISUAL_AT - 0.05 <= raw_shot_progress <= CHANCE_CONTACT_VISUAL_AT + 0.055
-            )
-            or (scoring_attack and float(state.get("ball_depth", 0.0)) >= 0.78)
+        self.draw_cinematic_ball(
+            state["ball_pos"],
+            active_goal=False,
+            shot_progress=shot_progress,
+            scale=int(state.get("ball_scale", CINEMATIC_BALL_SIZE)),
+            direction=direction,
+            prev_pos=state.get("ball_prev_pos"),
+            ground_pos=state.get("ball_ground_pos"),
+            velocity=state.get("ball_velocity_px_s"),
+            rotation_degrees=float(state.get("ball_rotation_degrees", 0.0)),
+            squash=(float(ball_squash[0]), float(ball_squash[1])),
+            phase=str(state.get("ball_phase", "drible")),
         )
-        if ball_behind_keeper:
-            render_ball()
-
-        if show_goal_front:
-            self.draw_cinematic_goal_impact(
-                goal,
-                goal_side,
-                float(state.get("net_progress", 0.0)),
-                state.get("goal_impact_pos"),
-                goal_alpha,
-            )
-            self.draw_cinematic_goal_front_posts(
-                goal,
-                goal_side,
-                float(state.get("net_progress", 0.0)),
-                alpha=goal_alpha,
-            )
-
-        if active_attack and shot_progress >= SHOT_KEEPER_REVEAL_AT:
-            keeper_alpha = self.cinematic_keeper_alpha(shot_progress)
-            if keeper_alpha > 0:
-                keeper_action = str(state.get("keeper_action", ""))
-                keeper_dive = scoring_attack or keeper_action == "dive_save"
-                self.draw_cinematic_keeper(
-                    keeper_team,
-                    state["keeper_pos"],
-                    flip=bool(state.get("keeper_flip", direction < 0)),
-                    active_goal=keeper_dive,
-                    shot_progress=raw_shot_progress,
-                    alpha=keeper_alpha,
-                    keeper_action=keeper_action,
-                )
-
-        if not ball_behind_keeper:
-            render_ball()
-        if active_attack and shot_progress >= SHOT_GOAL_REVEAL_AT:
-            if not scoring_attack:
-                self.draw_cinematic_chance_payoff(state, direction)
 
     def draw_cinematic_neutral(self, field: pygame.Rect, state: dict[str, object]) -> None:
         neutral_progress = float(state.get("neutral_progress", 1.0))
@@ -2685,7 +5485,7 @@ class App:
             rotation_degrees=float(state.get("ball_rotation_degrees", 0.0)),
             squash=(float(ball_squash[0]), float(ball_squash[1])),
             phase=str(state.get("ball_phase", "neutro")),
-            alpha=255,
+            alpha=neutral_alpha,
         )
         if neutral_alpha > 0:
             text = self.text_cache.render(self.f_md, "EMPATE", GOLD)
@@ -2709,9 +5509,13 @@ class App:
 
     def cinematic_stride_state(self, shot_progress: float, stride_phase: float) -> tuple[bool, int]:
         shot_phase = self.shot_phase(shot_progress)
-        if shot_phase in {SHOT_PHASE_PLANT, SHOT_PHASE_CONTACT_FREEZE, SHOT_PHASE_RELEASE}:
+        if shot_phase == SHOT_PHASE_PLANT:
+            return False, 2
+        if shot_phase == SHOT_PHASE_CONTACT_FREEZE and shot_progress < SHOT_KICK_POSE_AT:
+            return False, 2
+        if shot_phase in {SHOT_PHASE_CONTACT_FREEZE, SHOT_PHASE_RELEASE}:
             return True, 3
-        if shot_phase == SHOT_PHASE_FOLLOW_THROUGH and shot_progress < SHOT_FOLLOW_THROUGH_HOLD_END:
+        if shot_phase in {SHOT_PHASE_FOLLOW_THROUGH, SHOT_PHASE_NET_IMPACT} and shot_progress < SHOT_FOLLOW_THROUGH_HOLD_END:
             return True, 3
         if shot_phase in {SHOT_PHASE_FOLLOW_THROUGH, SHOT_PHASE_NET_IMPACT}:
             return False, 3
@@ -2723,6 +5527,239 @@ class App:
         if phase < 3.05:
             return False, 2
         return False, 3
+
+    def cinematic_runner_plant_blend(self, shot_progress: float) -> float:
+        plant_in = smoothstep(
+            (shot_progress - (SHOT_PLANT_AT - 0.10))
+            / max(0.001, SHOT_KICK_AT - (SHOT_PLANT_AT - 0.10))
+        )
+        recovery = 1.0 - smoothstep(
+            (shot_progress - SHOT_FOLLOW_THROUGH_HOLD_END)
+            / max(0.001, SHOT_RECOVERY_AT - SHOT_FOLLOW_THROUGH_HOLD_END)
+        )
+        return plant_in * recovery
+
+    def cinematic_controlled_stride_phase(
+        self,
+        shot_progress: float,
+        stride_phase: float,
+        event_seconds: float | None = None,
+        event_start_phase: float | None = None,
+    ) -> float:
+        phase = stride_phase % 4.0
+        motion = self.assets.cinematic_runner_motion
+        exit_frame = int(motion.get("kick_exit_runner_frame", 0))
+        exit_phase = exit_frame / CINEMATIC_RUNNER_FRAME_COUNT * 4.0
+        phase_rate = 124.0 / 60.0 * 2.0
+
+        if 0.0 < shot_progress < SHOT_RECOVERY_AT and event_seconds:
+            # The event-start pose is anchored during update(). A 124 steps/min
+            # clock then reaches the closest compatible entry monotonically.
+            start_phase = 1.75 if event_start_phase is None else event_start_phase % 4.0
+            natural_advance = phase_rate * event_seconds * SHOT_RUN_TO_PLANT_AT
+            candidates = tuple(
+                int(frame)
+                for frame in motion.get(
+                    "kick_entry_runner_frames",
+                    (motion.get("kick_entry_runner_frame", 0),),
+                )
+            )
+
+            def candidate_plan(frame: int) -> tuple[float, int, float]:
+                target_phase = frame / CINEMATIC_RUNNER_FRAME_COUNT * 4.0
+                forward = (target_phase - start_phase) % 4.0
+                cycles = max(0, round((natural_advance - forward) / 4.0))
+                advance = forward + cycles * 4.0
+                return abs(advance - natural_advance), candidates.index(frame), advance
+
+            _error, _priority, planned_advance = min(candidate_plan(frame) for frame in candidates)
+            progress = clamp(shot_progress / SHOT_RUN_TO_PLANT_AT)
+            return (start_phase + planned_advance * progress) % 4.0
+        if shot_progress <= SHOT_RUN_TO_PLANT_AT:
+            return phase
+        if shot_progress >= SHOT_RECOVERY_AT:
+            if event_seconds:
+                recovery_elapsed = (shot_progress - SHOT_RECOVERY_AT) * event_seconds
+                return (exit_phase + phase_rate * recovery_elapsed) % 4.0
+            return phase
+        return phase
+
+    def cinematic_runner_reference_height(
+        self,
+        uniform_code: str,
+        direction: int,
+    ) -> float:
+        direction_name = "left" if direction < 0 else "right"
+        cache_key = (uniform_code, direction_name)
+        cached = self.runner_reference_height_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        motion = self.assets.cinematic_runner_motion
+        uniforms = motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        frames = uniform_payload["directions"][direction_name]["frames"]  # type: ignore[index]
+        heights = sorted(
+            float(frame["visible_bbox"][3])
+            for frame in frames
+        )
+        middle = len(heights) // 2
+        reference = (
+            heights[middle]
+            if len(heights) % 2
+            else (heights[middle - 1] + heights[middle]) * 0.5
+        )
+        reference = max(1.0, reference)
+        self.runner_reference_height_cache[cache_key] = reference
+        return reference
+
+    def cinematic_runner_pose(
+        self,
+        actor_pos: tuple[float, float],
+        direction: int,
+        shot_progress: float,
+        stride_phase: float,
+        run_speed: float,
+        event_seconds: float | None = None,
+        event_start_phase: float | None = None,
+        uniform_code: str = "gold",
+    ) -> dict[str, object]:
+        motion = self.assets.cinematic_runner_motion
+        direction_name = "left" if direction < 0 else "right"
+        uniforms = motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        direction_payload = uniform_payload["directions"][direction_name]  # type: ignore[index]
+        frame_metadata = direction_payload["frames"]  # type: ignore[index]
+        controlled_phase = self.cinematic_controlled_stride_phase(
+            shot_progress,
+            stride_phase,
+            event_seconds,
+            event_start_phase,
+        )
+        frame_position = controlled_phase / 4.0 * CINEMATIC_RUNNER_FRAME_COUNT
+        frame_index = int(math.floor(frame_position)) % CINEMATIC_RUNNER_FRAME_COUNT
+        next_frame_index = (frame_index + 1) % CINEMATIC_RUNNER_FRAME_COUNT
+        frame_blend = frame_position - math.floor(frame_position)
+        render_frame_index = frame_index if frame_blend < 0.5 else next_frame_index
+        metadata = frame_metadata[frame_index]
+        next_metadata = frame_metadata[next_frame_index]
+
+        scale = (
+            CINEMATIC_POSE_SIZE
+            * CINEMATIC_PLAYER_SCALE
+            / self.cinematic_runner_reference_height(uniform_code, direction)
+        )
+        frame_size = int(motion["frame_size"])
+        target_size = (max(1, round(frame_size * scale)), max(1, round(frame_size * scale)))
+        root_anchor = motion["root_anchor"]
+        root_x = float(root_anchor[0]) * scale
+        baseline_y = float(motion["ground_baseline_y"]) * scale
+
+        support_weight = lerp(
+            float(metadata["support_weight"]),
+            float(next_metadata["support_weight"]),
+            frame_blend,
+        )
+        def local_point(name: str) -> tuple[float, float]:
+            previous = frame_metadata[(frame_index - 1) % CINEMATIC_RUNNER_FRAME_COUNT][name]
+            current = metadata[name]
+            following = next_metadata[name]
+            after = frame_metadata[(frame_index + 2) % CINEMATIC_RUNNER_FRAME_COUNT][name]
+
+            def catmull_rom(axis: int) -> float:
+                p0 = float(previous[axis])
+                p1 = float(current[axis])
+                p2 = float(following[axis])
+                p3 = float(after[axis])
+                t = frame_blend
+                return 0.5 * (
+                    2.0 * p1
+                    + (-p0 + p2) * t
+                    + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t
+                    + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t * t * t
+                )
+
+            return catmull_rom(0), catmull_rom(1)
+        touch_phase_offset = cinematic_dribble_touch_phase_offset(direction)
+        first_touch_frame = round(
+            touch_phase_offset / 4.0 * CINEMATIC_RUNNER_FRAME_COUNT
+        )
+        second_touch_frame = first_touch_frame + CINEMATIC_RUNNER_FRAME_COUNT // 2
+        first_contact = frame_metadata[first_touch_frame]["dribble_foot"]
+        second_contact = frame_metadata[second_touch_frame]["dribble_foot"]
+        cycle_from_touch = (controlled_phase - touch_phase_offset) % 4.0
+        contact_amount = smoothstep((cycle_from_touch % 2.0) / 2.0)
+        if cycle_from_touch < 2.0:
+            current_contact, following_contact = first_contact, second_contact
+        else:
+            current_contact, following_contact = second_contact, first_contact
+        touch_slot = 0 if cycle_from_touch < 1.0 or cycle_from_touch >= 3.0 else 1
+        dribble_anchor_x = lerp(float(current_contact[0]), float(following_contact[0]), contact_amount)
+        dribble_anchor_y = lerp(float(current_contact[1]), float(following_contact[1]), contact_amount)
+        current_support = metadata["support"]
+        following_support = next_metadata["support"]
+        metadata_support_transition = bool(metadata.get("support_transition"))
+        next_metadata_support_transition = bool(next_metadata.get("support_transition"))
+        if current_support and current_support == following_support:
+            current_support_point = metadata["support_foot"]
+            following_support_point = next_metadata["support_foot"]
+            support_local = (
+                lerp(float(current_support_point[0]), float(following_support_point[0]), frame_blend),
+                lerp(float(current_support_point[1]), float(following_support_point[1]), frame_blend),
+            )
+            support_name = current_support
+            support_transition = metadata_support_transition or next_metadata_support_transition
+        else:
+            selected_support = metadata if frame_blend < 0.5 else next_metadata
+            selected_support_point = selected_support["support_foot"]
+            support_local = (float(selected_support_point[0]), float(selected_support_point[1]))
+            support_name = selected_support["support"]
+            support_transition = (
+                current_support != following_support
+                or metadata_support_transition
+                or next_metadata_support_transition
+            )
+
+        # Foot locking is baked below the pelvis by the asset generator. The
+        # actor root stays fixed so the torso and shirt mark never slide.
+        lock_offset_x = 0.0
+        left = float(actor_pos[0]) - root_x
+        top = float(actor_pos[1]) - baseline_y
+
+        def screen_point(name: str) -> tuple[float, float]:
+            point_x, point_y = local_point(name)
+            return left + point_x * scale, top + point_y * scale
+
+        support_pos = (left + support_local[0] * scale, top + support_local[1] * scale)
+        rendered_dribble_pos = screen_point("dribble_foot")
+        dribble_control_pos = screen_point("dribble_control")
+        dribble_contact_pos = (
+            left + dribble_anchor_x * scale,
+            top + dribble_anchor_y * scale,
+        )
+        pelvis_pos = screen_point("pelvis")
+        return {
+            "controlled_phase": controlled_phase,
+            "frame_index": frame_index,
+            "next_frame_index": next_frame_index,
+            "frame_blend": frame_blend,
+            "render_frame_index": render_frame_index,
+            "target_size": target_size,
+            "rect_topleft": (left, top),
+            "root_offset_x": lock_offset_x,
+            "pelvis_pos": pelvis_pos,
+            "support_foot_pos": support_pos,
+            "dribble_foot_pos": rendered_dribble_pos,
+            "dribble_control_pos": dribble_control_pos,
+            "dribble_contact_pos": dribble_contact_pos,
+            "dribble_touch_slot": touch_slot,
+            "support": support_name,
+            "support_transition": support_transition,
+            "support_weight": support_weight,
+            "flight": support_weight < 0.21,
+            "root_bob": lerp(float(metadata["root_bob"]), float(next_metadata["root_bob"]), frame_blend) * scale,
+            "sole_ground_gap": float(actor_pos[1]) - support_pos[1],
+            "uniform_code": uniform_code,
+        }
 
     def draw_soft_shadow(self, rect: pygame.Rect, alpha: int) -> None:
         alpha_key = max(0, min(255, int(round(alpha / 4.0) * 4)))
@@ -2815,6 +5852,591 @@ class App:
             frame.get_height(),
         )
 
+    def cinematic_kick_contact_policy(self, uniform_code: str, direction: int) -> tuple[int, float]:
+        direction_name = "left" if direction < 0 else "right"
+        uniforms = self.assets.cinematic_runner_motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        direction_payload = uniform_payload["directions"][direction_name]  # type: ignore[index]
+        return (
+            int(direction_payload["kick_contact_frame"]),
+            float(direction_payload["kick_contact_gap_px"]),
+        )
+
+    def cinematic_ball_clearance_directed_x(
+        self,
+        pose: dict[str, object],
+        uniform_code: str,
+        direction: int,
+        action: str,
+    ) -> float:
+        direction_name = "left" if direction < 0 else "right"
+        motion = self.assets.cinematic_runner_motion
+        uniforms = motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        direction_payload = uniform_payload["directions"][direction_name]  # type: ignore[index]
+        if action in {"kick", "kick_physical"}:
+            metadata_frames = direction_payload["kick_frames"]
+            frame_index = int(pose["frame_index"])
+        elif action in {"run", "run_approach"}:
+            metadata_frames = direction_payload["frames"]
+            frame_index = int(pose["render_frame_index"])
+        else:
+            raise ValueError(f"unsupported cinematic clearance action: {action}")
+        metadata = metadata_frames[frame_index]
+        if "ball_clearance_offset_px" not in metadata:
+            raise RuntimeError(
+                f"runner motion metadata is missing the ball clearance contract: "
+                f"{uniform_code}/{direction_name}/{action}/{frame_index}"
+            )
+        offset_field = (
+            "ball_corridor_offset_px"
+            if action == "kick"
+            else "ball_approach_corridor_offset_px"
+            if action == "run_approach"
+            else "ball_clearance_offset_px"
+        )
+        if offset_field not in metadata:
+            raise RuntimeError(
+                f"runner motion metadata is missing {offset_field}: "
+                f"{uniform_code}/{direction_name}/{action}/{frame_index}"
+            )
+        frame_size = float(motion["frame_size"])
+        target_size = pose["target_size"]
+        scale = float(target_size[0]) / frame_size  # type: ignore[index]
+        root_x = float(motion["root_anchor"][0])
+        local_ball_x = root_x + direction * float(metadata[offset_field])
+        left = float(pose["rect_topleft"][0])  # type: ignore[index]
+        if action == "kick_physical":
+            return direction * (left + local_ball_x * scale)
+        if action != "kick":
+            return direction * (left + local_ball_x * scale)
+
+        unshifted_left = (
+            left
+            - float(pose.get("entry_root_offset_x", 0.0))
+            - float(pose.get("contact_root_offset_x", 0.0))
+            - float(pose.get("dynamic_contact_catchup_x", 0.0))
+        )
+        corridor_x = direction * (
+            unshifted_left + local_ball_x * scale
+        )
+        physical_local_x = root_x + direction * float(
+            metadata["ball_clearance_offset_px"]
+        )
+        physical_x = direction * (
+            left + physical_local_x * scale
+        )
+        return max(corridor_x, physical_x)
+
+    def cinematic_kick_contact_anchor(
+        self,
+        pose: dict[str, object],
+        uniform_code: str,
+        direction: int,
+        contact_gap: float,
+    ) -> tuple[float, float]:
+        direction_name = "left" if direction < 0 else "right"
+        motion = self.assets.cinematic_runner_motion
+        uniforms = motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        direction_payload = uniform_payload["directions"][direction_name]  # type: ignore[index]
+        frame_index = int(pose["frame_index"])
+        metadata = direction_payload["kick_frames"][frame_index]
+        frame_size = float(motion["frame_size"])
+        scale = float(pose["target_size"][0]) / frame_size  # type: ignore[index]
+        root_x = float(motion["root_anchor"][0])
+        local_ball_x = root_x + direction * float(
+            metadata["ball_clearance_offset_px"]
+        )
+        left = float(pose["rect_topleft"][0])  # type: ignore[index]
+        directed_ball_x = direction * (left + local_ball_x * scale)
+        contact_radius = CINEMATIC_BALL_SIZE * 0.46
+        foot_x = direction * (
+            directed_ball_x - contact_radius - contact_gap
+        )
+        foot_y = float(pose["dribble_foot_pos"][1])  # type: ignore[index]
+        return foot_x, foot_y
+
+    @staticmethod
+    def cinematic_contact_catchup_weight(shot_progress: float) -> float:
+        if shot_progress <= SHOT_RUN_TO_PLANT_AT:
+            return 0.0
+        if shot_progress <= SHOT_KICK_AT:
+            return smoothstep(
+                (shot_progress - SHOT_RUN_TO_PLANT_AT)
+                / max(0.001, SHOT_KICK_AT - SHOT_RUN_TO_PLANT_AT)
+            )
+        if shot_progress <= SHOT_CONTACT_FREEZE_END:
+            return 1.0
+        return 1.0 - smoothstep(
+            (shot_progress - SHOT_CONTACT_FREEZE_END)
+            / max(0.001, SHOT_RECOVERY_AT - SHOT_CONTACT_FREEZE_END)
+        )
+
+    @staticmethod
+    def cinematic_ball_corridor_cache_key(
+        actor_y: float,
+        direction: int,
+        uniform_code: str,
+        screen_anchor_x: float,
+        shot_actor_x: float,
+        event_seconds: float,
+        event_start_phase: float | None,
+    ) -> tuple[object, ...]:
+        return (
+            uniform_code,
+            direction,
+            round(actor_y, 3),
+            round(screen_anchor_x, 3),
+            round(shot_actor_x, 3),
+            round(event_seconds, 6),
+            None
+            if event_start_phase is None
+            else round(event_start_phase % 4.0, 6),
+        )
+
+    def cinematic_attack_contact_catchup(
+        self,
+        actor_y: float,
+        direction: int,
+        uniform_code: str,
+        screen_anchor_x: float,
+        shot_actor_x: float,
+        event_seconds: float,
+        event_start_phase: float | None,
+    ) -> float:
+        key = self.cinematic_ball_corridor_cache_key(
+            actor_y,
+            direction,
+            uniform_code,
+            screen_anchor_x,
+            shot_actor_x,
+            event_seconds,
+            event_start_phase,
+        )
+        cached = self.cinematic_ball_corridor_cache.get(key)
+        if cached is None:
+            self.cinematic_attack_ball_path_x(
+                SHOT_KICK_AT,
+                actor_y,
+                direction,
+                uniform_code,
+                screen_anchor_x,
+                shot_actor_x,
+                event_seconds,
+                event_start_phase,
+            )
+            cached = self.cinematic_ball_corridor_cache.get(key)
+        if cached is None:
+            raise RuntimeError("cinematic ball corridor cache was not populated")
+        return float(cached[1])
+
+    def cinematic_attack_ball_path_x(
+        self,
+        shot_progress: float,
+        actor_y: float,
+        direction: int,
+        uniform_code: str,
+        screen_anchor_x: float,
+        shot_actor_x: float,
+        event_seconds: float,
+        event_start_phase: float | None,
+    ) -> float:
+        start = CINEMATIC_BALL_CORRIDOR_START
+        end = SHOT_KICK_AT
+        sample_rate = 120.0
+        sample_count = max(
+            2,
+            math.ceil((end - start) * event_seconds * sample_rate) + 1,
+        )
+        key = self.cinematic_ball_corridor_cache_key(
+            actor_y,
+            direction,
+            uniform_code,
+            screen_anchor_x,
+            shot_actor_x,
+            event_seconds,
+            event_start_phase,
+        )
+        cached = self.cinematic_ball_corridor_cache.get(key)
+        if cached is None:
+            if len(self.cinematic_ball_corridor_cache) >= 128:
+                self.cinematic_ball_corridor_cache.clear()
+            entry_pose = self.cinematic_runner_pose(
+                (shot_actor_x, actor_y),
+                direction,
+                SHOT_RUN_TO_PLANT_AT,
+                0.0,
+                1.0,
+                event_seconds=event_seconds,
+                event_start_phase=event_start_phase,
+                uniform_code=uniform_code,
+            )
+            required_floors: list[float] = []
+            for index in range(sample_count):
+                progress = lerp(start, end, index / (sample_count - 1))
+                actor_x = lerp(
+                    screen_anchor_x,
+                    shot_actor_x,
+                    smoothstep(progress / 0.58),
+                )
+                if progress < SHOT_RUN_TO_PLANT_AT:
+                    pose = self.cinematic_runner_pose(
+                        (actor_x, actor_y),
+                        direction,
+                        progress,
+                        0.0,
+                        1.0,
+                        event_seconds=event_seconds,
+                        event_start_phase=event_start_phase,
+                        uniform_code=uniform_code,
+                    )
+                    physical_floor = self.cinematic_ball_clearance_directed_x(
+                        pose,
+                        uniform_code,
+                        direction,
+                        "run",
+                    )
+                else:
+                    pose = self.cinematic_kick_pose(
+                        (actor_x, actor_y),
+                        direction,
+                        progress,
+                        entry_pose,
+                    )
+                    if pose is None:
+                        raise RuntimeError(
+                            "kick pose is unavailable while building the ball corridor"
+                        )
+                    physical_floor = self.cinematic_ball_clearance_directed_x(
+                        pose,
+                        uniform_code,
+                        direction,
+                        "kick_physical",
+                    )
+                required_floor = (
+                    physical_floor
+                    if progress >= CINEMATIC_KICK_APPROACH_START
+                    else -math.inf
+                )
+                if progress <= CINEMATIC_KICK_APPROACH_START:
+                    natural_dribble = self.cinematic_dribble_kinematics(
+                        (actor_x, actor_y),
+                        direction,
+                        float(pose["controlled_phase"]),
+                        0.0,
+                        shot_progress=progress,
+                        kick_contact_position=(0.0, 0.0),
+                        foot_position=pose["dribble_control_pos"],  # type: ignore[arg-type]
+                        visible_foot_position=pose["dribble_foot_pos"],  # type: ignore[arg-type]
+                        contact_foot_position=pose["dribble_contact_pos"],  # type: ignore[arg-type]
+                        travel_distance=0.0,
+                    )
+                    required_floor = max(
+                        required_floor,
+                        direction * float(natural_dribble.ball.position[0]),
+                    )
+                required_floors.append(required_floor)
+
+            raw_contact_floor = required_floors[-1]
+            contact_catchup = 0.0
+            for index, required_floor in enumerate(required_floors[:-1]):
+                if not math.isfinite(required_floor):
+                    continue
+                progress = lerp(start, end, index / (sample_count - 1))
+                catchup_weight = self.cinematic_contact_catchup_weight(progress)
+                if catchup_weight >= 1.0 - 1e-6:
+                    continue
+                contact_catchup = max(
+                    contact_catchup,
+                    (required_floor - raw_contact_floor)
+                    / (1.0 - catchup_weight),
+                )
+            contact_catchup = max(0.0, contact_catchup)
+            if contact_catchup > CINEMATIC_CONTACT_CATCHUP_MAX:
+                raise RuntimeError(
+                    "cinematic contact catch-up exceeds the authored motion budget: "
+                    f"{uniform_code}/{direction}={contact_catchup:.3f}px"
+                )
+            if contact_catchup > 0.0:
+                required_floors = [
+                    (
+                        required_floor
+                        + contact_catchup
+                        * self.cinematic_contact_catchup_weight(
+                            lerp(start, end, index / (sample_count - 1))
+                        )
+                        if math.isfinite(required_floor)
+                        else required_floor
+                    )
+                    for index, required_floor in enumerate(required_floors)
+                ]
+
+            contact_floor = required_floors[-1]
+            for index in range(sample_count):
+                progress = lerp(start, end, index / (sample_count - 1))
+                if progress < CINEMATIC_KICK_APPROACH_START:
+                    continue
+                approach = smoothstep(
+                    (progress - CINEMATIC_KICK_APPROACH_START)
+                    / max(
+                        0.001,
+                        SHOT_KICK_AT - CINEMATIC_KICK_APPROACH_START,
+                    )
+                )
+                authored_floor = lerp(
+                    contact_floor - CINEMATIC_KICK_APPROACH_DISTANCE,
+                    contact_floor,
+                    approach,
+                )
+                required_floors[index] = max(
+                    required_floors[index],
+                    authored_floor,
+                )
+
+            approach_index = next(
+                index
+                for index in range(sample_count)
+                if lerp(start, end, index / (sample_count - 1))
+                >= CINEMATIC_KICK_APPROACH_START
+            )
+            monotonic_floors: list[float] = []
+            running_floor = max(required_floors[:approach_index])
+            for required_floor in required_floors[approach_index:]:
+                running_floor = max(running_floor, required_floor)
+                monotonic_floors.append(running_floor)
+
+            sample_dt = (end - start) * event_seconds / (sample_count - 1)
+            max_step = 150.0 * sample_dt
+            for index in range(len(monotonic_floors) - 2, -1, -1):
+                monotonic_floors[index] = max(
+                    monotonic_floors[index],
+                    monotonic_floors[index + 1] - max_step,
+                )
+            approach_floor = monotonic_floors[0]
+            lead_sample_count = approach_index
+            lead_start_floor = required_floors[0]
+            lead_start_slope = required_floors[1] - required_floors[0]
+            lead_end_slope = (
+                monotonic_floors[1] - monotonic_floors[0]
+                if len(monotonic_floors) > 1
+                else 0.0
+            )
+            lead_in_floors: list[float] = []
+            for index in range(approach_index):
+                blend = index / max(1, lead_sample_count)
+                blend_sq = blend * blend
+                blend_cu = blend_sq * blend
+                h00 = 2.0 * blend_cu - 3.0 * blend_sq + 1.0
+                h10 = blend_cu - 2.0 * blend_sq + blend
+                h01 = -2.0 * blend_cu + 3.0 * blend_sq
+                h11 = blend_cu - blend_sq
+                hermite_floor = (
+                    h00 * lead_start_floor
+                    + h10 * lead_start_slope * lead_sample_count
+                    + h01 * approach_floor
+                    + h11 * lead_end_slope * lead_sample_count
+                )
+                lead_in_floors.append(hermite_floor)
+            floors = tuple(lead_in_floors + monotonic_floors)
+            self.cinematic_ball_corridor_cache[key] = (
+                floors,
+                contact_catchup,
+            )
+        else:
+            floors, _contact_catchup = cached
+
+        normalized = clamp((shot_progress - start) / max(0.001, end - start))
+        position = normalized * (sample_count - 1)
+        first = min(sample_count - 1, int(math.floor(position)))
+        following = min(sample_count - 1, first + 1)
+        return lerp(
+            floors[first],
+            floors[following],
+            position - first,
+        )
+
+    def cinematic_kick_frame_index(
+        self,
+        shot_progress: float,
+        uniform_code: str | None = None,
+        direction: int = 1,
+    ) -> int | None:
+        blend = self.cinematic_kick_frame_blend(shot_progress, uniform_code, direction)
+        if blend is None:
+            return None
+        first, following, amount = blend
+        return first if amount < 0.5 else following
+
+    def cinematic_kick_frame_blend(
+        self,
+        shot_progress: float,
+        uniform_code: str | None = None,
+        direction: int = 1,
+    ) -> tuple[int, int, float] | None:
+        if shot_progress < SHOT_RUN_TO_PLANT_AT or shot_progress >= SHOT_RECOVERY_AT:
+            return None
+        contact_frame = (
+            int(self.assets.cinematic_runner_motion["kick_contact_frame"])
+            if uniform_code is None
+            else self.cinematic_kick_contact_policy(uniform_code, direction)[0]
+        )
+        last_frame = CINEMATIC_KICK_FRAME_COUNT - 1
+        if shot_progress < SHOT_KICK_AT:
+            normalized = smoothstep(
+                (shot_progress - SHOT_RUN_TO_PLANT_AT)
+                / max(0.001, SHOT_KICK_AT - SHOT_RUN_TO_PLANT_AT)
+            )
+            position = normalized * contact_frame
+        elif shot_progress < SHOT_CONTACT_FREEZE_END:
+            return contact_frame, contact_frame, 0.0
+        else:
+            follow_through_reach_at = max(
+                SHOT_CONTACT_FREEZE_END + 0.001,
+                SHOT_FOLLOW_THROUGH_HOLD_END - 0.036,
+            )
+            normalized = smoothstep(
+                (shot_progress - SHOT_CONTACT_FREEZE_END)
+                / max(0.001, follow_through_reach_at - SHOT_CONTACT_FREEZE_END)
+            )
+            position = contact_frame + normalized * (last_frame - contact_frame)
+            if shot_progress >= follow_through_reach_at:
+                return last_frame, last_frame, 0.0
+        first = min(last_frame, int(math.floor(position)))
+        following = min(last_frame, first + 1)
+        return first, following, position - math.floor(position)
+
+    def cinematic_kick_pose(
+        self,
+        actor_pos: tuple[float, float],
+        direction: int,
+        shot_progress: float,
+        entry_pose: dict[str, object] | None = None,
+    ) -> dict[str, object] | None:
+        motion = self.assets.cinematic_runner_motion
+        direction_name = "left" if direction < 0 else "right"
+        uniform_code = str(entry_pose.get("uniform_code", "gold")) if entry_pose is not None else "gold"
+        frame_blend = self.cinematic_kick_frame_blend(shot_progress, uniform_code, direction)
+        if frame_blend is None:
+            return None
+        first, following, blend = frame_blend
+        frame_index = first if blend < 0.5 else following
+        uniforms = motion.get("uniforms", {})
+        uniform_payload = uniforms.get(uniform_code, uniforms.get("gold", {}))  # type: ignore[union-attr]
+        direction_payload = uniform_payload["directions"][direction_name]  # type: ignore[index]
+        metadata_frames = direction_payload["kick_frames"]
+        metadata = metadata_frames[frame_index]
+        frame_size = float(motion["frame_size"])
+        scale = (
+            CINEMATIC_POSE_SIZE
+            * CINEMATIC_PLAYER_SCALE
+            / self.cinematic_runner_reference_height(uniform_code, direction)
+        )
+        baseline_y = float(motion["ground_baseline_y"])
+
+        plant_frame = int(motion.get("kick_plant_frame", 5))
+        # The approved kick POC keeps the body root on the authored pelvis arc.
+        # A generic lowest-pixel detector can swap the planted and striking
+        # boots, so it must not translate the whole player during the strike.
+        lock_offset_x = 0.0
+        lock_offset_y = 0.0
+
+        metadata_pelvis = metadata["pelvis"]
+        left = float(actor_pos[0]) - float(metadata_pelvis[0]) * scale + lock_offset_x * scale
+        top = float(actor_pos[1]) - baseline_y * scale + lock_offset_y * scale
+        entry_root_offset_x = 0.0
+        if entry_pose is not None and frame_index < plant_frame:
+            entry_weight = 1.0 - smoothstep(
+                float(frame_index) / max(1.0, float(plant_frame))
+            )
+            runner_frame_index = int(entry_pose["render_frame_index"])
+            runner_frame = self.assets.cinematic_runner_frames_for_uniform(
+                uniform_code,
+                left=direction < 0,
+            )[runner_frame_index]
+            kick_frame = self.assets.cinematic_kick_frames_for_uniform(
+                uniform_code,
+                left=direction < 0,
+            )[frame_index]
+            runner_centroid_x, _runner_centroid_y = self.visible_alpha_centroid(
+                runner_frame
+            )
+            kick_centroid_x, _kick_centroid_y = self.visible_alpha_centroid(
+                kick_frame
+            )
+            entry_left, _entry_top = entry_pose["rect_topleft"]  # type: ignore[misc]
+            entry_scale = float(entry_pose["target_size"][0]) / frame_size  # type: ignore[index]
+            entry_center_x = float(entry_left) + runner_centroid_x * entry_scale
+            kick_center_x = left + kick_centroid_x * scale
+            entry_root_offset_x = (
+                entry_center_x - kick_center_x
+            ) * entry_weight
+            left += entry_root_offset_x
+        contact_frame = int(direction_payload["kick_contact_frame"])
+        contact_root_offset_x = 0.0
+        contact_root_correction = float(
+            direction_payload["kick_contact_root_correction_px"]
+        )
+        frame_position = float(first) + float(blend)
+        if frame_position <= contact_frame:
+            root_advance_start = max(0, plant_frame - 2)
+            root_advance = smoothstep(
+                (frame_position - root_advance_start)
+                / max(1.0, float(contact_frame - root_advance_start))
+            )
+            available_correction = max(
+                0.0,
+                float(metadata["ball_corridor_offset_px"])
+                - float(metadata["ball_clearance_offset_px"]),
+            )
+            correction_native = min(
+                available_correction,
+                contact_root_correction * root_advance,
+            )
+        else:
+            last_frame = int(motion["kick_frame_count"]) - 1
+            correction_native = contact_root_correction * clamp(
+                (last_frame - frame_position)
+                / max(1.0, float(last_frame - contact_frame))
+            )
+        if correction_native > 0.0:
+            contact_root_offset_x = direction * correction_native * scale
+            left += contact_root_offset_x
+        dynamic_contact_catchup_x = 0.0
+        if entry_pose is not None:
+            contact_catchup = float(entry_pose.get("contact_catchup_px", 0.0))
+            if contact_catchup > 0.0:
+                dynamic_contact_catchup_x = (
+                    direction
+                    * contact_catchup
+                    * self.cinematic_contact_catchup_weight(shot_progress)
+                )
+                left += dynamic_contact_catchup_x
+        target_size = (max(1, round(frame_size * scale)), max(1, round(frame_size * scale)))
+
+        def screen_point(name: str) -> tuple[float, float]:
+            point = metadata[name]
+            return left + float(point[0]) * scale, top + float(point[1]) * scale
+
+        return {
+            "frame_index": frame_index,
+            "first_frame_index": first,
+            "following_frame_index": following,
+            "frame_blend": blend,
+            "target_size": target_size,
+            "rect_topleft": (left, top),
+            "root_lock_offset": (lock_offset_x * scale, lock_offset_y * scale),
+            "entry_root_offset_x": entry_root_offset_x,
+            "contact_root_offset_x": contact_root_offset_x,
+            "dynamic_contact_catchup_x": dynamic_contact_catchup_x,
+            "support": metadata.get("support"),
+            "support_weight": float(metadata.get("support_weight", 0.0)),
+            "support_foot_pos": screen_point("support_foot"),
+            "dribble_foot_pos": screen_point("dribble_foot"),
+            "pelvis_pos": screen_point("pelvis"),
+            "uniform_code": uniform_code,
+        }
+
     def draw_cinematic_runner(
         self,
         team: TeamProfile,
@@ -2825,39 +6447,153 @@ class App:
         run_speed: float = 1.0,
         settled: bool = False,
         alpha: int = 255,
+        runner_pose: dict[str, object] | None = None,
     ) -> None:
         x, ground_y = pos  # type: ignore[misc]
         frames = self.assets.cinematic_runners_left[team.code] if flip else self.assets.cinematic_runners[team.code]
+        kick_frames = self.assets.cinematic_kicks_left[team.code] if flip else self.assets.cinematic_kicks[team.code]
+        stop_frames = self.assets.cinematic_stops_left[team.code] if flip else self.assets.cinematic_stops[team.code]
         direction = -1 if flip else 1
-        kick_window, stride = self.cinematic_stride_state(shot_progress, stride_phase)
+        uniform_code = self.assets.cinematic_source_code(team)
+        if runner_pose is None:
+            runner_pose = self.cinematic_runner_pose(
+                (float(x), float(ground_y)),
+                direction,
+                shot_progress,
+                stride_phase,
+                run_speed,
+                uniform_code=uniform_code,
+            )
+
+        layers: list[tuple[pygame.Surface, tuple[int, int], pygame.Rect, float]] = []
+
+        def add_runner_layers(
+            weight: float,
+            *,
+            standing: bool = False,
+            stop_position: float | None = None,
+        ) -> None:
+            if weight <= 0.001:
+                return
+            target = runner_pose["target_size"]
+            left, top = runner_pose["rect_topleft"]
+            rect = pygame.Rect(int(round(float(left))), int(round(float(top))), *target)
+            if standing:
+                position = (
+                    float(len(stop_frames) - 1)
+                    if stop_position is None
+                    else clamp(stop_position, 0.0, float(len(stop_frames) - 1))
+                )
+                frame_index = int(round(position))
+                source = stop_frames[frame_index]
+                bbox = self.visible_bbox(source)
+                if bbox.w > 0 and bbox.h > 0:
+                    base_scale = float(target[0]) / max(1, source.get_width())
+                    visible_center_x = rect.left + bbox.centerx * base_scale
+                    visible_bottom = rect.top + bbox.bottom * base_scale
+                    pose_scale = (
+                        CINEMATIC_POSE_SIZE
+                        * CINEMATIC_PLAYER_SCALE
+                        / self.cinematic_runner_reference_height(
+                            uniform_code,
+                            direction,
+                        )
+                    )
+                    target = (
+                        max(1, round(source.get_width() * pose_scale)),
+                        max(1, round(source.get_height() * pose_scale)),
+                    )
+                    rect = pygame.Rect(
+                        int(round(visible_center_x - bbox.centerx * pose_scale)),
+                        int(round(visible_bottom - bbox.bottom * pose_scale)),
+                        *target,
+                    )
+                layers.append((source, target, rect, weight))
+                return
+            render_frame = int(runner_pose["render_frame_index"])
+            layers.append((frames[render_frame], target, rect, weight))
+
+        def add_kick_layer(
+            weight: float,
+            *,
+            pose_progress: float | None = None,
+        ) -> None:
+            if weight <= 0.001:
+                return
+            kick_pose = self.cinematic_kick_pose(
+                (float(x), float(ground_y)),
+                direction,
+                shot_progress if pose_progress is None else pose_progress,
+                runner_pose,
+            )
+            if kick_pose is None:
+                return
+            frame_index = int(kick_pose["frame_index"])
+            source = kick_frames[frame_index]
+            target = kick_pose["target_size"]
+            left, top = kick_pose["rect_topleft"]
+            rect = pygame.Rect(int(round(float(left))), int(round(float(top))), *target)
+            layers.append((source, target, rect, weight))
+
+        uses_run_shadow = False
         if settled:
-            pose_frames = self.assets.cinematic_players_left[team.code] if flip else self.assets.cinematic_players[team.code]
-            frame = pose_frames[0]
-            render_scale = CINEMATIC_PLAYER_SCALE
-            kick_window = False
-            stride = 0
-        elif kick_window:
-            pose_frames = self.assets.cinematic_players_left[team.code] if flip else self.assets.cinematic_players[team.code]
-            frame = pose_frames[3]
-            render_scale = CINEMATIC_PLAYER_SCALE
+            add_runner_layers(1.0, standing=True)
+        elif shot_progress < SHOT_RUN_TO_PLANT_AT:
+            add_runner_layers(1.0)
+            uses_run_shadow = True
+        elif shot_progress < SHOT_RECOVERY_AT:
+            add_kick_layer(1.0)
+        elif shot_progress < SHOT_STOP_BLEND_END:
+            recovery = clamp(
+                (shot_progress - SHOT_RECOVERY_AT)
+                / max(0.001, SHOT_STOP_BLEND_END - SHOT_RECOVERY_AT)
+            )
+            add_runner_layers(
+                1.0,
+                standing=True,
+                stop_position=smoothstep(recovery) * (len(stop_frames) - 1),
+            )
         else:
-            stride = min(len(frames) - 1, stride)
-            frame = frames[stride]
-            render_scale = CINEMATIC_PLAYER_SCALE
-        target = self.cinematic_actor_target_size(frame, render_scale)
-        bbox = self.visible_bbox(frame)
-        visible_w = bbox.w * target[0] / max(1, frame.get_width())
-        frame = self.cached_smoothscale(frame, target)
-        planted_x = self.cinematic_planted_x(x, stride, kick_window, direction, run_speed)
-        rect = self.cinematic_visible_midbottom_rect(frame, (planted_x, ground_y))
-        shadow_w = max(74, int(visible_w * 0.84))
-        shadow_h = int((13 + (1 if stride in (0, 2) else -1)) * CINEMATIC_PLAYER_SCALE)
+            add_runner_layers(1.0, standing=True)
+
+        visible_widths = []
+        for source, target, _rect, weight in layers:
+            if weight <= 0.001:
+                continue
+            bbox = self.visible_bbox(source)
+            visible_widths.append(bbox.w * target[0] / max(1, source.get_width()))
+        visible_w = max(visible_widths, default=96.0)
+        if uses_run_shadow:
+            support_weight = float(runner_pose["support_weight"])
+            flight = bool(runner_pose["flight"])
+            shadow_center_x = float(x)
+            shadow_w = max(70, int(visible_w * (0.72 + 0.14 * support_weight)))
+            shadow_h = max(
+                8,
+                int((10.0 + 4.0 * support_weight - (2.0 if flight else 0.0)) * CINEMATIC_PLAYER_SCALE),
+            )
+            shadow_alpha = int((112 + 54 * support_weight) * clamp(alpha / 255.0))
+        else:
+            shadow_center_x = float(x)
+            shadow_w = max(74, int(visible_w * 0.84))
+            shadow_h = int(14.0 * CINEMATIC_PLAYER_SCALE)
+            shadow_alpha = int(160 * clamp(alpha / 255.0))
         shadow = pygame.Rect(0, 0, shadow_w, shadow_h)
-        shadow.center = (int(planted_x), int(ground_y - 1))
-        self.draw_soft_shadow(shadow, int(160 * clamp(alpha / 255.0)))
-        if alpha < 255:
-            frame = self.cached_alpha(frame, alpha, step=8)
-        self.screen.blit(frame, rect)
+        shadow.center = (int(round(shadow_center_x)), int(round(float(ground_y) - 1)))
+        self.draw_soft_shadow(shadow, shadow_alpha)
+
+        for source, target, rect, weight in layers:
+            layer_alpha = max(0, min(255, int(round(alpha * weight))))
+            if layer_alpha <= 0:
+                continue
+            rendered = self.cached_smoothscale(source, target)
+            if layer_alpha < 255:
+                original_alpha = rendered.get_alpha()
+                rendered.set_alpha(layer_alpha)
+                self.screen.blit(rendered, rect)
+                rendered.set_alpha(original_alpha)
+            else:
+                self.screen.blit(rendered, rect)
 
     def neutral_frame_for_phase(
         self,
@@ -2867,12 +6603,13 @@ class App:
         flip: bool,
     ) -> pygame.Surface:
         runner_frames = self.assets.cinematic_runners_left[team.code] if flip else self.assets.cinematic_runners[team.code]
-        pose_frames = self.assets.cinematic_players_left[team.code] if flip else self.assets.cinematic_players[team.code]
+        stop_frames = self.assets.cinematic_stops_left[team.code] if flip else self.assets.cinematic_stops[team.code]
         if neutral_progress < 0.48:
-            return runner_frames[int(stride_phase) % len(runner_frames)]
-        if neutral_progress < 0.76:
-            return pose_frames[1]
-        return pose_frames[0]
+            frame_index = int((stride_phase % 4.0) / 4.0 * len(runner_frames)) % len(runner_frames)
+            return runner_frames[frame_index]
+        stop_progress = smoothstep((neutral_progress - 0.48) / 0.52)
+        frame_index = min(len(stop_frames) - 1, int(round(stop_progress * (len(stop_frames) - 1))))
+        return stop_frames[frame_index]
 
     def draw_cinematic_neutral_player(
         self,
@@ -2956,26 +6693,6 @@ class App:
         self.cinematic_overlay_cache[cache_key] = effect
         return effect
 
-    def draw_cinematic_player(
-        self,
-        team: TeamProfile,
-        pos: object,
-        pose_index: int,
-        flip: bool,
-        scale: float,
-    ) -> None:
-        x, y = pos  # type: ignore[misc]
-        frames = self.assets.cinematic_players_left[team.code] if flip else self.assets.cinematic_players[team.code]
-        frame = frames[pose_index % len(frames)]
-        target = (int(frame.get_width() * scale), int(frame.get_height() * scale))
-        frame = self.cached_smoothscale(frame, target)
-        if pose_index == 1:
-            frame = self.cached_rotozoom(frame, math.sin(self.t * 8.5) * 1.8, 1.0 + math.sin(self.t * 17.0) * 0.012)
-        shadow = pygame.Rect(0, 0, int(116 * scale), int(18 * scale))
-        shadow.center = (int(x), int(y + 82 * scale))
-        self.draw_soft_shadow(shadow, 142)
-        self.screen.blit(frame, frame.get_rect(center=(x, y)))
-
     def cinematic_keeper_animation_state(
         self,
         active_goal: bool,
@@ -2984,46 +6701,90 @@ class App:
         flip: bool,
         keeper_action: str = "",
     ) -> tuple[int, float, int]:
-        index = 0
-        if keeper_action == "dive_save":
-            if shot_progress > SHOT_KEEPER_DIVE_AT and frame_count > 2:
-                index = 2
-            elif shot_progress > SHOT_KEEPER_READ_AT and frame_count > 1:
-                index = 1
-        elif keeper_action == "stand_save":
-            if shot_progress > SHOT_KEEPER_READ_AT and frame_count > 1:
-                index = 1
-        elif active_goal and shot_progress > SHOT_NET_VISUAL_CONTACT_AT + 0.035 and frame_count > 3:
-            index = 3
-        elif active_goal and shot_progress > SHOT_KEEPER_DIVE_AT and frame_count > 2:
-            index = 2
-        elif active_goal and shot_progress > SHOT_KEEPER_READ_AT and frame_count > 1:
-            index = 1
+        first, following, blend = self.cinematic_keeper_frame_blend(
+            active_goal,
+            shot_progress,
+            frame_count,
+            keeper_action,
+        )
+        index = first if blend < 0.5 else following
+        # The authored GPT Image sequence already carries the complete body arc.
+        # Extra rotation or pulsing scale bends the goalkeeper and the shirt mark.
+        return index, CINEMATIC_KEEPER_SCALE, 0
 
-        scale = CINEMATIC_KEEPER_SCALE
-        angle = 0.0
-        if keeper_action == "stand_save" and shot_progress > SHOT_KEEPER_READ_AT:
-            read = smoothstep((shot_progress - SHOT_KEEPER_READ_AT) / max(0.001, SHOT_KEEPER_DIVE_AT - SHOT_KEEPER_READ_AT))
-            catch = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.20)
-            if shot_progress < SHOT_NET_VISUAL_CONTACT_AT - 0.04 and frame_count > 1:
-                index = 1
-            else:
-                index = 0
-            scale += 0.010 * read + 0.006 * math.sin(catch * math.pi)
-            angle = (-1 if flip else 1) * 0.8 * read * (1.0 - catch)
-        elif keeper_action == "dive_save" and shot_progress > SHOT_KEEPER_READ_AT:
-            read = smoothstep((shot_progress - SHOT_KEEPER_READ_AT) / max(0.001, SHOT_KEEPER_DIVE_AT - SHOT_KEEPER_READ_AT))
-            dive = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.28)
-            leap = math.sin(dive * math.pi)
-            scale += 0.010 * read + 0.018 * leap
-            angle = ((-1 if flip else 1) * 1.4 * read) + ((-3 if flip else 3) * leap)
-        elif active_goal and shot_progress > SHOT_KEEPER_READ_AT:
-            read = smoothstep((shot_progress - SHOT_KEEPER_READ_AT) / max(0.001, SHOT_KEEPER_DIVE_AT - SHOT_KEEPER_READ_AT))
-            dive = smoothstep((shot_progress - SHOT_KEEPER_DIVE_AT) / 0.28)
-            leap = math.sin(dive * math.pi)
-            scale += 0.010 * read + 0.030 * leap
-            angle = ((-2 if flip else 2) * read) + ((-6 if flip else 6) * leap)
-        return index, round(scale / 0.01) * 0.01, round(angle)
+    def cinematic_keeper_frame_blend(
+        self,
+        active_goal: bool,
+        shot_progress: float,
+        frame_count: int,
+        keeper_action: str = "",
+    ) -> tuple[int, int, float]:
+        if frame_count <= 1 or (not active_goal and not keeper_action):
+            return 0, 0, 0.0
+
+        def authored_pair(position: float) -> tuple[int, int, float]:
+            position = clamp(position, 0.0, float(frame_count - 1))
+            first = int(math.floor(position))
+            following = min(frame_count - 1, first + 1)
+            return first, following, position - first
+
+        last = float(frame_count - 1)
+        keeper_motion_frames = self.assets.cinematic_keeper_motion[
+            "runtime_frame_order"
+        ]
+        keeper_motion_last = max(1.0, float(self.assets.cinematic_keeper_motion["frame_count"]) - 1.0)
+
+        def authored_frame(source_index: int) -> float:
+            runtime_frame = float(keeper_motion_frames[source_index])  # type: ignore[index]
+            return min(last, runtime_frame / keeper_motion_last * last)
+
+        read_frame = authored_frame(3)
+        extended_frame = authored_frame(8)
+        landed_frame = authored_frame(12)
+        absorb_frame = authored_frame(13)
+        rising_frame = authored_frame(14)
+        read = smoothstep(
+            (shot_progress - SHOT_KEEPER_READ_AT)
+            / max(0.001, SHOT_KEEPER_DIVE_AT - SHOT_KEEPER_READ_AT)
+        )
+        if keeper_action == "stand_save":
+            stand_frame = authored_frame(2)
+            if shot_progress <= SHOT_KEEPER_DIVE_AT:
+                return authored_pair(stand_frame * read)
+            hold_end = CHANCE_CONTACT_VISUAL_AT + 0.055
+            if shot_progress <= hold_end:
+                return authored_pair(stand_frame)
+            settle = smoothstep((shot_progress - hold_end) / 0.09)
+            return authored_pair(stand_frame * (1.0 - settle))
+        if shot_progress <= SHOT_KEEPER_DIVE_AT:
+            return authored_pair(read_frame * read)
+
+        contact_at = (
+            CHANCE_CONTACT_VISUAL_AT
+            if keeper_action
+            else SHOT_NET_VISUAL_CONTACT_AT
+        )
+        recovery_at = contact_at + (0.055 if keeper_action else 0.020)
+        fully_extended_at = contact_at - (0.035 if keeper_action else 0.060)
+        if shot_progress <= recovery_at:
+            extension = smoothstep(
+                (shot_progress - SHOT_KEEPER_DIVE_AT)
+                / max(0.001, fully_extended_at - SHOT_KEEPER_DIVE_AT)
+            )
+            return authored_pair(lerp(read_frame, extended_frame, extension))
+        landing_end = recovery_at + 0.10
+        if shot_progress <= landing_end:
+            landing = clamp((shot_progress - recovery_at) / max(0.001, landing_end - recovery_at))
+            return authored_pair(lerp(extended_frame, landed_frame, landing))
+        if active_goal and not keeper_action:
+            return authored_pair(absorb_frame)
+        rise_end = landing_end + 0.18
+        if shot_progress <= rise_end:
+            rise = clamp((shot_progress - landing_end) / max(0.001, rise_end - landing_end))
+            return authored_pair(lerp(landed_frame, rising_frame, rise))
+        set_end = rise_end + 0.16
+        reset = smoothstep((shot_progress - rise_end) / max(0.001, set_end - rise_end))
+        return authored_pair(lerp(rising_frame, last, reset))
 
     def draw_cinematic_keeper(
         self,
@@ -3034,83 +6795,189 @@ class App:
         shot_progress: float,
         alpha: int = 255,
         keeper_action: str = "",
+        contrast_kit: bool = False,
+        ground_y: float | None = None,
     ) -> None:
         x, y = pos  # type: ignore[misc]
-        frames = self.assets.cinematic_keeper_frames[team.code]
-        index, scale, angle = self.cinematic_keeper_animation_state(active_goal, shot_progress, len(frames), flip, keeper_action)
-        frame = frames[index]
-        if flip:
-            frame = self.cached_flip(frame)
-        frame = self.cached_rotozoom(frame, angle, scale)
+        frames = (
+            self.assets.cinematic_keeper_frames_left[team.code]
+            if flip
+            else self.assets.cinematic_keeper_frames[team.code]
+        )
+        _index, scale, angle = self.cinematic_keeper_animation_state(active_goal, shot_progress, len(frames), flip, keeper_action)
+        first, following, blend = self.cinematic_keeper_frame_blend(
+            active_goal,
+            shot_progress,
+            len(frames),
+            keeper_action,
+        )
         reveal = clamp(alpha / 255.0)
         keeper_shadow = pygame.Rect(0, 0, 130, 18)
-        keeper_shadow.center = (int(x), int(y + 84))
+        keeper_shadow.center = (
+            int(x),
+            int(round(float(ground_y) - 1.0)) if ground_y is not None else int(y + 84),
+        )
         self.draw_soft_shadow(keeper_shadow, int(150 * reveal))
-        bbox = self.visible_bbox(frame)
-        if bbox.w > 0 and bbox.h > 0:
-            frame_rect = pygame.Rect(
-                int(round(x - bbox.centerx)),
-                int(round(y - bbox.centery)),
+
+        frame = self.cinematic_keeper_material(
+            team,
+            flip,
+            first,
+            following,
+            blend,
+            scale,
+            angle,
+            contrast_kit,
+        )
+        frame_rect = self.cinematic_keeper_rect(
+            frame,
+            (x, y),
+            shot_progress,
+            active_goal,
+            keeper_action,
+            ground_y=ground_y,
+        )
+        if alpha < 255:
+            original_alpha = frame.get_alpha()
+            frame.set_alpha(alpha)
+            self.screen.blit(frame, frame_rect)
+            frame.set_alpha(original_alpha)
+        else:
+            self.screen.blit(frame, frame_rect)
+
+    def cinematic_keeper_rect(
+        self,
+        frame: pygame.Surface,
+        pos: tuple[float, float],
+        shot_progress: float,
+        active_goal: bool,
+        keeper_action: str = "",
+        ground_y: float | None = None,
+    ) -> pygame.Rect:
+        x, y = pos
+        mask = pygame.mask.from_surface(frame, 48)
+        centroid = mask.centroid()
+        if centroid == (0, 0) and mask.count() == 0:
+            centered = frame.get_rect(center=(round(x), round(y)))
+        else:
+            centered = pygame.Rect(
+                int(round(x - centroid[0])),
+                int(round(y - centroid[1])),
                 frame.get_width(),
                 frame.get_height(),
             )
+        if keeper_action == "stand_save":
+            grounding = 1.0
         else:
-            frame_rect = frame.get_rect(center=(x, y))
-        if alpha < 255:
-            frame = self.cached_alpha(frame, alpha, step=8)
-        self.screen.blit(frame, frame_rect)
+            recovery_at = (
+                CHANCE_CONTACT_VISUAL_AT + 0.055
+                if keeper_action
+                else SHOT_NET_VISUAL_CONTACT_AT + 0.020
+            )
+            if (
+                not active_goal
+                and keeper_action != "dive_save"
+                and shot_progress < recovery_at
+            ):
+                return centered
 
-    def draw_cinematic_chance_payoff(self, state: dict[str, object], direction: int) -> None:
-        shot_progress = float(state.get("shot_progress", 0.0))
-        chance_impact_start = CHANCE_CONTACT_VISUAL_AT
-        strength = smoothstep((shot_progress - chance_impact_start) / 0.10) * (1.0 - smoothstep((shot_progress - 1.04) / 0.18))
-        if strength <= 0.02:
-            return
-        ball_x, ball_y = state["ball_pos"]  # type: ignore[misc]
-        kind = str(state.get("attack_kind", "save"))
-        effect = self.cached_chance_payoff_effect(kind, direction, strength, self.t)
-        self.screen.blit(effect, effect.get_rect(center=(int(ball_x), int(ball_y))))
+            landing_end = recovery_at + 0.10
+            grounding = smoothstep(
+                (shot_progress - recovery_at)
+                / max(0.001, landing_end - recovery_at)
+            )
+        if grounding <= 0.0:
+            return centered
+        visible = self.visible_bbox(frame)
+        visible_ground_y = (
+            float(ground_y)
+            if ground_y is not None
+            else float(self.match_field_rect().bottom - 54)
+        )
+        grounded = pygame.Rect(
+            int(round(x - visible.centerx)),
+            int(round(visible_ground_y - visible.bottom)),
+            frame.get_width(),
+            frame.get_height(),
+        )
+        field = self.match_field_rect()
+        visible_field_left = field.left + 8
+        visible_field_right = field.right - 8
+        visible_left = grounded.x + visible.left
+        visible_right = grounded.x + visible.right
+        if visible_left < visible_field_left:
+            grounded.x += visible_field_left - visible_left
+        elif visible_right > visible_field_right:
+            grounded.x -= visible_right - visible_field_right
+        return pygame.Rect(
+            round(lerp(float(centered.x), float(grounded.x), grounding)),
+            round(lerp(float(centered.y), float(grounded.y), grounding)),
+            frame.get_width(),
+            frame.get_height(),
+        )
 
-    def cached_chance_payoff_effect(self, kind: str, direction: int, strength: float, time_value: float) -> pygame.Surface:
-        strength_key = int(round(clamp(strength) * 24))
-        cache_key = ("chance_payoff", kind, direction, strength_key)
+    def cinematic_keeper_material(
+        self,
+        team: TeamProfile,
+        flip: bool,
+        first: int,
+        following: int,
+        blend: float,
+        scale: float,
+        angle: float,
+        contrast_kit: bool = False,
+    ) -> pygame.Surface:
+        frames = (
+            self.assets.cinematic_keeper_frames_left[team.code]
+            if flip
+            else self.assets.cinematic_keeper_frames[team.code]
+        )
+        resolved_index = first if blend < 0.5 else following
+        transition_key = (
+            "keeper_authored",
+            team.code,
+            resolved_index,
+            contrast_kit,
+            flip,
+            scale,
+            angle,
+        )
+        frame = self.cinematic_overlay_cache.get(transition_key)
+        if frame is None:
+            source = frames[resolved_index]
+            if contrast_kit:
+                source = self.cinematic_contrast_keeper_frame(source)
+            frame = self.cached_rotozoom(source, angle, scale)
+            self.cinematic_overlay_cache[transition_key] = frame
+        return frame
+
+    def cinematic_contrast_keeper_frame(self, frame: pygame.Surface) -> pygame.Surface:
+        cache_key = ("keeper_contrast_kit", id(frame))
         cached = self.cinematic_overlay_cache.get(cache_key)
         if cached is not None:
             return cached
-        effect = pygame.Surface((104, 76), pygame.SRCALPHA)
-        local = (52, 38)
-        strength = strength_key / 24.0
-        if kind == "wide":
-            for index in range(5):
-                offset = 8 + index * 7
-                py = local[1] + 16 + (index % 2) * 3
-                pygame.draw.line(
-                    effect,
-                    (196, 225, 184, int((44 - index * 5) * strength)),
-                    (local[0] - direction * offset, py),
-                    (local[0] - direction * (offset + 8), py + 3),
-                    1,
-                )
-        else:
-            contact_alpha = int(72 * strength)
-            radius = int(12 + 5 * strength)
-            pygame.draw.ellipse(
-                effect,
-                (244, 247, 240, contact_alpha),
-                pygame.Rect(local[0] - radius, local[1] - int(radius * 0.62), radius * 2, int(radius * 1.24)),
-                1,
-            )
-            for index in range(3):
-                offset = 7 + index * 5
-                pygame.draw.line(
-                    effect,
-                    (238, 244, 235, int((48 - index * 9) * strength)),
-                    (local[0] - direction * offset, local[1] - 8 + index * 7),
-                    (local[0] - direction * (offset + 9), local[1] - 9 + index * 7),
-                    1,
-                )
-        self.cinematic_overlay_cache[cache_key] = effect
-        return effect
+        result = frame.copy().convert_alpha()
+        rgb_view = pygame.surfarray.pixels3d(result)
+        rgb = rgb_view.astype(np.float32)
+        alpha = pygame.surfarray.array_alpha(result)
+        red = rgb[:, :, 0]
+        green = rgb[:, :, 1]
+        blue = rgb[:, :, 2]
+        uniform = (
+            (alpha > 40)
+            & (green > red * 1.16)
+            & (green > blue * 1.10)
+            & (green - np.minimum(red, blue) > 22)
+        )
+        value = np.maximum.reduce((red, green, blue))
+        shade = np.clip(value / 170.0, 0.34, 1.24)
+        target = np.asarray((214.0, 62.0, 174.0), dtype=np.float32)
+        recolored = target[None, None, :] * shade[:, :, None]
+        rgb[uniform] = np.clip(recolored[uniform], 0, 255)
+        rgb_view[:, :, :] = rgb.astype(np.uint8)
+        del rgb_view
+        self.cinematic_overlay_cache[cache_key] = result
+        return result
 
     def draw_cinematic_ball(
         self,
@@ -3158,11 +7025,16 @@ class App:
         speed = math.hypot(velocity_x, velocity_y)
         blur_strength = smoothstep((speed - 160.0) / 220.0) if phase == "chute" else 0.0
         if blur_strength > 0.02:
-            frame_dx = velocity_x / FPS
-            frame_dy = velocity_y / FPS
+            render_dt = clamp(
+                float(self.cinematic_render_dt),
+                1.0 / FPS,
+                MAX_FRAME_DT,
+            )
+            frame_dx = velocity_x * render_dt
+            frame_dy = velocity_y * render_dt
             displacement = math.hypot(frame_dx, frame_dy)
-            if displacement > 22.0:
-                factor = 22.0 / displacement
+            if displacement > 42.0:
+                factor = 42.0 / displacement
                 frame_dx *= factor
                 frame_dy *= factor
             for amount, ghost_alpha in ((0.82, 10), (0.54, 18), (0.28, 28)):
@@ -3183,23 +7055,9 @@ class App:
 
     def cached_cinematic_ball_material(self, size: int, rotation_degrees: float) -> pygame.Surface:
         frame_count = len(self.assets.balls)
-        phase_steps = frame_count * 2
-        phase_key = int(round((rotation_degrees % 360.0) / 360.0 * phase_steps)) % phase_steps
-        frame_float = phase_key / 2.0
-        frame_index = int(math.floor(frame_float)) % frame_count
-        next_index = (frame_index + 1) % frame_count
-        blend = frame_float - math.floor(frame_float)
-        base = self.cached_smoothscale(self.assets.balls[frame_index], (size, size))
-        if blend <= 0.01:
-            return base
-        cache_key = ("ball_material", size, phase_key)
-        material = self.cinematic_overlay_cache.get(cache_key)
-        if material is None:
-            material = base.copy()
-            following = self.cached_smoothscale(self.assets.balls[next_index], (size, size))
-            material.blit(self.cached_alpha(following, int(round(255 * blend))), (0, 0))
-            self.cinematic_overlay_cache[cache_key] = material
-        return material
+        frame_float = (rotation_degrees % 360.0) / 360.0 * frame_count
+        frame_index = int(frame_float) % frame_count
+        return self.cached_smoothscale(self.assets.balls[frame_index], (size, size))
 
     def draw_cinematic_goal_overlay(self, field: pygame.Rect, pred: Prediction) -> None:
         event = self.active_goal_event(pred)
@@ -3226,7 +7084,7 @@ class App:
         self.screen.blit(panel, panel.get_rect(center=center))
 
     def cinematic_goal_overlay_center(self, field: pygame.Rect) -> tuple[int, int]:
-        return field.centerx, field.y + 146
+        return field.centerx, field.y + 128
 
     def draw_model_flow(self, field: pygame.Rect, pred: Prediction, algo: str) -> None:
         cache_key = ("model_flow_overlay", field.w, field.h)
@@ -3506,6 +7364,18 @@ class App:
     def emit_match_audio_events(self, result_pred: Prediction, previous_minute: float | None = None) -> None:
         minute = self.match_minute_float()
         for goal_minute, side in self.goal_schedule(result_pred):
+            audio_thresholds = self.cinematic_poc_audio_thresholds(
+                CinematicAttackEvent(
+                    goal_minute,
+                    side,
+                    True,
+                    "goal",
+                )
+            )
+            kick_audio_at = audio_thresholds["kick"]
+            whoosh_audio_at = audio_thresholds["whoosh"]
+            impact_audio_at = audio_thresholds["net"]
+            reverb_audio_at = audio_thresholds["reverb"]
             goal_audio_key = (result_pred.algorithm, goal_minute, side)
             previous_progress = self.shot_progress_cursor.get(goal_audio_key, 0.0)
             in_window = goal_minute - GOAL_EVENT_WINDOW_MINUTES <= minute <= goal_minute + GOAL_PAYOFF_MINUTES
@@ -3514,35 +7384,57 @@ class App:
                 and previous_minute <= goal_minute + GOAL_PAYOFF_MINUTES
                 and minute >= goal_minute - GOAL_EVENT_WINDOW_MINUTES
             )
-            catching_up = 0.0 < previous_progress < SHOT_REVERB_AT and not in_window
+            catching_up = (
+                0.0 < previous_progress < reverb_audio_at
+                and not in_window
+            )
             if not (in_window or crossed_window or catching_up):
                 continue
-            shot_progress = clamp((minute - (goal_minute - GOAL_EVENT_WINDOW_MINUTES)) / GOAL_EVENT_WINDOW_MINUTES)
+            shot_progress = max(
+                0.0,
+                (
+                    minute
+                    - (goal_minute - GOAL_EVENT_WINDOW_MINUTES)
+                )
+                / GOAL_EVENT_WINDOW_MINUTES,
+            )
             if (crossed_window and minute > goal_minute + GOAL_PAYOFF_MINUTES) or catching_up:
-                shot_progress = 1.0
+                shot_progress = max(
+                    shot_progress,
+                    reverb_audio_at,
+                )
             crossed = [
                 (name, threshold)
                 for name, threshold in (
-                    ("kick", SHOT_KICK_AUDIO_AT),
-                    ("whoosh", SHOT_WHOOSH_AUDIO_AT),
-                    ("net", SHOT_NET_AUDIO_AT),
-                    ("bass", SHOT_BASS_AUDIO_AT),
-                    ("cheer", SHOT_CHEER_AUDIO_AT),
-                    ("reverb", SHOT_REVERB_AT),
+                    ("kick", kick_audio_at),
+                    ("whoosh", whoosh_audio_at),
+                    ("net", impact_audio_at),
+                    ("bass", audio_thresholds["bass"]),
+                    ("cheer", audio_thresholds["cheer"]),
+                    ("reverb", reverb_audio_at),
                 )
                 if previous_progress < threshold <= shot_progress + 1e-9
             ]
             if len(crossed) > 1 or shot_progress - previous_progress > 0.18:
                 crossed_names = {name for name, _threshold in crossed}
-                if shot_progress + 1e-9 >= SHOT_NET_AUDIO_AT and crossed_names & GOAL_IMPACT_AUDIO_EVENTS:
+                synchronized_impact_events = set(GOAL_IMPACT_AUDIO_EVENTS)
+                if shot_progress + 1e-9 >= reverb_audio_at:
+                    synchronized_impact_events.add("reverb")
+                if (
+                    shot_progress + 1e-9 >= impact_audio_at
+                    and crossed_names & GOAL_IMPACT_AUDIO_EVENTS
+                ):
                     crossed = [
                         (name, threshold)
                         for name, threshold in crossed
-                        if name in GOAL_IMPACT_AUDIO_EVENTS
+                        if name in synchronized_impact_events
                     ]
                 else:
                     crossed = crossed[:1]
-            if previous_progress < SHOT_KICK_AT and shot_progress >= SHOT_KICK_AT - 0.09:
+            if (
+                previous_progress < kick_audio_at
+                and shot_progress >= kick_audio_at - 0.09
+            ):
                 self.sound.duck_commentary(0.55)
             goal_pan = 0.34 if side == "home" else -0.34
             emitted_threshold = previous_progress
@@ -3557,29 +7449,65 @@ class App:
             else:
                 self.shot_progress_cursor[goal_audio_key] = max(previous_progress, shot_progress)
             goal_key = (result_pred.algorithm, goal_minute, side)
-            if shot_progress >= SHOT_REVERB_AT:
+            if shot_progress >= reverb_audio_at:
                 self.goal_events.add(goal_key)
         for chance_minute, side, kind in self.chance_schedule(result_pred):
+            chance_event = CinematicAttackEvent(
+                chance_minute,
+                side,
+                False,
+                kind,
+            )
+            audio_thresholds = self.cinematic_poc_audio_thresholds(
+                chance_event
+            )
+            kick_audio_at = audio_thresholds["kick"]
+            whoosh_audio_at = audio_thresholds["whoosh"]
+            contact_name = (
+                "save"
+                if kind == "save"
+                else "near_miss"
+            )
+            contact_audio_at = audio_thresholds[contact_name]
             chance_audio_key = (result_pred.algorithm, chance_minute, f"{side}:{kind}")
             previous_progress = self.shot_progress_cursor.get(chance_audio_key, 0.0)
             in_window = chance_minute - CHANCE_EVENT_WINDOW_MINUTES <= minute <= chance_minute + CHANCE_PAYOFF_MINUTES
-            catching_up = 0.0 < previous_progress < CHANCE_CONTACT_AUDIO_AT and not in_window
+            catching_up = (
+                0.0 < previous_progress < contact_audio_at
+                and not in_window
+            )
             if not in_window and not catching_up:
                 continue
-            shot_progress = clamp((minute - (chance_minute - CHANCE_EVENT_WINDOW_MINUTES)) / CHANCE_EVENT_WINDOW_MINUTES)
+            shot_progress = max(
+                0.0,
+                (
+                    minute
+                    - (chance_minute - CHANCE_EVENT_WINDOW_MINUTES)
+                )
+                / CHANCE_EVENT_WINDOW_MINUTES,
+            )
             if catching_up:
-                shot_progress = max(shot_progress, CHANCE_CONTACT_AUDIO_AT)
+                shot_progress = max(
+                    shot_progress,
+                    contact_audio_at,
+                )
             crossed = [
                 (name, threshold)
                 for name, threshold in (
-                    ("kick", SHOT_KICK_AUDIO_AT),
-                    ("whoosh", SHOT_WHOOSH_AUDIO_AT),
-                    ("save" if kind == "save" else "near_miss", CHANCE_CONTACT_AUDIO_AT),
+                    ("kick", kick_audio_at),
+                    ("whoosh", whoosh_audio_at),
+                    (contact_name, contact_audio_at),
                 )
                 if previous_progress < threshold <= shot_progress + 1e-9
             ]
             if len(crossed) > 1 or shot_progress - previous_progress > 0.18:
-                if shot_progress + 1e-9 >= CHANCE_CONTACT_AUDIO_AT and any(name in {"save", "near_miss"} for name, _threshold in crossed):
+                if (
+                    shot_progress + 1e-9 >= contact_audio_at
+                    and any(
+                        name in {"save", "near_miss"}
+                        for name, _threshold in crossed
+                    )
+                ):
                     crossed = [
                         (name, threshold)
                         for name, threshold in crossed
@@ -3587,7 +7515,7 @@ class App:
                     ]
                 else:
                     crossed = crossed[:1]
-            if shot_progress >= SHOT_KICK_AT - 0.09:
+            if shot_progress >= kick_audio_at - 0.09:
                 self.sound.duck_commentary(0.40)
             chance_pan = 0.26 if side == "home" else -0.26
             emitted_threshold = previous_progress
@@ -3603,9 +7531,41 @@ class App:
                 self.shot_progress_cursor[chance_audio_key] = max(previous_progress, shot_progress)
 
     def shot_cursor_completion_threshold(self, key: tuple[object, ...]) -> float:
-        if len(key) >= 3 and str(key[2]) in {"home", "away"}:
-            return SHOT_REVERB_AT
-        return CHANCE_CONTACT_AUDIO_AT
+        if len(key) < 3:
+            return 1.0
+        event_minute = int(key[1])
+        event_kind = str(key[2])
+        if event_kind in {"home", "away"}:
+            thresholds = self.cinematic_poc_audio_thresholds(
+                CinematicAttackEvent(
+                    event_minute,
+                    event_kind,
+                    True,
+                    "goal",
+                )
+            )
+            return thresholds["reverb"]
+        if ":" in event_kind:
+            side, outcome = event_kind.split(":", 1)
+            if (
+                side in {"home", "away"}
+                and outcome in {"save", "wide"}
+            ):
+                thresholds = self.cinematic_poc_audio_thresholds(
+                    CinematicAttackEvent(
+                        event_minute,
+                        side,
+                        False,
+                        outcome,
+                    )
+                )
+                terminal = (
+                    "save"
+                    if outcome == "save"
+                    else "near_miss"
+                )
+                return thresholds[terminal]
+        return 1.0
 
     def queue_match_audio_event(self, name: str, pan: float) -> None:
         self.arm_queued_match_audio_event(name)
@@ -3620,7 +7580,7 @@ class App:
         queued = self.match_audio_frame_queue
         self.match_audio_frame_queue = []
         for name, pan in queued:
-            self.sound.play(name, pan=pan)
+            self.sound.play(name, pan=pan, already_armed=True)
 
     def has_pending_match_audio(self) -> bool:
         if self.match_audio_frame_queue:
@@ -3688,6 +7648,11 @@ class App:
 
     def update(self, dt: float) -> None:
         dt = clamp(dt, 0.0, MAX_FRAME_DT)
+        self.drain_cinematic_poc_preload()
+        cinematic_preload_waiting = (
+            self.state == "simulate"
+            and not self.poc_preload_ready
+        )
         self.drain_monte_carlo_queue()
         if self.pending_tournament_seed is not None:
             if self.mc_thread is not None and self.mc_thread.is_alive():
@@ -3698,16 +7663,24 @@ class App:
                 self.start_champion_odds_job(seed=seed)
         previous_minute = self.match_minute_float() if self.state == "simulate" else None
         if self.state == "simulate":
-            if self.match_intro_audio_pending:
+            if (
+                self.match_intro_audio_pending
+                and not cinematic_preload_waiting
+            ):
                 self.sound.play("ui_chime")
                 self.sound.play("whistle")
                 self.match_intro_audio_pending = False
-            self.t += dt
-            self.t = min(self.t, SIMULATION_SECONDS)
-            self.update_cinematic_scroll(dt)
-            segment = int(self.t // self.segment_duration())
-            if segment != self.segment_started:
-                self.segment_started = segment
+            if not cinematic_preload_waiting:
+                self.cinematic_render_dt = max(1.0 / FPS, dt)
+                remaining = dt
+                while remaining > 1e-9 and self.t < SIMULATION_SECONDS:
+                    step = min(1.0 / FPS, remaining)
+                    self.t = min(self.t + step, SIMULATION_SECONDS)
+                    self.update_cinematic_scroll(step)
+                    remaining -= step
+                segment = int(self.t // self.segment_duration())
+                if segment != self.segment_started:
+                    self.segment_started = segment
         elif self.state == "tournament":
             self.t += dt
             self.apply_pending_monte_carlo_result_if_ready()
@@ -3723,10 +7696,25 @@ class App:
         if pred is None or self.simulation_progress() >= 1.0:
             self.ground_scroll_velocity += (0.0 - self.ground_scroll_velocity) * clamp(dt * 5.0)
             return
+        active_attack = self.active_attack_event(pred)
         motion = self.cinematic_motion_state(pred)
         target_velocity = float(motion.get("desired_scroll_velocity", 0.0))
         self.ground_scroll_velocity += (target_velocity - self.ground_scroll_velocity) * clamp(dt * 3.8)
         self.ground_scroll += self.ground_scroll_velocity * dt
+        self.ground_travel_distance += (
+            abs(self.ground_scroll_velocity) * CINEMATIC_TURF_FOREGROUND_PARALLAX * dt
+        )
+        if active_attack:
+            event_key = (
+                active_attack.minute,
+                active_attack.side,
+                active_attack.is_goal,
+                active_attack.kind,
+            )
+            self.cinematic_attack_phase_anchors.setdefault(
+                event_key,
+                (self.ground_travel_distance / CINEMATIC_RUNNER_STRIDE_DISTANCE * 4.0) % 4.0,
+            )
 
     def update_soundscape(self, dt: float, previous_minute: float | None = None) -> None:
         self.sound.set_scene(self.state)
@@ -4259,15 +8247,20 @@ class App:
 
     def set_select(self) -> None:
         self.cancel_champion_odds_job()
+        self.cancel_cinematic_poc_preload()
         self.sound.stop_one_shots()
         self.sound.reset_scene_queues()
         self.match_audio_frame_queue.clear()
         self.match_prediction = None
         self.match_analysis = None
         self.match_runtime_state_cache.clear()
+        self.cinematic_shot_plan_cache.clear()
+        self.poc_layer_frame_cache.clear()
+        self.poc_layer_cache.clear()
         self.state = "select"
 
     def set_simulate(self, mode: str) -> None:
+        self.cancel_cinematic_poc_preload()
         self.sound.stop_one_shots()
         self.sound.reset_scene_queues()
         self.match_audio_frame_queue.clear()
@@ -4276,11 +8269,22 @@ class App:
         self.t = 0.0
         self.ground_scroll = 0.0
         self.ground_scroll_velocity = 0.0
+        self.ground_travel_distance = 0.0
+        self.cinematic_attack_phase_anchors.clear()
         self.segment_started = 0
         self.match_seed = self.rng.randint(1, 999999)
         self.match_runtime_state_cache.clear()
+        self.cinematic_shot_plan_cache.clear()
+        self.poc_layer_frame_cache.clear()
+        self.poc_layer_cache.clear()
         self.match_analysis = self.model.analyze_match(self.home, self.away, seed=self.match_seed)
         self.match_prediction = self.match_analysis.prediction
+        runtime = self.match_runtime_state(
+            self.match_prediction
+        )
+        self.start_cinematic_poc_preload(
+            self.cinematic_poc_sequences_for_match(runtime)
+        )
         self.goal_events.clear()
         self.shot_events.clear()
         self.shot_progress_cursor.clear()
@@ -4290,9 +8294,12 @@ class App:
     def set_tournament(self) -> None:
         self.mc_cancel_event.set()
         self.mc_generation += 1
+        self.cancel_cinematic_poc_preload()
         self.sound.stop_one_shots()
         self.sound.reset_scene_queues()
         self.match_audio_frame_queue.clear()
+        self.poc_layer_frame_cache.clear()
+        self.poc_layer_cache.clear()
         self.state = "tournament"
         self.t = 0.0
         seed = self.tournament_rng.randint(1, 999999)
@@ -4409,8 +8416,12 @@ class App:
             self.update(dt)
             self.draw()
             self.flush_queued_match_audio()
+        preload_stopped = self.shutdown_cinematic_poc_preloads(
+            timeout=5.0,
+        )
         self.cancel_champion_odds_job()
-        pygame.quit()
+        if preload_stopped:
+            pygame.quit()
 
 
 def main() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import csv
 import argparse
 import hashlib
@@ -25,20 +26,15 @@ sys.path.insert(0, str(SRC))
 
 from arena_ai.main import (
     App,
-    CHANCE_CONTACT_AUDIO_AT,
-    CHANCE_CONTACT_VISUAL_AT,
+    CinematicAttackEvent,
     CHANCE_EVENT_WINDOW_MINUTES,
     GOAL_EVENT_WINDOW_MINUTES,
     SHOT_BASS_AUDIO_AT,
     SHOT_CHEER_AUDIO_AT,
     SHOT_KICK_AUDIO_AT,
-    SHOT_KICK_AT,
     SHOT_NET_AUDIO_AT,
-    SHOT_NET_AT,
-    SHOT_NET_VISUAL_CONTACT_AT,
     SHOT_REVERB_AT,
     SHOT_WHOOSH_AUDIO_AT,
-    SHOT_WHOOSH_AT,
     SIMULATION_SECONDS,
     TOURNAMENT_MIN_LOADING_SECONDS,
     GOAL_IMPACT_AUDIO_EVENTS,
@@ -46,6 +42,7 @@ from arena_ai.main import (
 from arena_ai.audio import (
     AUDIO_CUE_POLICIES,
     AUDIO_SOUND_VOLUMES,
+    AudioBus,
     GOAL_ATTACK_SWELL_FILENAME,
     GOAL_CC0_TAIL_FILENAME,
     MATCH_CUE_MIX,
@@ -63,11 +60,15 @@ from arena_ai.audio_manifest import (
     AUDIO_TRANSIENT_START_LIMITS,
     CUP_PROGRESS_MARKERS,
     GOAL_AUDIO_SEQUENCE,
+    GOAL_ONLY_SOUND_FILES,
     KICK_SOUND_BAG,
     NEAR_MISS_REACTION_SOUND_BAG,
     NET_SOUND_BAG,
+    NON_GOAL_EVENT_AUDIO_ROUTES,
     REQUIRED_AUDIO_BUSES,
+    SAVE_IMPACT_SOUND_BAG,
     WHOOSH_SOUND_BAG,
+    audio_asset,
 )
 
 
@@ -131,6 +132,21 @@ def init_pygame() -> None:
     pygame.init()
     if not pygame.mixer.get_init():
         pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+
+
+def wait_for_cinematic_preload(app: App) -> None:
+    deadline = time.perf_counter() + 15.0
+    while (
+        not app.poc_preload_ready
+        and time.perf_counter() < deadline
+    ):
+        app.drain_cinematic_poc_preload(max_assets=1)
+        if not app.poc_preload_ready:
+            time.sleep(0.001)
+    if not app.poc_preload_ready:
+        raise AssertionError(
+            "cinematic preload did not complete during audio QA"
+        )
 
 
 def sound_array(sound: pygame.mixer.Sound) -> np.ndarray:
@@ -411,6 +427,7 @@ def validate_sound_bag_audible_fingerprints() -> None:
         "kick": KICK_SOUND_BAG,
         "whoosh": WHOOSH_SOUND_BAG,
         "net": NET_SOUND_BAG,
+        "save_impact": SAVE_IMPACT_SOUND_BAG,
         "goal_roar": GOAL_ROAR_SOUND_BAG,
         "goal_explosion": GOAL_EXPLOSION_SOUND_BAG,
         "crowd_reaction": CROWD_REACTION_SOUND_BAG,
@@ -537,12 +554,13 @@ def assert_short_mix_headroom(label: str, mix: np.ndarray) -> None:
 
 def validate_short_event_mixes_headroom() -> None:
     scenarios: list[tuple[str, tuple[tuple[str, float, float, float, float], ...]]] = []
-    for net_filename, reaction_filename in product(NET_SOUND_BAG, CROWD_REACTION_SOUND_BAG):
+    save_cue = MATCH_CUE_MIX["save_impact"]
+    for impact_filename, reaction_filename in product(SAVE_IMPACT_SOUND_BAG, CROWD_REACTION_SOUND_BAG):
         scenarios.append(
             (
-                f"save:{net_filename}+{reaction_filename}",
+                f"save:{impact_filename}+{reaction_filename}",
                 (
-                    (net_filename, 0.00, 0.20, 0.62, 0.22),
+                    (impact_filename, 0.00, save_cue.volume, save_cue.maxtime, 0.22),
                     (reaction_filename, 0.05, 0.12, 1.70, 0.06),
                 ),
             )
@@ -551,10 +569,7 @@ def validate_short_event_mixes_headroom() -> None:
         scenarios.append(
             (
                 f"near_miss:{reaction_filename}",
-                (
-                    (reaction_filename, 0.00, 0.10, 1.80, -0.06),
-                    ("stadium_reverb_tail.mp3", 0.10, 0.08, 1.45, -0.05),
-                ),
+                ((reaction_filename, 0.00, 0.10, 1.80, -0.06),),
             )
         )
     for reaction_filename in CUP_REVEAL_CROWD_SOUND_BAG:
@@ -680,44 +695,194 @@ def validate_runtime_assets() -> None:
 
 
 def validate_no_candidate_runtime_imports() -> None:
-    forbidden = ("assets/sounds/candidates", "sounds/candidates", "candidates/")
+    forbidden = ("assets/sounds/candidates", "sounds/candidates")
+
+    def path_fragments(node: ast.AST) -> list[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [
+                part
+                for part in node.value.replace("\\", "/").split("/")
+                if part
+            ]
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return path_fragments(node.left) + path_fragments(node.right)
+        if isinstance(node, ast.Call):
+            call_name = qualified_name(node.func)
+            if call_name in {"Path", "PurePath", "os.path.join"} or call_name.endswith(
+                ".joinpath"
+            ):
+                base = (
+                    path_fragments(node.func.value)
+                    if isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "joinpath"
+                    else []
+                )
+                return base + [
+                    part
+                    for argument in node.args
+                    for part in path_fragments(argument)
+                ]
+        return []
+
+    adversarial = ast.parse(
+        'candidate_dir = ROOT / "assets" / "sounds" / "candidates"'
+    ).body[0]
+    adversarial_value = (
+        adversarial.value
+        if isinstance(adversarial, ast.Assign)
+        else adversarial
+    )
+    adversarial_path = "/".join(path_fragments(adversarial_value))
+    if not any(token in adversarial_path for token in forbidden):
+        raise AssertionError(
+            "candidate-audio AST gate failed its split-path adversarial probe"
+        )
+
     for source in (SRC / "arena_ai").rglob("*.py"):
-        text = source.read_text(encoding="utf-8", errors="ignore")
-        for token in forbidden:
-            if token in text:
-                raise AssertionError(f"runtime source imports candidate audio directly: {source} token={token}")
+        tree = ast.parse(
+            source.read_text(encoding="utf-8", errors="ignore"),
+            filename=str(source),
+        )
+        docstrings = {
+            id(owner.body[0].value)
+            for owner in ast.walk(tree)
+            if isinstance(
+                owner,
+                (
+                    ast.Module,
+                    ast.ClassDef,
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                ),
+            )
+            and owner.body
+            and isinstance(owner.body[0], ast.Expr)
+            and isinstance(owner.body[0].value, ast.Constant)
+            and isinstance(owner.body[0].value.value, str)
+        }
+        for node in ast.walk(tree):
+            if id(node) in docstrings:
+                continue
+            literal = "/".join(path_fragments(node))
+            if not literal:
+                continue
+            token = next(
+                (
+                    candidate
+                    for candidate in forbidden
+                    if candidate in literal
+                ),
+                None,
+            )
+            if token is not None:
+                raise AssertionError(
+                    "runtime source imports candidate audio directly: "
+                    f"{source} token={token}"
+                )
+
+
+def qualified_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = qualified_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""
+
+
+def main_ast() -> ast.Module:
+    return ast.parse(
+        MAIN_PY.read_text(encoding="utf-8"),
+        filename=str(MAIN_PY),
+    )
+
+
+def app_method(tree: ast.Module, name: str) -> ast.FunctionDef:
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != "App":
+            continue
+        for child in node.body:
+            if isinstance(child, ast.FunctionDef) and child.name == name:
+                return child
+    raise AssertionError(f"App.{name} not found in {MAIN_PY}")
 
 
 def validate_draw_purity() -> None:
-    in_draw = False
-    method_name = ""
-    for lineno, line in enumerate(MAIN_PY.read_text(encoding="utf-8").splitlines(), start=1):
-        stripped = line.lstrip()
-        if stripped.startswith("def "):
-            method_name = stripped.split("(", 1)[0].replace("def ", "")
-            in_draw = method_name.startswith("draw")
-        elif stripped.startswith("class "):
-            in_draw = False
-        if in_draw and any(token in line for token in ("self.sound.", "pygame.mixer", "AudioEngine(")):
-            raise AssertionError(f"draw method {method_name} touches audio at {MAIN_PY}:{lineno}")
+    tree = main_ast()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or not node.name.startswith("draw"):
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call):
+                continue
+            call_name = qualified_name(child.func)
+            if (
+                call_name.startswith("self.sound.")
+                or call_name.startswith("pygame.mixer.")
+                or call_name == "AudioEngine"
+            ):
+                raise AssertionError(
+                    f"draw method {node.name} touches audio at "
+                    f"{MAIN_PY}:{child.lineno}"
+                )
 
 
 def validate_audio_update_ownership() -> None:
     allowed = {"emit_match_audio_events", "flush_queued_match_audio", "update", "update_tournament_audio"}
-    method_name = ""
-    for lineno, line in enumerate(MAIN_PY.read_text(encoding="utf-8").splitlines(), start=1):
-        stripped = line.lstrip()
-        if stripped.startswith("def "):
-            method_name = stripped.split("(", 1)[0].replace("def ", "")
-        if "self.sound.play(" in line and method_name not in allowed:
-            raise AssertionError(f"audio event outside update-owned timeline: {method_name} at {MAIN_PY}:{lineno}")
+    tree = main_ast()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for child in ast.walk(node):
+            if (
+                isinstance(child, ast.Call)
+                and qualified_name(child.func) == "self.sound.play"
+                and node.name not in allowed
+            ):
+                raise AssertionError(
+                    "audio event outside update-owned timeline: "
+                    f"{node.name} at {MAIN_PY}:{child.lineno}"
+                )
 
 
 def validate_runtime_mixer_pre_init_order() -> None:
-    text = MAIN_PY.read_text(encoding="utf-8")
-    pre_init_index = text.find("        pre_init_mixer()")
-    init_index = text.find("        pygame.init()")
-    if pre_init_index < 0 or init_index < 0 or pre_init_index > init_index:
+    initializer = app_method(main_ast(), "__init__")
+
+    class ExecutedCallVisitor(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, str]] = []
+
+        def visit_Call(self, node: ast.Call) -> None:
+            self.calls.append((node.lineno, qualified_name(node.func)))
+            self.generic_visit(node)
+
+        def visit_FunctionDef(self, _node: ast.FunctionDef) -> None:
+            return
+
+        def visit_AsyncFunctionDef(
+            self,
+            _node: ast.AsyncFunctionDef,
+        ) -> None:
+            return
+
+        def visit_Lambda(self, _node: ast.Lambda) -> None:
+            return
+
+    visitor = ExecutedCallVisitor()
+    for statement in initializer.body:
+        visitor.visit(statement)
+    calls = visitor.calls
+    pre_init_lines = [
+        lineno for lineno, name in calls if name == "pre_init_mixer"
+    ]
+    init_lines = [
+        lineno for lineno, name in calls if name == "pygame.init"
+    ]
+    if (
+        len(pre_init_lines) != 1
+        or len(init_lines) != 1
+        or pre_init_lines[0] > init_lines[0]
+    ):
         raise AssertionError("runtime must call pre_init_mixer() before pygame.init()")
 
 
@@ -734,6 +899,8 @@ def validate_engine_contract() -> None:
         raise AssertionError("base ambience loop is not running on the base channel")
     if len(app.sound.kick_bag) < 4 or len(app.sound.whoosh_bag) < 2 or len(app.sound.net_bag) < 2:
         raise AssertionError("ball sound-bags lost take diversity")
+    if len(app.sound.save_impact_bag) != len(SAVE_IMPACT_SOUND_BAG):
+        raise AssertionError("save impact sound-bag lost its licensed ball-contact source")
     if len(app.sound.goal_roars) < 3 or len(app.sound.goal_explosions) < 3 or len(app.sound.crowd_reactions) < 3 or len(app.sound.near_miss_reactions) < 3:
         raise AssertionError("crowd/goal sound-bags lost take diversity")
     chosen_kicks = [app.sound.choose_bag("qa_kick", app.sound.kick_bag) for _index in range(8)]
@@ -785,6 +952,133 @@ def validate_engine_contract() -> None:
         raise AssertionError("one-shot reset must not stop ambience loops")
 
 
+def assert_non_goal_event_internal_routes(event: str, traces: list[dict[str, str]]) -> None:
+    expected_routes = NON_GOAL_EVENT_AUDIO_ROUTES[event]
+    expected_buses = sorted(bus for bus, _filenames in expected_routes)
+    actual_buses = sorted(trace["bus"] for trace in traces)
+    if actual_buses != expected_buses:
+        raise AssertionError(f"{event} internal buses drifted: expected={expected_buses} actual={actual_buses}")
+
+    allowed_by_bus = {bus: frozenset(filenames) for bus, filenames in expected_routes}
+    for trace in traces:
+        bus = trace["bus"]
+        filename = trace["filename"]
+        preferred = trace["preferred"]
+        if not filename:
+            raise AssertionError(f"{event} emitted an unregistered runtime sound on bus {bus}")
+        if filename in GOAL_ONLY_SOUND_FILES:
+            raise AssertionError(f"{event} leaked goal-only sample {filename} through bus {bus}")
+        if bus == "goal":
+            raise AssertionError(f"{event} leaked into the goal bus with sample {filename}")
+        if filename not in allowed_by_bus.get(bus, frozenset()):
+            raise AssertionError(f"{event} sample {filename} is not allowed on internal bus {bus}")
+        contract = audio_asset(filename)
+        if contract.bus != bus:
+            raise AssertionError(
+                f"{event} routed {filename} through {bus}, but its licensed runtime contract declares {contract.bus}"
+            )
+        if preferred and preferred not in trace["bus_channels"].split(","):
+            raise AssertionError(f"{event} preferred channel {preferred} does not belong to bus {bus}")
+
+
+def validate_non_goal_event_internal_routing() -> None:
+    source_rows = parse_runtime_source_rows()
+    for event, routes in NON_GOAL_EVENT_AUDIO_ROUTES.items():
+        for bus, filenames in routes:
+            if bus == "goal":
+                raise AssertionError(f"{event} contract must not declare the goal bus")
+            for filename in filenames:
+                contract = audio_asset(filename)
+                if filename in GOAL_ONLY_SOUND_FILES:
+                    raise AssertionError(f"{event} contract contains goal-only sample {filename}")
+                if contract.bus != bus:
+                    raise AssertionError(
+                        f"{event} contract routes {filename} through {bus}, but the licensed asset declares {contract.bus}"
+                    )
+
+    for filename in SAVE_IMPACT_SOUND_BAG:
+        contract = audio_asset(filename)
+        usage = source_rows[filename]["usage"].lower()
+        if contract.bus != "ball" or contract.role in {"net", "net_alt"}:
+            raise AssertionError(f"save impact source must be a non-net ball cue: {filename}")
+        if "impacto de bola" not in usage:
+            raise AssertionError(f"save impact source lacks explicit licensed ball-impact usage: {filename}")
+        if filename in GOAL_ONLY_SOUND_FILES:
+            raise AssertionError(f"save impact source is classified as goal-only: {filename}")
+
+    for event in ("save", "near_miss"):
+        app = App(seed=2026)
+        app.sound.stop_one_shots(fade_ms=0)
+        traces: list[dict[str, str]] = []
+        originals: dict[str, object] = {}
+        for bus_name, bus in app.sound.buses.items():
+            original = bus.play
+            originals[bus_name] = original
+
+            def spy(
+                sound: pygame.mixer.Sound | None,
+                *,
+                _bus_name: str = bus_name,
+                _bus: object = bus,
+                _original: object = original,
+                **kwargs: object,
+            ) -> pygame.mixer.Channel | None:
+                traces.append(
+                    {
+                        "bus": _bus_name,
+                        "filename": app.sound.sound_asset_name(sound) or "",
+                        "preferred": str(kwargs.get("preferred") or ""),
+                        "bus_channels": ",".join(getattr(_bus, "channel_names")),
+                    }
+                )
+                return _original(sound, **kwargs)  # type: ignore[operator]
+
+            bus.play = spy  # type: ignore[method-assign]
+        try:
+            app.sound.play(event, pan=0.34)
+        finally:
+            for bus_name, original in originals.items():
+                app.sound.buses[bus_name].play = original  # type: ignore[method-assign]
+        assert_non_goal_event_internal_routes(event, traces)
+
+    rejected_leaks = (
+        (
+            "save",
+            [
+                {
+                    "bus": "ball",
+                    "filename": NET_SOUND_BAG[0],
+                    "preferred": "net",
+                    "bus_channels": "ball,motion,net,ball_alt",
+                },
+                {
+                    "bus": "crowd",
+                    "filename": CROWD_REACTION_SOUND_BAG[0],
+                    "preferred": "react",
+                    "bus_channels": "light,tension,chant,react,roar",
+                },
+            ],
+        ),
+        (
+            "near_miss",
+            [
+                {
+                    "bus": "goal",
+                    "filename": "stadium_reverb_tail.mp3",
+                    "preferred": "reverb",
+                    "bus_channels": "explosion,bass,reverb,roar,goal_alt",
+                }
+            ],
+        ),
+    )
+    for event, traces in rejected_leaks:
+        try:
+            assert_non_goal_event_internal_routes(event, traces)
+        except AssertionError:
+            continue
+        raise AssertionError(f"internal route gate failed to reject synthetic {event} goal-audio leakage")
+
+
 def validate_audio_cue_policy_contract() -> None:
     required = set(GOAL_AUDIO_SEQUENCE) | {"save", "near_miss", "whistle", "final_whistle", "cup_reveal"}
     missing = required - set(AUDIO_CUE_POLICIES)
@@ -795,9 +1089,30 @@ def validate_audio_cue_policy_contract() -> None:
     ducked_impact = [name for name in GOAL_IMPACT_AUDIO_EVENTS if AUDIO_CUE_POLICIES[name].duck_seconds > 0.0]
     if ducked_impact:
         raise AssertionError(f"goal impact cues should not hard-duck the stadium bed: {ducked_impact}")
-    source = MAIN_PY.read_text(encoding="utf-8")
-    if "elif name == \"bass\"" in source or "elif name == \"cheer\"" in source:
-        raise AssertionError("App-level match cue policy drifted back into main.py")
+    flush_method = app_method(main_ast(), "flush_queued_match_audio")
+    forbidden_branches: set[str] = set()
+    for node in ast.walk(flush_method):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            continue
+        operands = (node.left, *node.comparators)
+        has_name = any(
+            isinstance(operand, ast.Name) and operand.id == "name"
+            for operand in operands
+        )
+        values = {
+            child.value
+            for operand in operands
+            for child in ast.walk(operand)
+            if isinstance(child, ast.Constant)
+            and isinstance(child.value, str)
+        }
+        if has_name:
+            forbidden_branches.update(values.intersection({"bass", "cheer"}))
+    if forbidden_branches:
+        raise AssertionError(
+            "App-level match cue policy drifted back into main.py: "
+            f"{sorted(forbidden_branches)}"
+        )
 
 
 def validate_goal_impact_layer_contract() -> None:
@@ -856,7 +1171,15 @@ def validate_match_event_order() -> None:
     app.set_simulate("match")
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
-    goal_minute = app.goal_schedule(pred)[0][0]
+    goal_minute, side = app.goal_schedule(pred)[0]
+    thresholds = app.cinematic_poc_audio_thresholds(
+        CinematicAttackEvent(
+            goal_minute,
+            side,
+            True,
+            "goal",
+        )
+    )
     played: list[str] = []
     pans: list[float] = []
 
@@ -867,14 +1190,18 @@ def validate_match_event_order() -> None:
 
     app.sound.play = spy  # type: ignore[method-assign]
     for progress in (
-        SHOT_KICK_AUDIO_AT,
-        SHOT_WHOOSH_AT + 0.01,
-        SHOT_NET_VISUAL_CONTACT_AT,
-        SHOT_REVERB_AT + 0.01,
-        SHOT_REVERB_AT + 0.01,
-        SHOT_REVERB_AT + 0.01,
+        thresholds["kick"],
+        thresholds["whoosh"],
+        thresholds["net"],
+        thresholds["reverb"],
+        thresholds["reverb"] + 0.01,
+        thresholds["reverb"] + 0.01,
     ):
-        app.t = (goal_minute - 5.0 + progress * 5.0) / 90.0 * 45.0
+        app.t = (
+            goal_minute
+            - GOAL_EVENT_WINDOW_MINUTES
+            + progress * GOAL_EVENT_WINDOW_MINUTES
+        ) / 90.0 * SIMULATION_SECONDS
         app.update_soundscape(1 / 60)
         app.flush_queued_match_audio()
     expected = list(GOAL_AUDIO_SEQUENCE)
@@ -884,40 +1211,90 @@ def validate_match_event_order() -> None:
         raise AssertionError(f"goal audio should carry side-based pan, got {pans}")
 
 
-def validate_match_audio_visual_sync_thresholds() -> None:
-    kick_lead = SHOT_KICK_AT - SHOT_KICK_AUDIO_AT
-    if not 0.004 <= kick_lead <= 0.014:
-        raise AssertionError(
-            f"kick audio must lead the visual foot contact by one transient-safe slice: "
-            f"lead={kick_lead:.3f}, audio={SHOT_KICK_AUDIO_AT:.3f}, visual={SHOT_KICK_AT:.3f}"
-        )
-    impact_thresholds = {
-        "net": SHOT_NET_AUDIO_AT,
-        "bass": SHOT_BASS_AUDIO_AT,
-        "cheer": SHOT_CHEER_AUDIO_AT,
-    }
-    drifted = {
-        name: threshold
-        for name, threshold in impact_thresholds.items()
-        if abs(threshold - SHOT_NET_AUDIO_AT) > 1e-9
-    }
-    if drifted:
-        raise AssertionError(f"goal impact cues must stay bundled in one cinematic frame: {drifted}")
-    late_or_early = {
-        name: SHOT_NET_VISUAL_CONTACT_AT - threshold
-        for name, threshold in impact_thresholds.items()
-        if not 0.004 <= SHOT_NET_VISUAL_CONTACT_AT - threshold <= 0.014
-    }
-    if late_or_early:
-        raise AssertionError(
-            f"goal impact audio must be pre-rolled for transient sync with visual net contact={SHOT_NET_VISUAL_CONTACT_AT:.3f}: {late_or_early}"
-        )
+def validate_queued_match_cue_arms_once() -> None:
+    app = App(seed=2026)
+    armed: list[str] = []
+    app.sound.arm_event = lambda name: armed.append(name)  # type: ignore[method-assign]
 
+    match_cues = (*GOAL_AUDIO_SEQUENCE, "save", "near_miss")
+    for index, name in enumerate(match_cues):
+        app.queue_match_audio_event(name, -0.25 + index * 0.05)
+        if armed.count(name) != 1:
+            raise AssertionError(
+                f"queued {name} must arm before render exactly once: {armed}"
+            )
+        before_flush = list(armed)
+        app.flush_queued_match_audio()
+        if armed != before_flush:
+            raise AssertionError(
+                f"flushing pre-armed {name} must not extend its policy: {armed}"
+            )
+
+    direct_app = App(seed=2026)
+    direct_armed: list[str] = []
+    direct_app.sound.arm_event = (  # type: ignore[method-assign]
+        lambda name: direct_armed.append(name)
+    )
+    for name in match_cues:
+        direct_app.sound.play(name, pan=0.25)
+        if direct_armed.count(name) != 1:
+            raise AssertionError(
+                f"direct {name} playback must arm its policy exactly once: "
+                f"{direct_armed}"
+            )
+
+
+def validate_match_audio_visual_sync_thresholds() -> None:
     app = App(seed=2026)
     app.set_simulate("match")
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
     goal_minute, side = app.goal_schedule(pred)[0]
+    event = CinematicAttackEvent(
+        goal_minute,
+        side,
+        True,
+        "goal",
+    )
+    sequence = app.cinematic_poc_sequence_for_event(event)
+    cue_seconds = dict(sequence.audio_cues)
+    if tuple(cue_seconds) != GOAL_AUDIO_SEQUENCE:
+        raise AssertionError(
+            f"POC goal audio order drifted: {tuple(cue_seconds)}"
+        )
+    if not (
+        0.005
+        <= sequence.release_seconds - cue_seconds["kick"]
+        <= 0.030
+    ):
+        raise AssertionError(
+            "kick audio must pre-roll the POC ball release by 5-30ms"
+        )
+    if not (
+        0.0
+        <= sequence.impact_seconds - cue_seconds["net"]
+        <= 0.050
+    ):
+        raise AssertionError(
+            "net transient must land at or immediately before POC impact"
+        )
+    impact_seconds = [
+        cue_seconds[name]
+        for name in ("net", "bass", "cheer")
+    ]
+    if max(impact_seconds) - min(impact_seconds) > 1.0 / 60.0:
+        raise AssertionError(
+            f"POC impact bundle is not synchronized: {impact_seconds}"
+        )
+    if not (
+        0.020
+        <= cue_seconds["reverb"] - sequence.impact_seconds
+        <= 0.080
+    ):
+        raise AssertionError(
+            "POC reverb must trail visual impact by 20-80ms"
+        )
+    thresholds = app.cinematic_poc_audio_thresholds(event)
     played: list[tuple[str, float]] = []
 
     def spy(name: str, *_args: object, **_kwargs: object) -> None:
@@ -927,12 +1304,8 @@ def validate_match_audio_visual_sync_thresholds() -> None:
 
     app.sound.play = spy  # type: ignore[method-assign]
     samples = (
-        SHOT_KICK_AUDIO_AT - 0.002,
-        SHOT_KICK_AUDIO_AT,
-        SHOT_NET_AUDIO_AT - 0.002,
-        SHOT_NET_AUDIO_AT,
-        SHOT_NET_VISUAL_CONTACT_AT,
-        SHOT_REVERB_AT + 0.002,
+        max(0.0, thresholds["kick"] - 0.002),
+        *sorted(set(thresholds.values())),
     )
     for progress in samples:
         before = len(played)
@@ -941,45 +1314,61 @@ def validate_match_audio_visual_sync_thresholds() -> None:
         if len(played) != before:
             raise AssertionError("match audio played before the post-frame queue was flushed")
         app.flush_queued_match_audio()
-
     kick_times = [progress for name, progress in played if name == "kick"]
-    if not kick_times or abs(kick_times[0] - SHOT_KICK_AUDIO_AT) > 1e-9:
+    if (
+        not kick_times
+        or abs(kick_times[0] - thresholds["kick"]) > 1e-9
+    ):
         raise AssertionError(f"kick audio did not land on the visual contact follow-through: {played}")
     impact_times = {name: progress for name, progress in played if name in GOAL_IMPACT_AUDIO_EVENTS}
     if set(impact_times) != GOAL_IMPACT_AUDIO_EVENTS:
         raise AssertionError(f"goal impact bundle missing synchronized cues: {played}")
     for name, progress in impact_times.items():
-        expected = impact_thresholds[name]
+        expected = thresholds[name]
         if abs(progress - expected) > 1e-9:
             raise AssertionError(f"{name} audio drifted from its pre-roll threshold={expected:.3f}: progress={progress:.3f}, events={played}")
 
 
 def validate_whoosh_reverb_chance_timing_contract() -> None:
-    whoosh_lead = SHOT_WHOOSH_AT - SHOT_WHOOSH_AUDIO_AT
-    if not 0.006 <= whoosh_lead <= 0.010:
-        raise AssertionError(
-            f"whoosh audio must pre-roll the visual release by 6-10ms: "
-            f"lead={whoosh_lead:.3f}, audio={SHOT_WHOOSH_AUDIO_AT:.3f}, visual={SHOT_WHOOSH_AT:.3f}"
+    app = App(seed=2026)
+    for outcome, terminal_name in (
+        ("save", "save"),
+        ("wide", "near_miss"),
+    ):
+        event = CinematicAttackEvent(
+            50,
+            "home",
+            False,
+            outcome,
         )
-    reverb_lag = SHOT_REVERB_AT - SHOT_NET_VISUAL_CONTACT_AT
-    if not 0.006 <= reverb_lag <= 0.020:
-        raise AssertionError(
-            f"reverb tail must trail the visual net impact without drifting late: "
-            f"lag={reverb_lag:.3f}, reverb={SHOT_REVERB_AT:.3f}, visual={SHOT_NET_VISUAL_CONTACT_AT:.3f}"
+        sequence = app.cinematic_poc_sequence_for_event(event)
+        cue_seconds = dict(sequence.audio_cues)
+        if tuple(cue_seconds) != (
+            "kick",
+            "whoosh",
+            terminal_name,
+        ):
+            raise AssertionError(
+                f"{outcome} POC cue order drifted: {tuple(cue_seconds)}"
+            )
+        if not (
+            cue_seconds["kick"]
+            < cue_seconds["whoosh"]
+            < cue_seconds[terminal_name]
+            <= sequence.impact_seconds
+        ):
+            raise AssertionError(
+                f"{outcome} POC cues are not synchronized to impact: "
+                f"{cue_seconds}, impact={sequence.impact_seconds}"
+            )
+        terminal_lead = (
+            sequence.impact_seconds
+            - cue_seconds[terminal_name]
         )
-    chance_lead = CHANCE_CONTACT_VISUAL_AT - CHANCE_CONTACT_AUDIO_AT
-    if not 0.006 <= chance_lead <= 0.010:
-        raise AssertionError(
-            f"save/near-miss audio must pre-roll the chance visual contact by 6-10ms: "
-            f"lead={chance_lead:.3f}, audio={CHANCE_CONTACT_AUDIO_AT:.3f}, visual={CHANCE_CONTACT_VISUAL_AT:.3f}"
-        )
-    if CHANCE_CONTACT_VISUAL_AT != SHOT_NET_AT:
-        raise AssertionError(
-            f"chance visual contact must stay explicit at the no-goal payoff frame: "
-            f"chance={CHANCE_CONTACT_VISUAL_AT:.3f}, shot_net={SHOT_NET_AT:.3f}"
-        )
-    if CHANCE_CONTACT_AUDIO_AT == SHOT_NET_AUDIO_AT or CHANCE_CONTACT_VISUAL_AT == SHOT_NET_VISUAL_CONTACT_AT:
-        raise AssertionError("chance contact markers drifted back to the goal net-impact markers")
+        if not 0.0 <= terminal_lead <= 0.050:
+            raise AssertionError(
+                f"{outcome} terminal cue must pre-roll impact by at most 50ms"
+            )
 
 
 def validate_match_audio_quantized_frame_sync() -> None:
@@ -987,15 +1376,23 @@ def validate_match_audio_quantized_frame_sync() -> None:
     app.set_simulate("match")
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
-    goal_minute, _side = app.goal_schedule(pred)[0]
+    goal_minute, side = app.goal_schedule(pred)[0]
+    thresholds = app.cinematic_poc_audio_thresholds(
+        CinematicAttackEvent(
+            goal_minute,
+            side,
+            True,
+            "goal",
+        )
+    )
     played: list[str] = []
 
     def spy(name: str, *_args: object, **_kwargs: object) -> None:
         played.append(name)
 
     app.sound.play = spy  # type: ignore[method-assign]
-    previous_progress = SHOT_KICK_AUDIO_AT - 0.003
-    current_progress = SHOT_KICK_AT + 0.010
+    previous_progress = thresholds["kick"] - 0.003
+    current_progress = thresholds["kick"] + 0.010
     previous_minute = goal_minute - GOAL_EVENT_WINDOW_MINUTES + previous_progress * GOAL_EVENT_WINDOW_MINUTES
     app.t = (goal_minute - GOAL_EVENT_WINDOW_MINUTES + current_progress * GOAL_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
     app.update_soundscape(1 / 20, previous_minute=previous_minute)
@@ -1014,6 +1411,14 @@ def validate_match_impact_quantized_frame_sync() -> None:
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
     goal_minute, side = app.goal_schedule(pred)[0]
+    thresholds = app.cinematic_poc_audio_thresholds(
+        CinematicAttackEvent(
+            goal_minute,
+            side,
+            True,
+            "goal",
+        )
+    )
     goal_audio_key = (pred.algorithm, goal_minute, side)
     played: list[str] = []
 
@@ -1021,11 +1426,14 @@ def validate_match_impact_quantized_frame_sync() -> None:
         played.append(name)
 
     app.sound.play = spy  # type: ignore[method-assign]
-    previous_progress = SHOT_NET_AUDIO_AT - 0.003
+    previous_progress = thresholds["net"] - 0.003
     app.shot_progress_cursor[goal_audio_key] = previous_progress
     previous_minute = goal_minute - GOAL_EVENT_WINDOW_MINUTES + previous_progress * GOAL_EVENT_WINDOW_MINUTES
     app.t = (
-        goal_minute - GOAL_EVENT_WINDOW_MINUTES + (SHOT_NET_VISUAL_CONTACT_AT + 0.004) * GOAL_EVENT_WINDOW_MINUTES
+        goal_minute
+        - GOAL_EVENT_WINDOW_MINUTES
+        + (thresholds["reverb"] + 0.001)
+        * GOAL_EVENT_WINDOW_MINUTES
     ) / 90.0 * SIMULATION_SECONDS
     app.update_soundscape(1 / 20, previous_minute=previous_minute)
     if played:
@@ -1036,11 +1444,12 @@ def validate_match_impact_quantized_frame_sync() -> None:
     if volumes["tension"] < 0.025 or volumes["chant"] < 0.020:
         raise AssertionError(f"frame-quantized impact lost crowd tension/chant layers: {volumes}")
     queued = [name for name, _pan in app.match_audio_frame_queue]
-    if queued != ["net", "bass", "cheer"]:
-        raise AssertionError(f"frame-quantized goal impact bundle drifted: {queued}")
+    expected_impact = ["net", "bass", "cheer", "reverb"]
+    if queued != expected_impact:
+        raise AssertionError(f"frame-quantized goal impact lost its ordered layer stack: {queued}")
     app.flush_queued_match_audio()
-    if played != ["net", "bass", "cheer"]:
-        raise AssertionError(f"frame-quantized goal impact did not flush as one bundle: {played}")
+    if played != expected_impact:
+        raise AssertionError(f"frame-quantized impact layer order changed: {played}")
 
 
 def validate_low_fps_goal_timeline_does_not_collapse() -> None:
@@ -1049,8 +1458,16 @@ def validate_low_fps_goal_timeline_does_not_collapse() -> None:
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
     goal_minute, side = app.goal_schedule(pred)[0]
+    thresholds = app.cinematic_poc_audio_thresholds(
+        CinematicAttackEvent(
+            goal_minute,
+            side,
+            True,
+            "goal",
+        )
+    )
     goal_audio_key = (pred.algorithm, goal_minute, side)
-    previous_progress = SHOT_NET_AT - 0.02
+    previous_progress = thresholds["net"] - 0.02
     app.shot_progress_cursor[goal_audio_key] = previous_progress
     played: list[str] = []
 
@@ -1059,11 +1476,20 @@ def validate_low_fps_goal_timeline_does_not_collapse() -> None:
 
     app.sound.play = spy  # type: ignore[method-assign]
     previous_minute = goal_minute - GOAL_EVENT_WINDOW_MINUTES + previous_progress * GOAL_EVENT_WINDOW_MINUTES
-    app.t = (goal_minute - GOAL_EVENT_WINDOW_MINUTES + (SHOT_REVERB_AT + 0.01) * GOAL_EVENT_WINDOW_MINUTES) / 90.0 * 45.0
+    app.t = (
+        goal_minute
+        - GOAL_EVENT_WINDOW_MINUTES
+        + (thresholds["reverb"] + 0.01)
+        * GOAL_EVENT_WINDOW_MINUTES
+    ) / 90.0 * SIMULATION_SECONDS
     app.update_soundscape(0.33, previous_minute=previous_minute)
     app.flush_queued_match_audio()
-    if played != ["net", "bass", "cheer"]:
-        raise AssertionError(f"low-FPS goal impact should keep the impact bundle synchronized: {played}")
+    if played != ["net", "bass", "cheer", "reverb"]:
+        raise AssertionError(f"low-FPS goal impact lost ordered layers: {played}")
+    app.update_soundscape(0.33)
+    app.flush_queued_match_audio()
+    if played != ["net", "bass", "cheer", "reverb"]:
+        raise AssertionError(f"low-FPS goal impact duplicated during catch-up: {played}")
 
 
 def validate_match_audio_uses_post_frame_queue() -> None:
@@ -1071,14 +1497,26 @@ def validate_match_audio_uses_post_frame_queue() -> None:
     app.set_simulate("match")
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
-    goal_minute, _side = app.goal_schedule(pred)[0]
+    goal_minute, side = app.goal_schedule(pred)[0]
+    thresholds = app.cinematic_poc_audio_thresholds(
+        CinematicAttackEvent(
+            goal_minute,
+            side,
+            True,
+            "goal",
+        )
+    )
     played: list[str] = []
 
     def spy(name: str, *_args: object, **_kwargs: object) -> None:
         played.append(name)
 
     app.sound.play = spy  # type: ignore[method-assign]
-    app.t = (goal_minute - GOAL_EVENT_WINDOW_MINUTES + SHOT_KICK_AUDIO_AT * GOAL_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
+    app.t = (
+        goal_minute
+        - GOAL_EVENT_WINDOW_MINUTES
+        + thresholds["kick"] * GOAL_EVENT_WINDOW_MINUTES
+    ) / 90.0 * SIMULATION_SECONDS
     app.update_soundscape(1 / 60)
     if played:
         raise AssertionError(f"match audio escaped before the visual frame was presented: {played}")
@@ -1111,7 +1549,20 @@ def validate_chance_audio_events() -> None:
         pans.clear()
         chance_minute = 36 if kind == "save" else 54
         app.chance_schedule = lambda _pred, chance_minute=chance_minute, side=side, kind=kind: [(chance_minute, side, kind)]  # type: ignore[method-assign]
-        for progress in (SHOT_KICK_AUDIO_AT, SHOT_WHOOSH_AUDIO_AT, CHANCE_CONTACT_AUDIO_AT):
+        thresholds = app.cinematic_poc_audio_thresholds(
+            CinematicAttackEvent(
+                chance_minute,
+                side,
+                False,
+                kind,
+            )
+        )
+        terminal = "save" if kind == "save" else "near_miss"
+        for progress in (
+            thresholds["kick"],
+            thresholds["whoosh"],
+            thresholds[terminal],
+        ):
             app.t = (chance_minute - CHANCE_EVENT_WINDOW_MINUTES + progress * CHANCE_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
             app.emit_match_audio_events(pred)
             app.flush_queued_match_audio()
@@ -1130,6 +1581,14 @@ def validate_save_near_miss_contact_pre_roll() -> None:
         app.goal_schedule = lambda _pred: []  # type: ignore[method-assign]
         chance_minute = 38 if kind == "save" else 52
         app.chance_schedule = lambda _pred, chance_minute=chance_minute, side=side, kind=kind: [(chance_minute, side, kind)]  # type: ignore[method-assign]
+        event = CinematicAttackEvent(
+            chance_minute,
+            side,
+            False,
+            kind,
+        )
+        thresholds = app.cinematic_poc_audio_thresholds(event)
+        contact_progress = thresholds[terminal]
         played: list[tuple[str, float]] = []
 
         def spy(name: str, *_args: object, **_kwargs: object) -> None:
@@ -1138,7 +1597,11 @@ def validate_save_near_miss_contact_pre_roll() -> None:
             played.append((name, progress))
 
         app.sound.play = spy  # type: ignore[method-assign]
-        for progress in (CHANCE_CONTACT_AUDIO_AT - 0.002, CHANCE_CONTACT_AUDIO_AT, CHANCE_CONTACT_VISUAL_AT):
+        for progress in (
+            contact_progress - 0.002,
+            contact_progress,
+            1.0,
+        ):
             app.t = (chance_minute - CHANCE_EVENT_WINDOW_MINUTES + progress * CHANCE_EVENT_WINDOW_MINUTES) / 90.0 * SIMULATION_SECONDS
             before = len(played)
             app.emit_match_audio_events(pred)
@@ -1148,22 +1611,24 @@ def validate_save_near_miss_contact_pre_roll() -> None:
         terminal_times = [progress for name, progress in played if name == terminal]
         if not terminal_times:
             raise AssertionError(f"chance {kind} never played terminal contact cue: {played}")
-        if abs(terminal_times[0] - CHANCE_CONTACT_AUDIO_AT) > 1e-9:
+        if abs(terminal_times[0] - contact_progress) > 1e-9:
             raise AssertionError(
                 f"chance {kind} terminal cue drifted from pre-roll marker: "
-                f"played={terminal_times[0]:.3f}, expected={CHANCE_CONTACT_AUDIO_AT:.3f}, events={played}"
+                f"played={terminal_times[0]:.3f}, expected={contact_progress:.3f}, events={played}"
             )
 
 
 def validate_chance_cursor_does_not_block_final_whistle() -> None:
     app = App(seed=2026)
     app.set_simulate("match")
+    wait_for_cinematic_preload(app)
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
     app.match_intro_audio_pending = False
     app.t = SIMULATION_SECONDS
     chance_key = (pred.algorithm, 74, "home:save")
-    app.shot_progress_cursor[chance_key] = CHANCE_CONTACT_AUDIO_AT - 0.002
+    completion = app.shot_cursor_completion_threshold(chance_key)
+    app.shot_progress_cursor[chance_key] = completion - 0.002
     played: list[str] = []
 
     def spy(name: str, *_args: object, **_kwargs: object) -> None:
@@ -1173,11 +1638,11 @@ def validate_chance_cursor_does_not_block_final_whistle() -> None:
     app.update(0.0)
     if "final_whistle" in played:
         raise AssertionError(f"chance cursor played final whistle before chance payoff: {played}")
-    app.shot_progress_cursor[chance_key] = CHANCE_CONTACT_AUDIO_AT - 0.001
+    app.shot_progress_cursor[chance_key] = completion - 0.001
     app.update(0.0)
     if "final_whistle" in played:
         raise AssertionError(f"chance cursor played final whistle before audio contact threshold: {played}")
-    app.shot_progress_cursor[chance_key] = CHANCE_CONTACT_AUDIO_AT
+    app.shot_progress_cursor[chance_key] = completion
     app.update(0.0)
     if "final_whistle" not in played:
         raise AssertionError(f"chance cursor blocked the final whistle: {played}")
@@ -1186,6 +1651,7 @@ def validate_chance_cursor_does_not_block_final_whistle() -> None:
 def validate_final_whistle_blocks_same_frame_reaction() -> None:
     app = App(seed=2026)
     app.set_simulate("match")
+    wait_for_cinematic_preload(app)
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = replace(pred, score_home=0, score_away=0, outcome_class=1)
     app.match_intro_audio_pending = False
@@ -1290,6 +1756,7 @@ def validate_cup_audio_queue_scene_reset() -> None:
 def validate_external_update_dt_clamp_prevents_parallel_goal_stack() -> None:
     app = App(seed=2026)
     app.set_simulate("match")
+    wait_for_cinematic_preload(app)
     pred = app.model.predict_matchup(app.home, app.away, seed=2026)
     app.match_prediction = pred
     app.match_intro_audio_pending = False
@@ -1308,6 +1775,60 @@ def validate_external_update_dt_clamp_prevents_parallel_goal_stack() -> None:
         raise AssertionError(f"giant external update stacked match audio cues in one frame: played={played} queued={app.match_audio_frame_queue}")
 
 
+def validate_audio_bus_applies_stereo_pan() -> None:
+    class FakeChannel:
+        def __init__(self) -> None:
+            self.volumes: list[tuple[float, float]] = []
+            self.play_calls = 0
+
+        def get_busy(self) -> bool:
+            return False
+
+        def set_volume(self, left: float, right: float) -> None:
+            self.volumes.append((left, right))
+
+        def play(self, *_args: object) -> None:
+            self.play_calls += 1
+
+    channel = FakeChannel()
+    bus = AudioBus(
+        "qa",
+        {"qa": channel},  # type: ignore[arg-type]
+        ("qa",),
+        master=0.5,
+    )
+    sound = object()
+    bus.play(
+        sound,  # type: ignore[arg-type]
+        volume=0.8,
+        key="right",
+        pan=0.25,
+    )
+    bus.play(
+        sound,  # type: ignore[arg-type]
+        volume=0.8,
+        key="left",
+        pan=-0.5,
+    )
+    expected = ((0.3, 0.4), (0.4, 0.2))
+    if len(channel.volumes) != len(expected):
+        raise AssertionError(
+            "AudioBus did not apply both stereo pan cases"
+        )
+    for actual, target in zip(channel.volumes, expected):
+        if any(
+            abs(actual_value - target_value) > 1e-9
+            for actual_value, target_value in zip(actual, target)
+        ):
+            raise AssertionError(
+                f"AudioBus stereo pan drifted: {channel.volumes}"
+            )
+    if channel.play_calls != 2:
+        raise AssertionError(
+            "AudioBus stereo pan gate did not reach channel playback"
+        )
+
+
 SMOKE_STEPS = (
     validate_runtime_assets,
     validate_sound_bag_audible_fingerprints,
@@ -1315,7 +1836,9 @@ SMOKE_STEPS = (
     validate_audio_update_ownership,
     validate_runtime_mixer_pre_init_order,
     validate_engine_contract,
+    validate_non_goal_event_internal_routing,
     validate_audio_cue_policy_contract,
+    validate_audio_bus_applies_stereo_pan,
 )
 
 FULL_STEPS = (
@@ -1330,11 +1853,14 @@ FULL_STEPS = (
     validate_audio_update_ownership,
     validate_runtime_mixer_pre_init_order,
     validate_engine_contract,
+    validate_non_goal_event_internal_routing,
     validate_audio_cue_policy_contract,
+    validate_audio_bus_applies_stereo_pan,
     validate_goal_impact_layer_contract,
     validate_initial_whistle_suppresses_reactions,
     validate_match_events_suppress_before_crowd,
     validate_match_event_order,
+    validate_queued_match_cue_arms_once,
     validate_match_audio_visual_sync_thresholds,
     validate_whoosh_reverb_chance_timing_contract,
     validate_match_audio_quantized_frame_sync,
@@ -1386,9 +1912,17 @@ def main() -> None:
         pygame.quit()
     elapsed = time.perf_counter() - suite_started
     if args.suite == "smoke":
-        print(f"audio smoke passed in {elapsed:.2f}s: runtime assets, governance, mixer setup, buses and cue policy")
+        print(
+            f"audio smoke passed in {elapsed:.2f}s: runtime assets, governance, mixer setup, "
+            "buses, non-goal sample routing and cue policy"
+        )
     else:
-        print(f"audio qa passed in {elapsed:.2f}s: audio_manifest.json governance, project archive receipts, transients, 144-combo active-bed mix headroom/loudness, short event mix headroom, long-loop seams, buses, cue policy, impact-bed preservation, frame sync, goal/chance/final-whistle events, Monte Carlo tick queue/reset, and draw purity")
+        print(
+            f"audio qa passed in {elapsed:.2f}s: audio_manifest.json governance, project archive receipts, "
+            "transients, 144-combo active-bed mix headroom/loudness, short event mix headroom, long-loop seams, "
+            "internal sample/bus leakage, cue policy, impact-bed preservation, frame sync, "
+            "goal/chance/final-whistle events, Monte Carlo tick queue/reset, and draw purity"
+        )
 
 
 if __name__ == "__main__":

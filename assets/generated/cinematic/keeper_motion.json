@@ -1,0 +1,73 @@
+{
+  "version": 4,
+  "artifact": "arena_keeper_motion_contract",
+  "status": "promoted",
+  "artwork_provenance": "gpt_image_authored_directional_frames",
+  "frame_count": 16,
+  "left_runtime_derivation": "separately_generated_gpt_image",
+  "temporal_interpolation": "none_gpt_image_authored_frames",
+  "wordmark_provenance": "native_gpt_image_jersey_pixels_no_overlay",
+  "directions": {
+    "right": {
+      "jersey_color": "green",
+      "runtime_sha256": [
+        "790e5cb2b98d1c4c8a3f47af544cdb161f6856fece0042122e7066ba7f6fc22f",
+        "72b72764845dfb0f210b63827209f63caa20c012f23f0d25483ac57428348b81",
+        "15277fbda02e819e524eeb10401aaf3eae78a4831db188cad4eac6bb453173ea",
+        "e090c87d92d22e1199b94cdbe3f4c33b53e2039fc740234d7211605c3cc67c3a",
+        "b7f69d041fd24810d3db6bd1b45e425e9dc6878496bfcc5b677afc124bc7cfc2",
+        "2b9f82d83d970fd4253ec5929a8cbd0cac7bf83d956ce2a96cf4b88352ca892c",
+        "bc8f50db26b93d08ffa9e9797007403886093f5448f4e1aea90d892e6b33d1a6",
+        "93fbc8d93fa82ed4965bd04a8e1e983718d0f0db1d477ca2599813e166676e8f",
+        "15514d6a3a4286e101b7607439937bd2747ab7b2934ed202764a46155fd8e759",
+        "8b9fb4a5777e63f707f299a063272f409dab99eda06c3bd5c84b14d3ee8b18b2",
+        "37b23162c4a0b17fc79cb7106dd8d47d40a1b1f1f7bd0b722475e38098d62db9",
+        "938d1a1e85558c719d73eb3f98a13a5568e955a1b6c2ea59b7047f08927d9abe",
+        "ae3f04c35dec93399ec94c3e4baa1f8ff470b1c40350606c489f314cadeebe20",
+        "b9dc1e76c327d5d976e419fc156bec358c34ffd0099f390d2c6d4f26e8749596",
+        "23215cbe393b6231bac77dd1f75e2b05ba7f69b428bc2b5d0da076d0e1445f6b",
+        "790e5cb2b98d1c4c8a3f47af544cdb161f6856fece0042122e7066ba7f6fc22f"
+      ]
+    },
+    "left": {
+      "jersey_color": "orange",
+      "runtime_sha256": [
+        "07d733f028520a3f0517a9ef9102f0ad6fa883a89611d5775b46203028a8d106",
+        "e1ae44d6bba28471abc474b0f57f362d34fa9ab33e07c993be99e529ba5ef536",
+        "15b255e73adc74f5702b4a76bd1a8f3511f773f92906fb08258d7761566df2ae",
+        "c08fe00792dadeb1d8763e734316e0b56e4bbed3b2a0c359de27376abacc28b9",
+        "b9c5c49200ac02028795eaee9b33f4aadfc22fdea16bbb75197dcb3850318da6",
+        "0ee5d366be607a8224546c1f844b5ea30ebdb0abc5200a2aee1caff8a3712f56",
+        "ee3ac6fdd7fdd0eda398ab91ce0f669fcfd278dfd72915db1a38cf094085911d",
+        "35d28b8590c0717a23df9ba429148b26d2c43672e54d6698a4cb42787ddcc070",
+        "f9edac036427752e675e9f83d643a6e3bd1471b935178bd1e47bfea2af869e6e",
+        "5d8b67f14f745723ee8f960ead984e1392aae80f30e873ac8ebc8aeacba664e5",
+        "fdf023c08bd99c196a840be751a363b34a27080c325cc1821342fa38b788a388",
+        "3ab15ceebc77f01fb9f6f0e60889b7d97674fb9bd464a702666951b851f80b40",
+        "c86318a41b01fa4a3d220cc81fef1cdb69a95822765655a3e009dce0584b12d5",
+        "98c1dbc8478d906610d5a2d059919e71de33ee80e88201db095bc66f0f054d9c",
+        "a728ce11199c32dad33093b328ad99ae94f45bebadea30a5fd3d9bc257709b2e",
+        "07d733f028520a3f0517a9ef9102f0ad6fa883a89611d5775b46203028a8d106"
+      ]
+    }
+  },
+  "authored_frame_count": 16,
+  "runtime_frame_order": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ]
+}
