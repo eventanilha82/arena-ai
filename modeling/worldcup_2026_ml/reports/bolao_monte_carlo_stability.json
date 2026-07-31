@@ -997,7 +997,7 @@
     },
     "passed": true
   },
-  "generated_at": "2026-07-31T18:36:32.405046Z",
+  "generated_at": "2026-07-31T19:11:36.649749Z",
   "independent_seed_audit": {
     "comparisons": [
       {
@@ -1264,7 +1264,7 @@
     },
     "stability_audit": {
       "path": "scripts/bolao_mc_stability.py",
-      "sha256": "8d1e4ad59251de8d185f65bd83ba57a82e5776c0c5eeab30298e971bf6d16aee"
+      "sha256": "b8928e238751794c424d487d01f2525e7541cefe00df06dbd18dabb8c52b1990"
     },
     "worldcup_model": {
       "path": "src/arena_ai/worldcup_model.py",

@@ -465,6 +465,18 @@ def build_report(
 def write_report(path: Path, report: dict[str, object]) -> Path:
     target = path if path.is_absolute() else ROOT / path
     target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing = None
+        if isinstance(existing, dict):
+            existing_body = dict(existing)
+            candidate_body = dict(report)
+            existing_body.pop("generated_at", None)
+            candidate_body.pop("generated_at", None)
+            if existing_body == candidate_body:
+                return target
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return target
 
