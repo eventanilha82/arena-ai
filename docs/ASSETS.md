@@ -467,9 +467,11 @@ Embora este documento consolide principalmente fontes/licenças, estes grupos ta
 - `assets/generated/stadium_parallax_real.png`: estádio/campo do confronto.
 - `assets/generated/parallax_sources/imagen_turf_*.png`: fontes do gramado geradas por `image_gen`.
 - `assets/generated/parallax/turf_*_strip.png`: faixas preparadas para parallax.
-- `assets/generated/cinematic/runner*_smooth_*.png`: inventário final de 54 sheets para 9 uniformes, 2 direções e corrida/chute/parada. Cada direção tem 16 poses de corrida, 16 de chute e 8 de parada. Não há espelhamento, fluxo óptico, recoloração de jogador ou wordmark sobreposto; `ORACLE` está nos pixels originais.
-- `assets/generated/cinematic/runner_motion.json`: contrato runtime v8 de pivô, baseline, pelve, apoio, toque, compensação autoral de altura e `ball_clearance_offset_px` alpha-safe em cada quadro de corrida e chute.
-- `assets/generated/cinematic/keeper_anim_{right,left}_{0..15}.png` e `keeper_motion.json`: 16 quadros finais por direção; o jogo separa a direção visual do asset da projeção do goleiro, ancora o pouso no gramado, mantém a pose derrotada após gol sofrido e usa a recuperação completa nos lances sem gol.
+- `assets/generated/cinematic/poc2_runner_{right,left}_*.png`: 18 sheets promovidos para 9 uniformes e 2 direções, com 8 poses GPT Image diretas em canvas `320x320`. Esquerda e direita foram produzidas separadamente; `ORACLE` está nos pixels originais.
+- `assets/generated/cinematic/poc2_runner_motion.json`: contrato promovido da corrida e condução, com timing variável, apoio, root offset, contato com a bola e ciclo de `1,6 s` sem morph ou crossfade. O `source_sha256` de cada pose é um recibo interno da geração; como as fontes intermediárias foram removidas depois da promoção, a integridade reproduzível no repositório é garantida pelo hash do sheet e pelo hash RGBA de cada quadro final, ambos validados no carregamento.
+- `assets/generated/cinematic/runner*_smooth_*.png`: inventário final de 54 sheets que preserva 16 poses de chute, 8 de parada e a corrida legada de 16 poses por uniforme/direção. Não há espelhamento, fluxo óptico, recoloração de jogador ou wordmark sobreposto.
+- `assets/generated/cinematic/runner_motion.json`: contrato runtime v8 de chute/parada, pivô, baseline, pelve, apoio, toque, compensação autoral de altura e `ball_clearance_offset_px` alpha-safe.
+- `assets/generated/cinematic/keeper_anim_{right,left}_{0..15}.png` e `keeper_motion.json`: 16 quadros runtime por direção, com 15 poses únicas e um quadro aprovado de reset; o jogo separa a direção visual do asset da projeção do goleiro, ancora o pouso no gramado, mantém a pose derrotada após gol sofrido e usa a recuperação completa nos lances sem gol.
 - `assets/generated/cinematic/poc7_runtime_contract.json`: contrato cinematográfico v5 promovido. Contém 30 sequências, amostras gerais a 60 Hz, cues de áudio, pesos dos medoids, cadências da rede e hashes de todas as camadas rasterizadas.
 - `assets/generated/cinematic/poc7_net/`: 58 PNGs finais: quatro camadas compartilhadas e três arquivos por campanha de gol (`static_back`, atlas traseiro e atlas de contato). Cada uma das 18 campanhas possui 70 estados traseiros a 30 Hz e contato frontal até `180 ms`; o runtime nunca usa crossfade.
 - `assets/generated/balls3d/ball_{0..31}.png`: 32 quadros finais promovidos; o runtime escolhe um quadro nativo, sem blend sintético.
@@ -501,7 +503,7 @@ make cinematic-game-qa
 make aaa-qa
 ```
 
-O runtime não executa chroma key, fluxo óptico, espelhamento de personagem, recoloração dos jogadores de linha ou sobreposição de `ORACLE`. Cada pose visível vem de um quadro GPT Image direto, com esquerda e direita produzidas separadamente. A escala de composição permanece constante durante a animação; deslocamento mundial, sombra, bola e câmera são integrados em substeps fixos de 60 Hz. O uniforme contrastante do goleiro permanece como a única adaptação cromática em runtime. Se um sheet, direção, pose, contrato ou metadata estiver ausente ou stale, os gates reprovam o inventário.
+O runtime não executa chroma key, fluxo óptico, espelhamento de personagem, recoloração dos jogadores de linha, morph, crossfade integral ou sobreposição de `ORACLE`. Cada pose visível vem de um quadro GPT Image direto, com esquerda e direita produzidas separadamente. POC2 distribui suas 8 poses por timing variável em um ciclo exato de `1,6 s`; escala, handoff para o chute, sombra, bola e câmera são integrados de forma determinística. O uniforme contrastante do goleiro permanece como a única adaptação cromática em runtime. Se um sheet, direção, pose, contrato ou metadata estiver ausente ou stale, os gates reprovam o inventário.
 
 ## Validação
 
@@ -541,7 +543,7 @@ artifacts/visual_qa/current/
 `make aaa-qa` adiciona gates pesados:
 
 - ausência de sprites obsoletos no inventário runtime;
-- `ORACLE` nativo e visível no peito em 720 combinações de uniforme, direção e quadro de corrida/chute/parada, com área, limites, contraste e cobertura medidos nos pixels finais; as folhas de contato mantêm a leitura tipográfica como revisão visual explícita, sem fingir que a heurística de cor é OCR;
+- `ORACLE` nativo e visível no peito em 864 combinações de uniforme, direção e quadro: 720 poses legadas de corrida/chute/parada mais as 144 poses POC2 ativas, com área, limites, contraste e cobertura medidos nos pixels finais; as folhas de contato mantêm a leitura tipográfica como revisão visual explícita, sem fingir que a heurística de cor é OCR;
 - locomoção e planta medidas na silhueta alpha final dos nove uniformes nos dois sentidos, com rejeição de flutuação, submersão, deslocamento da raiz corporal e mutações mesmo quando o metadata permanece inalterado;
 - corredor da bola do contrato promovido com ajuste alpha mínimo por pose, uniforme, direção, rotação e altura da bola; o gate percorre as 30 sequências nos nove uniformes e nove instantes pós-chute, inclui os rastros visíveis e limita o overlap a `3%`;
 - pernas e bbox;
@@ -550,7 +552,7 @@ artifacts/visual_qa/current/
 - silhueta única por ator, sem crossfade integral ou alpha residual;
 - bola duplicada, grudada ou atravessando a perna;
 - retomada sequencial da corrida após o chute;
-- goleiro no gol, 16 quadros diretos por direção e uma única silhueta por update;
+- goleiro no gol, 16 quadros runtime por direção (15 poses únicas mais reset) e uma única silhueta por update;
 - bola na rede;
 - rede visível;
 - parallax sem seam;

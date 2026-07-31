@@ -15,6 +15,7 @@ import tempfile
 import time
 import zipfile
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
@@ -32,6 +33,7 @@ from arena_ai.main import (
     CINEMATIC_BALL_MATERIAL_FRAME_COUNT,
     CINEMATIC_BALL_MATERIAL_BLEND_STEPS,
     CINEMATIC_KEEPER_FRAME_COUNT,
+    CINEMATIC_GOAL_COMPOSITE_CACHE_LIMIT,
     CINEMATIC_PLAYER_SCALE,
     CINEMATIC_POSE_SIZE,
     CINEMATIC_KICK_FRAME_COUNT,
@@ -59,11 +61,16 @@ from arena_ai.main import (
     HEIGHT,
 )
 from arena_ai.cinematic_poc_runtime import (
+    POC_APPROVED_REFERENCE_VISIBLE_HEIGHT,
     POC_RUNNER_CANVAS_SIZE,
     POC_RUNNER_ROOT,
     PocSequence,
     PocSequenceSample,
     PocViewport,
+)
+from arena_ai.cinematic_dribble_runtime import (
+    CinematicDribbleRuntime,
+    Poc2DribbleSample,
 )
 from arena_ai.cinematic_uniforms import CINEMATIC_UNIFORMS, UNIFORM_CODES
 from arena_ai.audio_manifest import AUDIO_RUNTIME_FILES, GOAL_AUDIO_SEQUENCE, REQUIRED_AUDIO_BUSES
@@ -104,6 +111,7 @@ SMOOTH_KICK_SHEET_SIZE = (1152, 1152)
 SMOOTH_STOP_SHEET_SIZE = (1152, 576)
 KEEPER_SPRITE_SIZE = (340, 340)
 RUNNER_MOTION = CINEMATIC_DIR / "runner_motion.json"
+POC2_RUNNER_MOTION = CINEMATIC_DIR / "poc2_runner_motion.json"
 KEEPER_MOTION = CINEMATIC_DIR / "keeper_motion.json"
 REQUIRED_SOUNDS = tuple(f"runtime_assets/{filename}" for filename in AUDIO_RUNTIME_FILES)
 GOAL_AUDIO_EVENTS = list(GOAL_AUDIO_SEQUENCE)
@@ -124,6 +132,7 @@ AUXILIARY_CACHE_LIMITS = {
     "gradient_tile_cache": 8,
     "gradient_mask_cache": 8,
     "surface_bbox_cache": 360,
+    "poc_goal_composite_cache": CINEMATIC_GOAL_COMPOSITE_CACHE_LIMIT,
     "cinematic_ball_corridor_cache": 128,
     "ball_net_path_cache": 128,
     "cinematic_ball_history_cache": 32,
@@ -250,6 +259,7 @@ def auxiliary_cache_sizes(app: App) -> dict[str, int]:
         "gradient_tile_cache": len(app.gradient_tile_cache),
         "gradient_mask_cache": len(app.gradient_mask_cache),
         "surface_bbox_cache": len(app.surface_bbox_cache),
+        "poc_goal_composite_cache": len(app.poc_goal_composite_cache),
         "cinematic_ball_corridor_cache": len(app.cinematic_ball_corridor_cache),
         "ball_net_path_cache": len(app.ball_net_path_cache),
         "cinematic_ball_history_cache": len(app.cinematic_ball_history_cache),
@@ -853,6 +863,8 @@ def alpha_pixel_count(surface: pygame.Surface, threshold: int = 25, step: int = 
 def expected_cinematic_runtime_files() -> set[str]:
     expected: set[str] = set()
     for code in ROWS:
+        expected.add(f"poc2_runner_right_{code}.png")
+        expected.add(f"poc2_runner_left_{code}.png")
         expected.add(f"runner_smooth_{code}.png")
         expected.add(f"runner_left_smooth_{code}.png")
         expected.add(f"runner_kick_smooth_{code}.png")
@@ -890,6 +902,27 @@ def validate_flag_sprites() -> None:
 
 
 def validate_cinematic_inventory() -> None:
+    try:
+        poc2_runtime = CinematicDribbleRuntime.load(POC2_RUNNER_MOTION)
+    except Exception as exc:
+        raise AssertionError(
+            f"invalid promoted POC 2 motion contract: {exc}"
+        ) from exc
+    if (
+        poc2_runtime.metadata.status != "promoted"
+        or set(poc2_runtime.uniform_codes) != set(UNIFORM_CODES)
+        or set(poc2_runtime.direction_names) != {"right", "left"}
+        or poc2_runtime.metadata.frame_count != 8
+        or not math.isclose(
+            poc2_runtime.metadata.cycle_seconds,
+            1.6,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        )
+    ):
+        raise AssertionError(
+            f"invalid promoted POC 2 motion metadata: {POC2_RUNNER_MOTION}"
+        )
     if not RUNNER_MOTION.exists():
         raise AssertionError(f"missing grounded runner metadata: {RUNNER_MOTION}")
     runner_motion = json.loads(RUNNER_MOTION.read_text(encoding="utf-8"))
@@ -985,6 +1018,8 @@ def validate_cinematic_inventory() -> None:
         raise AssertionError(f"cinematic runtime sprite inventory mismatch; extra={extra}, missing={missing}")
     for sample_name, expected_size in (
         ("runner_smooth_blue.png", SMOOTH_RUNNER_SHEET_SIZE),
+        ("poc2_runner_right_blue.png", (1280, 640)),
+        ("poc2_runner_left_blue.png", (1280, 640)),
         ("runner_kick_smooth_blue.png", SMOOTH_KICK_SHEET_SIZE),
         ("runner_stop_smooth_blue.png", SMOOTH_STOP_SHEET_SIZE),
         ("keeper_anim_right_0.png", KEEPER_SPRITE_SIZE),
@@ -1039,6 +1074,7 @@ def validate_authored_cinematic_sprites() -> None:
 
     active_sources = (
         ROOT / "src" / "arena_ai" / "main.py",
+        ROOT / "src" / "arena_ai" / "cinematic_dribble_runtime.py",
         ROOT / "src" / "arena_ai" / "cinematic_poc_runtime.py",
     )
     forbidden_imports = {"scripts.motion_interpolation"}
@@ -1167,6 +1203,118 @@ def validate_authored_cinematic_sprites() -> None:
 
     if len(avatar_alpha_signatures) != len(UNIFORM_CODES):
         raise AssertionError("the nine uniform colors do not preserve nine distinct authored avatar silhouettes")
+
+    poc2_motion = json.loads(POC2_RUNNER_MOTION.read_text(encoding="utf-8"))
+    poc2_frame_size = int(poc2_motion["canvas_size"])
+    poc2_frame_count = int(poc2_motion["frame_count"])
+    poc2_columns = int(poc2_motion["sheet_columns"])
+    if (
+        poc2_motion.get("status") != "promoted"
+        or poc2_frame_size != 320
+        or poc2_frame_count != 8
+        or poc2_columns != 4
+    ):
+        raise AssertionError(
+            "promoted POC 2 authored player contract drifted: "
+            f"status={poc2_motion.get('status')}, size={poc2_frame_size}, "
+            f"frames={poc2_frame_count}, columns={poc2_columns}"
+        )
+    poc2_sequences: dict[tuple[str, str], list[pygame.Surface]] = {}
+    for code in UNIFORM_CODES:
+        for direction in ("right", "left"):
+            entry = poc2_motion["uniforms"][code]["directions"][direction]
+            sheet_path = CINEMATIC_DIR / str(entry["sheet"])
+            frames = authored_sheet_frames(
+                sheet_path,
+                poc2_frame_size,
+                poc2_columns,
+                poc2_frame_count,
+            )
+            poc2_sequences[(code, direction)] = frames
+            frame_hashes = {
+                hashlib.sha256(
+                    pygame.image.tobytes(frame, "RGBA")
+                ).hexdigest()
+                for frame in frames
+            }
+            if len(frame_hashes) != poc2_frame_count:
+                raise AssertionError(
+                    f"POC 2 {code} {direction} repeats authored run poses"
+                )
+
+            areas: list[int] = []
+            for index, frame in enumerate(frames):
+                label = f"POC 2 {code} {direction} run frame {index}"
+                bbox = alpha_bbox(frame)
+                margins = (
+                    bbox.left,
+                    bbox.top,
+                    poc2_frame_size - bbox.right,
+                    poc2_frame_size - bbox.bottom,
+                )
+                if min(margins) < 8:
+                    raise AssertionError(
+                        f"{label} is clipped: bbox={bbox}, margins={margins}"
+                    )
+                detached = [
+                    (size, rect)
+                    for size, rect in alpha_components(frame)[1:]
+                    if size > 20
+                ]
+                if detached:
+                    raise AssertionError(
+                        f"{label} contains detached neighboring fragments: {detached}"
+                    )
+                if (
+                    chroma_leak_count(frame) > 4
+                    or opaque_chroma_artifact_count(frame) > 4
+                ):
+                    raise AssertionError(
+                        f"{label} contains visible magenta-key residue"
+                    )
+                if interior_soft_alpha_ratio(frame) > 0.010:
+                    raise AssertionError(
+                        f"{label} contains translucent double-exposure pixels"
+                    )
+                if oracle_mark_pixel_count(frame, code) < 60:
+                    raise AssertionError(
+                        f"{label} lost the native ORACLE shirt mark"
+                    )
+                assert_green_uniform_alpha(frame, code, sheet_path)
+                assert_no_light_short_holes(frame, code, sheet_path, 220)
+                areas.append(alpha_pixel_count(frame))
+
+            area_ratio = max(areas) / max(1, min(areas))
+            if area_ratio > 1.35:
+                raise AssertionError(
+                    f"POC 2 {code} {direction} run silhouette scale flickers: "
+                    f"ratio={area_ratio:.3f}"
+                )
+            deltas = [
+                perceptual_frame_delta(first, second)
+                for first, second in zip(frames, frames[1:])
+            ]
+            if min(deltas) < 5.0 or max(deltas) > 30.0:
+                raise AssertionError(
+                    f"POC 2 {code} {direction} authored cadence is static or pops: "
+                    f"min={min(deltas):.3f}, max={max(deltas):.3f}"
+                )
+
+        for index, (right, left) in enumerate(
+            zip(
+                poc2_sequences[(code, "right")],
+                poc2_sequences[(code, "left")],
+            )
+        ):
+            mirrored = pygame.transform.flip(right, True, False)
+            if (
+                pygame.image.tobytes(left, "RGBA")
+                == pygame.image.tobytes(mirrored, "RGBA")
+                or perceptual_frame_delta(left, mirrored) < 0.50
+            ):
+                raise AssertionError(
+                    f"POC 2 {code} run frame {index} left art is effectively mirrored"
+                )
 
     keeper_motion = json.loads(KEEPER_MOTION.read_text(encoding="utf-8"))
     keeper_sequences: dict[str, list[pygame.Surface]] = {}
@@ -1304,7 +1452,47 @@ def validate_native_oracle_legibility() -> None:
                             f"runtime native ORACLE collapses for {code} {direction} {action} frame {index}: {bounds}"
                         )
                     checked += 1
-    expected = len(UNIFORM_CODES) * 2 * (16 + 16 + CINEMATIC_STOP_FRAME_COUNT)
+    poc2_motion = json.loads(POC2_RUNNER_MOTION.read_text(encoding="utf-8"))
+    poc2_frame_size = int(poc2_motion["canvas_size"])
+    poc2_frame_count = int(poc2_motion["frame_count"])
+    poc2_columns = int(poc2_motion["sheet_columns"])
+    poc2_scale = (
+        CINEMATIC_POSE_SIZE
+        * CINEMATIC_PLAYER_SCALE
+        / POC_APPROVED_REFERENCE_VISIBLE_HEIGHT
+    )
+    poc2_target_size = max(1, round(poc2_frame_size * poc2_scale))
+    for code in UNIFORM_CODES:
+        for direction in ("right", "left"):
+            entry = poc2_motion["uniforms"][code]["directions"][direction]
+            path = CINEMATIC_DIR / str(entry["sheet"])
+            frames = authored_sheet_frames(
+                path,
+                poc2_frame_size,
+                poc2_columns,
+                poc2_frame_count,
+            )
+            for index, frame in enumerate(frames):
+                rendered = pygame.transform.smoothscale(
+                    frame,
+                    (poc2_target_size, poc2_target_size),
+                )
+                count, bounds = oracle_mark_bounds(rendered, code)
+                if oracle_mark_pixel_count(rendered, code) < 18 or count < 12:
+                    raise AssertionError(
+                        "runtime native ORACLE disappears for POC 2 "
+                        f"{code} {direction} run frame {index}: "
+                        f"pixels={count}, bounds={bounds}"
+                    )
+                if bounds.w < 8 or bounds.h < 3:
+                    raise AssertionError(
+                        "runtime native ORACLE collapses for POC 2 "
+                        f"{code} {direction} run frame {index}: {bounds}"
+                    )
+                checked += 1
+    expected = len(UNIFORM_CODES) * 2 * (
+        16 + 16 + CINEMATIC_STOP_FRAME_COUNT + poc2_frame_count
+    )
     if checked != expected:
         raise AssertionError(f"runtime native ORACLE coverage is incomplete: {checked}/{expected}")
 
@@ -1573,6 +1761,29 @@ def runner_render_for_state(
     state: dict[str, object],
     direction: int,
 ) -> tuple[pygame.Surface, pygame.Rect]:
+    poc2_sample = state.get("poc2_dribble_sample")
+    if (
+        isinstance(poc2_sample, Poc2DribbleSample)
+        and bool(state.get("poc2_dribble"))
+        and not bool(state.get("settled", False))
+    ):
+        team_code = getattr(team, "code")
+        frames = (
+            app.assets.cinematic_poc2_runners_left[team_code]
+            if direction < 0
+            else app.assets.cinematic_poc2_runners[team_code]
+        )
+        frame = frames[poc2_sample.frame_index]
+        target = (
+            max(1, round(poc2_sample.player.scene_size)),
+        ) * 2
+        rendered = app.cached_smoothscale(frame, target)
+        rect = pygame.Rect(
+            round(poc2_sample.player.scene_left),
+            round(poc2_sample.player.scene_top),
+            *target,
+        )
+        return rendered, rect
     sequence = state.get("poc_contract_sequence")
     sample = state.get("poc_contract_sample")
     viewport = state.get("poc_viewport")
@@ -1589,28 +1800,58 @@ def runner_render_for_state(
             )
         )
         actor_scale *= viewport.scale
+        source_canvas_size = (
+            int(app.assets.cinematic_poc2_motion["canvas_size"])
+            if sample.actor_source == 0
+            else POC_RUNNER_CANVAS_SIZE
+        )
         target = (
             max(
                 1,
-                round(POC_RUNNER_CANVAS_SIZE * actor_scale),
+                round(source_canvas_size * actor_scale),
             ),
         ) * 2
         root = viewport.point(
             float(state["poc_actor_x"]),
             sample.actor_ground_y,
         )
-        rect = pygame.Rect(
-            round(
-                root[0]
-                - POC_RUNNER_ROOT[0] * actor_scale
-            ),
-            round(
-                root[1]
-                - POC_RUNNER_ROOT[1] * actor_scale
-            ),
-            *target,
-        )
-        return app.cached_smoothscale(frame, target), rect
+        rendered = app.cached_smoothscale(frame, target)
+        if sample.actor_source == 0:
+            rect = pygame.Rect(
+                round(
+                    root[0]
+                    - source_canvas_size * 0.5 * actor_scale
+                ),
+                round(
+                    root[1]
+                    - float(
+                        app.assets.cinematic_poc2_motion[
+                            "canvas_ground_y"
+                        ]
+                    )
+                    * actor_scale
+                ),
+                *target,
+            )
+        else:
+            rect = pygame.Rect(
+                round(
+                    root[0]
+                    - POC_RUNNER_ROOT[0] * actor_scale
+                ),
+                round(
+                    root[1]
+                    - POC_RUNNER_ROOT[1] * actor_scale
+                ),
+                *target,
+            )
+            visible_actor = app.visible_bbox(rendered)
+            submersion = (
+                rect.top + visible_actor.bottom - round(root[1])
+            )
+            if submersion > 0:
+                rect.y -= submersion
+        return rendered, rect
     rendered_kind = str(state.get("rendered_player_kind", "run"))
     pose_key = "kick_pose" if rendered_kind == "kick" else "runner_pose"
     pose = state.get(pose_key)
@@ -1987,7 +2228,10 @@ def validate_aaa_findings_light_gate() -> None:
         possession_team = app.home if side == "home" else app.away
 
         actor_frames: set[tuple[int, int]] = set()
-        actor_sizes: set[tuple[int, int]] = set()
+        actor_visible_heights: dict[int, list[int]] = {
+            0: [],
+            1: [],
+        }
         for progress in (
             0.10,
             0.22,
@@ -2018,21 +2262,43 @@ def validate_aaa_findings_light_gate() -> None:
                 )
             )
             actor_frames.add((sample.actor_source, render_frame))
-            actor_sizes.add(
-                (
-                    round(288.0 * actor_scale * viewport.scale),
-                    round(288.0 * actor_scale * viewport.scale),
-                )
+            source_canvas_size = (
+                int(app.assets.cinematic_poc2_motion["canvas_size"])
+                if sample.actor_source == 0
+                else POC_RUNNER_CANVAS_SIZE
+            )
+            target_size = max(
+                1,
+                round(
+                    source_canvas_size
+                    * actor_scale
+                    * viewport.scale
+                ),
+            )
+            rendered = pygame.transform.smoothscale(
+                _frame,
+                (target_size, target_size),
+            )
+            actor_visible_heights[sample.actor_source].append(
+                rendered.get_bounding_rect(min_alpha=30).height
             )
         if len(actor_frames) < 6:
             raise AssertionError(
                 f"{goal_sequence.key}: approved run/kick progression is too sparse: "
                 f"{sorted(actor_frames)}"
             )
-        if len(actor_sizes) != 1:
+        if any(not heights for heights in actor_visible_heights.values()):
             raise AssertionError(
-                f"{goal_sequence.key}: player changes size across the POC sequence: "
-                f"{sorted(actor_sizes)}"
+                f"{goal_sequence.key}: run/kick height samples are incomplete: "
+                f"{actor_visible_heights}"
+            )
+        run_height = float(np.median(actor_visible_heights[0]))
+        kick_height = float(np.median(actor_visible_heights[1]))
+        if abs(run_height - kick_height) > 5.0:
+            raise AssertionError(
+                f"{goal_sequence.key}: visible player height changes at the "
+                f"run/kick handoff: {run_height:.1f}/{kick_height:.1f} "
+                f"from {actor_visible_heights}"
             )
 
         payoff_states = [
@@ -2140,9 +2406,9 @@ def validate_aaa_findings_light_gate() -> None:
                 app.draw_cinematic_poc_keeper = original_keeper  # type: ignore[method-assign]
 
             expected_middle = (
-                ["actor", "keeper", "ball"]
+                ["actor", "ball", "keeper"]
                 if sample.ball_after_keeper
-                else ["actor", "ball", "keeper"]
+                else ["actor", "keeper", "ball"]
             )
             expected_order = [
                 "goal_back",
@@ -2154,6 +2420,64 @@ def validate_aaa_findings_light_gate() -> None:
                     f"{direction}/{outcome}: POC layer order drifted: "
                     f"{render_order} != {expected_order}"
                 )
+
+
+def validate_match_final_cinematic_settlement_gate() -> None:
+    app = App(seed=2026)
+    app.set_simulate("match")
+    pred = replace(
+        home_win_prediction(),
+        score_home=6,
+        score_away=4,
+    )
+    app.match_prediction = pred
+    if app.goal_schedule(pred)[-1][0] != 86:
+        raise AssertionError("final settlement fixture lost its late goal")
+    app.t = SIMULATION_SECONDS
+    field = app.match_field_rect()
+    state = app.cinematic_scene_state(field, pred)
+    ball_x, _ball_y = state["ball_pos"]  # type: ignore[misc]
+    if (
+        state.get("active_attack") is not None
+        or not bool(state.get("settled"))
+        or abs(float(ball_x) - field.centerx) > 1e-6
+    ):
+        raise AssertionError(
+            "finished match must leave the player/ball settled at midfield"
+        )
+
+
+def validate_goal_composite_cache_bound_gate() -> None:
+    app = App(seed=2026)
+    patch = pygame.Surface((2, 2), pygame.SRCALPHA)
+    patch.fill((255, 255, 255, 255))
+    scaled_cache_size = len(app.surface_cache.scaled)
+    for index in range(CINEMATIC_GOAL_COMPOSITE_CACHE_LIMIT + 5):
+        rendered = app.cinematic_poc_composite_goal_layer(
+            cache_key=("qa-cache", index),
+            canvas_size=(4, 4),
+            patch=patch,
+            patch_rect=(1, 1, 2, 2),
+            target_size=(3, 3),
+        )
+        if rendered.get_size() != (3, 3):
+            raise AssertionError("goal composite cache returned native size")
+    if len(app.poc_goal_composite_cache) != CINEMATIC_GOAL_COMPOSITE_CACHE_LIMIT:
+        raise AssertionError(
+            "goal composite LRU cache did not enforce its memory bound"
+        )
+    if (
+        "scaled_goal_composite",
+        "qa-cache",
+        0,
+        3,
+        3,
+    ) in app.poc_goal_composite_cache:
+        raise AssertionError("goal composite LRU cache did not evict oldest entry")
+    if len(app.surface_cache.scaled) != scaled_cache_size:
+        raise AssertionError(
+            "dynamic goal composites leaked into the global scale cache"
+        )
 
 
 def validate_audio_event_order() -> None:
@@ -2824,7 +3148,14 @@ def validate_chance_schedule_no_dead_air() -> None:
         for minute in range(4, 89, 4):
             app.t = minute / 90.0 * SIMULATION_SECONDS
             state = app.cinematic_scene_state(field, pred)
-            if state.get("active_goal") or float(state.get("run_speed", 0.0)) > 0.38:
+            if (
+                state.get("active_goal")
+                or (
+                    state.get("poc2_dribble")
+                    and not state.get("settled")
+                )
+                or float(state.get("run_speed", 0.0)) > 0.38
+            ):
                 active_samples += 1
             ball = state.get("ball_pos")
             if isinstance(ball, tuple) and previous_ball is not None and math.dist(previous_ball, ball) > 1.0:
@@ -4252,6 +4583,7 @@ STANDARD_STEPS = (
     validate_match_runtime_state_cache_gate,
     validate_ball_physics_contract_fast,
     validate_aaa_findings_light_gate,
+    validate_match_final_cinematic_settlement_gate,
     validate_copa_copy_contract,
     validate_chance_schedule_no_dead_air,
     validate_nil_draw_has_no_fake_goals_gate,
@@ -4269,6 +4601,7 @@ AAA_STEPS = (
     validate_parallax_assets,
     validate_authored_cinematic_sprites,
     validate_native_oracle_legibility,
+    validate_goal_composite_cache_bound_gate,
     validate_audio_event_order,
     validate_fifa_external_assets,
     *STANDARD_STEPS,

@@ -38,17 +38,20 @@ from arena_ai.cinematic_poc_runtime import (
     PocSequenceBank,
     PocViewport,
 )
+from arena_ai.cinematic_dribble_runtime import CinematicDribbleRuntime
 from arena_ai.cinematic_uniforms import CINEMATIC_UNIFORMS
 from arena_ai.main import (
     App,
     BG,
     CHANCE_EVENT_WINDOW_MINUTES,
     CHANCE_PAYOFF_MINUTES,
+    CINEMATIC_POC_NET_SAFE_FRAME_REMAP,
     CinematicAttackEvent,
     GOAL_EVENT_WINDOW_MINUTES,
     GOAL_PAYOFF_MINUTES,
     MatchRuntimeState,
     SIMULATION_SECONDS,
+    smoothstep,
 )
 from arena_ai.worldcup_model import Prediction
 CONTRACT = (
@@ -57,6 +60,13 @@ CONTRACT = (
     / "generated"
     / "cinematic"
     / "poc7_runtime_contract.json"
+)
+POC2_CONTRACT = (
+    ROOT
+    / "assets"
+    / "generated"
+    / "cinematic"
+    / "poc2_runner_motion.json"
 )
 MANIFEST = ROOT / "assets" / "asset_manifest.json"
 PROFILES = ("high", "mid", "low")
@@ -70,13 +80,15 @@ CLEARANCE_RELEASE_OFFSETS = tuple(
 EXPECTED_SEQUENCE_COUNT = 30
 EXPECTED_RENDERER_CASES = 150
 EXPECTED_ACTOR_PROGRESSION_CASES = 18
+EXPECTED_POC2_MOTION_CASES = 162
+EXPECTED_POC2_HANDOFF_CASES = 270
 EXPECTED_CLEARANCE_CASES = 2_430
 EXPECTED_E2E_CASES = 6
 EXPECTED_FRAMEBUFFER_CASES = 8
 EXPECTED_PRELOAD_ASSETS = 58
 EXPECTED_SEQUENTIAL_NET_CASES = 2_502
-EVIDENCE_SCHEMA_VERSION = 13
-EXPECTED_RUNTIME_ASSETS = 181
+EVIDENCE_SCHEMA_VERSION = 14
+EXPECTED_RUNTIME_ASSETS = 200
 EVIDENCE_ARTIFACT = "approved_cinematic_runtime_renderer"
 EVIDENCE_CAPTURE_POLICY = (
     "30 promoted sequences x 5 renderer checkpoints "
@@ -496,6 +508,278 @@ def validate_profile_ordering(
                 )
 
 
+def validate_poc2_dribble_runtime(
+    bank: PocSequenceBank,
+    failures: list[str],
+) -> tuple[int, int]:
+    try:
+        runtime = CinematicDribbleRuntime.load(POC2_CONTRACT)
+    except Exception as exc:
+        failures.append(f"invalid promoted POC 2 runtime: {exc}")
+        return 0, 0
+
+    app = App(seed=20260728)
+    if app.poc2_dribble.metadata.contract_sha256 != runtime.metadata.contract_sha256:
+        failures.append("game runtime loaded a different POC 2 contract")
+    if app.assets.cinematic_poc2_motion.get("status") != "promoted":
+        failures.append("game assets did not load the promoted POC 2 contract")
+
+    motion_cases = 0
+    for uniform in CINEMATIC_UNIFORMS:
+        for direction_name in DIRECTIONS:
+            left = direction_name == "left"
+            direction = runtime.direction(uniform.code, left)
+            frames = app.assets.cinematic_poc2_frames_for_uniform(
+                uniform.code,
+                left=left,
+            )
+            if len(frames) != runtime.metadata.frame_count:
+                failures.append(
+                    f"{uniform.code}/{direction_name}: POC 2 sheet did not "
+                    "materialize all eight frames"
+                )
+                continue
+            elapsed = 0.0
+            for frame in direction.frames:
+                sample = runtime.sample(
+                    uniform.code,
+                    left,
+                    elapsed + frame.effective_duration_seconds * 0.5,
+                    500.0,
+                    306.0,
+                )
+                if sample.frame_index != frame.index:
+                    failures.append(
+                        f"{uniform.code}/{direction_name}: variable timing "
+                        f"selected frame {sample.frame_index}/{frame.index}"
+                    )
+                if frames[frame.index].get_size() != (
+                    runtime.metadata.canvas_size_px,
+                    runtime.metadata.canvas_size_px,
+                ):
+                    failures.append(
+                        f"{uniform.code}/{direction_name}/{frame.index}: "
+                        "materialized POC 2 frame has invalid dimensions"
+                    )
+                if (
+                    not math.isclose(
+                        sample.player.scene_center_x,
+                        500.0,
+                        rel_tol=0.0,
+                        abs_tol=1e-9,
+                    )
+                    or not math.isclose(
+                        sample.player.scene_ground_y,
+                        306.0,
+                        rel_tol=0.0,
+                        abs_tol=1e-9,
+                    )
+                    or not math.isclose(
+                        sample.player.scene_size,
+                        float(runtime.metadata.canvas_size_px),
+                        rel_tol=0.0,
+                        abs_tol=1e-9,
+                    )
+                ):
+                    failures.append(
+                        f"{uniform.code}/{direction_name}/{frame.index}: "
+                        "POC 2 player geometry drifted"
+                    )
+                if (
+                    sample.frame.flight != frame.flight
+                    or sample.frame.phase != frame.phase
+                    or sample.ball.canvas_ground_y_px
+                    != runtime.metadata.canvas_ground_y_px
+                    or not math.isfinite(sample.ball.rotation_degrees)
+                    or not math.isfinite(sample.ball.angular_velocity_deg_s)
+                ):
+                    failures.append(
+                        f"{uniform.code}/{direction_name}/{frame.index}: "
+                        "POC 2 motion/ball state drifted"
+                    )
+                if not frame.flight and (
+                    frame.foot_lock_error_px is None
+                    or abs(frame.foot_lock_error_px) > 0.75
+                    or frame.foot_lock_error_y_px is None
+                    or abs(frame.foot_lock_error_y_px) > 3.0
+                ):
+                    failures.append(
+                        f"{uniform.code}/{direction_name}/{frame.index}: "
+                        "POC 2 authored support lock exceeds its envelope"
+                    )
+                elapsed += frame.effective_duration_seconds
+                motion_cases += 1
+            wrapped = runtime.sample(
+                uniform.code,
+                left,
+                runtime.metadata.cycle_seconds,
+                500.0,
+                306.0,
+            )
+            if wrapped.cycle_index != 1 or wrapped.frame_index != 0:
+                failures.append(
+                    f"{uniform.code}/{direction_name}: POC 2 cycle did not "
+                    "wrap deterministically at 1.6 seconds"
+                )
+            motion_cases += 1
+
+    handoff_cases = 0
+    for sequence in bank.sequences.values():
+        side = "home" if sequence.attack_direction == "right" else "away"
+        original = app.home if side == "home" else app.away
+        run_start, handoff = app.cinematic_poc2_run_window(sequence)
+        if not math.isclose(
+            handoff - run_start,
+            runtime.metadata.cycle_seconds,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            failures.append(
+                f"{sequence.key}: POC 2 visible run window is not exactly 1.6s"
+            )
+        for uniform in CINEMATIC_UNIFORMS:
+            team = replace(
+                original,
+                key=f"qa-handoff-{uniform.code}-{sequence.key}",
+                code=f"QA_HANDOFF_{uniform.code}",
+                kit=uniform.primary,
+            )
+            before = bank.sample(
+                sequence,
+                max(0.0, handoff - 1.0 / bank.sample_hz),
+            )
+            approved = app.cinematic_poc2_sequence_sample(
+                sequence,
+                before,
+                team,
+            )
+            at_handoff = bank.sample(sequence, handoff)
+            handoff_x = app.cinematic_poc_ball_x(
+                sequence,
+                at_handoff,
+                team,
+            )
+            handoff_rotation = app.cinematic_poc2_ball_rotation(
+                sequence,
+                at_handoff,
+                team,
+            )
+            before_frame, before_index, _before_metadata, before_scale = (
+                app.cinematic_poc_actor_material(
+                    sequence,
+                    before,
+                    team,
+                )
+            )
+            kick_frame, kick_index, kick_metadata, kick_scale = (
+                app.cinematic_poc_actor_material(
+                    sequence,
+                    at_handoff,
+                    team,
+                )
+            )
+            if (
+                before.actor_source != 0
+                or at_handoff.actor_source != 1
+                or approved.frame_index
+                != runtime.metadata.frame_count - 1
+                or before_index != runtime.metadata.frame_count - 1
+                or kick_index != 0
+            ):
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: POC 2 actor handoff "
+                    "did not execute run frame 7 -> kick frame 0"
+                )
+            before_target = round(
+                runtime.metadata.canvas_size_px * before_scale
+            )
+            kick_target = round(POC_RUNNER_CANVAS_SIZE * kick_scale)
+            if abs(before_target - kick_target) > 22:
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: actor canvas scale pops "
+                    f"at handoff {before_target}/{kick_target}"
+                )
+            before_rendered = pygame.transform.smoothscale(
+                before_frame,
+                (before_target, before_target),
+            )
+            kick_rendered = pygame.transform.smoothscale(
+                kick_frame,
+                (kick_target, kick_target),
+            )
+            before_visible = before_rendered.get_bounding_rect(min_alpha=30)
+            kick_visible = kick_rendered.get_bounding_rect(min_alpha=30)
+            before_ground_gap = round(
+                runtime.metadata.canvas_ground_y_px * before_scale
+            ) - before_visible.bottom
+            kick_ground_gap = round(
+                POC_RUNNER_ROOT[1] * kick_scale
+            ) - kick_visible.bottom
+            corrected_kick_ground_gap = max(0, kick_ground_gap)
+            kick_support = kick_metadata.get("support_foot")
+            if (
+                before_visible.w <= 0
+                or before_visible.h <= 0
+                or kick_visible.w <= 0
+                or kick_visible.h <= 0
+                or not 6 <= before_ground_gap <= 12
+                or corrected_kick_ground_gap != 0
+                or not isinstance(kick_support, list)
+                or len(kick_support) != 2
+                or abs(
+                    float(kick_support[1]) - POC_RUNNER_ROOT[1]
+                )
+                > 1.0
+            ):
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: actor bbox/support "
+                    "continuity drifted at POC 2 handoff"
+                )
+            before_actor_x = app.cinematic_poc_actor_x(
+                sequence,
+                before,
+                team,
+            )
+            handoff_actor_x = app.cinematic_poc_actor_x(
+                sequence,
+                at_handoff,
+                team,
+            )
+            if abs(handoff_actor_x - before_actor_x) > 1.0:
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: actor root jumps at handoff"
+                )
+            if not math.isclose(
+                handoff_x,
+                approved.ball.scene_center_x,
+                rel_tol=0.0,
+                abs_tol=1e-6,
+            ):
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: POC 2 handoff changed ball X"
+                )
+            if not math.isclose(
+                at_handoff.ball_y,
+                approved.ball.scene_center_y,
+                rel_tol=0.0,
+                abs_tol=1e-6,
+            ):
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: POC 2 handoff changed ball Y"
+                )
+            if not math.isclose(
+                handoff_rotation,
+                approved.ball.rotation_degrees,
+                rel_tol=0.0,
+                abs_tol=1e-6,
+            ):
+                failures.append(
+                    f"{sequence.key}/{uniform.code}: POC 2 handoff changed ball rotation"
+                )
+            handoff_cases += 1
+    return motion_cases, handoff_cases
+
+
 def surface_rgba_sha256(surface: pygame.Surface) -> str:
     return hashlib.sha256(
         pygame.image.tostring(surface, "RGBA")
@@ -507,6 +791,8 @@ def validate_sequential_net_contract(
     payload: dict[str, object],
     failures: list[str],
 ) -> int:
+    if CINEMATIC_POC_NET_SAFE_FRAME_REMAP != {4: 3, 5: 3, 6: 7}:
+        failures.append("promoted net safety remap drift")
     if not pygame.get_init():
         pygame.init()
     if pygame.display.get_surface() is None:
@@ -850,25 +1136,49 @@ def validate_renderer(
                 expected_keeper = expected_keeper_frames[
                     keeper_team.code
                 ][sample.keeper_frame]  # type: ignore[union-attr]
+                actor_team = app.home if side == "home" else app.away
                 expected_actor = app.cinematic_poc_actor_material(
                     sequence,
                     sample,  # type: ignore[arg-type]
-                    app.home if side == "home" else app.away,
+                    actor_team,
                 )[0]
-                ball_frame_index = (
-                    int(
-                        (
-                            float(sample.ball_rotation)  # type: ignore[union-attr]
-                            % 360.0
-                        )
-                        / 360.0
-                        * len(app.assets.balls)
+                recovery_start = sequence.release_seconds + 0.30
+                if (
+                    sample.actor_source == 1  # type: ignore[union-attr]
+                    and sample.elapsed >= recovery_start  # type: ignore[union-attr]
+                ):
+                    stop_frames = (
+                        app.assets.cinematic_stops_left[actor_team.code]
+                        if sequence.attack_direction == "left"
+                        else app.assets.cinematic_stops[actor_team.code]
                     )
-                    % len(app.assets.balls)
+                    recovery_progress = smoothstep(
+                        (
+                            sample.elapsed  # type: ignore[union-attr]
+                            - recovery_start
+                        )
+                        / 0.34
+                    )
+                    recovery_index = min(
+                        len(stop_frames) - 1,
+                        round(
+                            recovery_progress
+                            * (len(stop_frames) - 1)
+                        ),
+                    )
+                    expected_actor = stop_frames[recovery_index]
+                ball_size = max(
+                    1,
+                    round(POC_BALL_CANVAS_SIZE * viewport.scale),
                 )
-                expected_ball = app.assets.balls[
-                    ball_frame_index
-                ]
+                expected_ball = app.cached_cinematic_ball_material(
+                    ball_size,
+                    app.cinematic_poc2_ball_rotation(
+                        sequence,
+                        sample,  # type: ignore[arg-type]
+                        actor_team,
+                    ),
+                )
                 front_asset = bank.goal_front_layers[
                     expected_sequence.goal_side
                 ]
@@ -877,6 +1187,9 @@ def validate_renderer(
                     front_asset.sha256,
                 )
                 expected_goal_sources = [expected_front]
+                expected_goal_composite_keys: list[
+                    tuple[object, ...]
+                ] = []
                 if (
                     expected_sequence.outcome != "goal"
                     or sample.elapsed  # type: ignore[union-attr]
@@ -901,40 +1214,55 @@ def validate_renderer(
                             f"{expected_sequence.key}: missing net back"
                         )
                         continue
-                    expected_goal_sources.append(
-                        original_layer_load(
-                            expected_sequence.net_static_back,
-                            expected_sequence.net_static_back_sha256,
-                        )
+                    static_back = original_layer_load(
+                        expected_sequence.net_static_back,
+                        expected_sequence.net_static_back_sha256,
                     )
-                    net_frame = bank.nearest_net_keyframe(
+                    net_frame = app.cinematic_poc_net_keyframe(
                         expected_sequence,
-                        sample.elapsed,  # type: ignore[union-attr]
+                        sample,  # type: ignore[arg-type]
                     )
                     if net_frame is not None:
-                        expected_goal_sources.append(
-                            app.load_cinematic_poc_atlas_frame(
+                        expected_goal_composite_keys.append(
+                            (
+                                "back_net",
+                                expected_sequence.net_static_back,
                                 net_frame.back_roi,
-                                net_frame.back_roi_sha256,
                                 net_frame.back_roi_source_rect,
+                                net_frame.back_roi_rect,
                             )
                         )
+                    else:
+                        expected_goal_sources.append(static_back)
                     contact_frame = (
                         bank.nearest_net_contact_frame(
                             expected_sequence,
                             sample.elapsed,  # type: ignore[union-attr]
                         )
                     )
-                    if contact_frame is not None:
-                        expected_goal_sources.append(
-                            app.load_cinematic_poc_atlas_frame(
+                    if (
+                        contact_frame is not None
+                        and sample.elapsed  # type: ignore[union-attr]
+                        >= expected_sequence.impact_seconds
+                    ):
+                        expected_goal_composite_keys.append(
+                            (
+                                "front_contact",
                                 contact_frame.front_contact,
-                                contact_frame.front_contact_sha256,
                                 contact_frame.front_contact_source_rect,
+                                contact_frame.front_contact_rect,
                             )
                         )
                 scaled_sources: list[int] = []
+                composite_calls: list[
+                    tuple[tuple[object, ...], tuple[int, int] | None]
+                ] = []
+                ball_material_sources: list[int] = []
                 original_scale = app.cached_smoothscale
+                original_goal_composite = (
+                    app.cinematic_poc_composite_goal_layer
+                )
+                original_ball_material = app.cached_cinematic_ball_material
                 original_ball_draw = app.draw_cinematic_poc_ball
                 original_keeper_draw = app.draw_cinematic_poc_keeper
                 actor_layer_order: list[str] = []
@@ -945,6 +1273,36 @@ def validate_renderer(
                 ) -> pygame.Surface:
                     scaled_sources.append(id(image))
                     return original_scale(image, size)
+
+                def goal_composite_spy(
+                    *,
+                    cache_key: tuple[object, ...],
+                    canvas_size: tuple[int, int],
+                    patch: pygame.Surface,
+                    patch_rect: tuple[int, int, int, int],
+                    base: pygame.Surface | None = None,
+                    target_size: tuple[int, int] | None = None,
+                ) -> pygame.Surface:
+                    composite_calls.append((cache_key, target_size))
+                    return original_goal_composite(
+                        cache_key=cache_key,
+                        canvas_size=canvas_size,
+                        patch=patch,
+                        patch_rect=patch_rect,
+                        base=base,
+                        target_size=target_size,
+                    )
+
+                def ball_material_spy(
+                    size: int,
+                    rotation_degrees: float,
+                ) -> pygame.Surface:
+                    material = original_ball_material(
+                        size,
+                        rotation_degrees,
+                    )
+                    ball_material_sources.append(id(material))
+                    return material
 
                 def ball_draw_spy(
                     active_state: dict[str, object],
@@ -959,6 +1317,8 @@ def validate_renderer(
                     original_keeper_draw(active_state)
 
                 app.cached_smoothscale = scale_spy  # type: ignore[method-assign]
+                app.cinematic_poc_composite_goal_layer = goal_composite_spy  # type: ignore[method-assign]
+                app.cached_cinematic_ball_material = ball_material_spy  # type: ignore[method-assign]
                 app.draw_cinematic_poc_ball = ball_draw_spy  # type: ignore[method-assign]
                 app.draw_cinematic_poc_keeper = keeper_draw_spy  # type: ignore[method-assign]
                 try:
@@ -972,6 +1332,8 @@ def validate_renderer(
                     app.screen.set_clip(old_clip)
                 finally:
                     app.cached_smoothscale = original_scale  # type: ignore[method-assign]
+                    app.cinematic_poc_composite_goal_layer = original_goal_composite  # type: ignore[method-assign]
+                    app.cached_cinematic_ball_material = original_ball_material  # type: ignore[method-assign]
                     app.draw_cinematic_poc_ball = original_ball_draw  # type: ignore[method-assign]
                     app.draw_cinematic_poc_keeper = original_keeper_draw  # type: ignore[method-assign]
                 if id(expected_keeper) not in scaled_sources:
@@ -987,7 +1349,7 @@ def validate_renderer(
                     )
                 if (
                     sample.ball_visible  # type: ignore[union-attr]
-                    and id(expected_ball) not in scaled_sources
+                    and id(expected_ball) not in ball_material_sources
                 ):
                     failures.append(
                         f"{sequence.key}: renderer did not draw the approved ball"
@@ -997,10 +1359,18 @@ def validate_renderer(
                         failures.append(
                             f"{sequence.key}: renderer omitted an approved goal layer"
                         )
+                for composite_key in expected_goal_composite_keys:
+                    if (
+                        composite_key,
+                        expected_goal_size,
+                    ) not in composite_calls:
+                        failures.append(
+                            f"{sequence.key}: renderer omitted an approved goal composite"
+                        )
                 expected_layer_order = (
-                    ["keeper", "ball"]
+                    ["ball", "keeper"]
                     if sample.ball_after_keeper  # type: ignore[union-attr]
-                    else ["ball", "keeper"]
+                    else ["keeper", "ball"]
                 )
                 if actor_layer_order != expected_layer_order:
                     failures.append(
@@ -1158,26 +1528,50 @@ def validate_framebuffer_materialization(
             team,
         )
         actor_scale *= viewport.scale  # type: ignore[union-attr]
+        actor_canvas_size = (
+            int(app.assets.cinematic_poc2_motion["canvas_size"])
+            if actor_sample.actor_source == 0  # type: ignore[union-attr]
+            else POC_RUNNER_CANVAS_SIZE
+        )
         actor_size = max(
             1,
-            round(POC_RUNNER_CANVAS_SIZE * actor_scale),
+            round(actor_canvas_size * actor_scale),
         )
         actor_root = viewport.point(  # type: ignore[union-attr]
             float(actor_state["poc_actor_x"]),
             actor_sample.actor_ground_y,  # type: ignore[union-attr]
         )
-        actor_rect = pygame.Rect(
-            round(
-                actor_root[0]
-                - POC_RUNNER_ROOT[0] * actor_scale
-            ),
-            round(
-                actor_root[1]
-                - POC_RUNNER_ROOT[1] * actor_scale
-            ),
-            actor_size,
-            actor_size,
-        )
+        if actor_sample.actor_source == 0:  # type: ignore[union-attr]
+            actor_rect = pygame.Rect(
+                round(
+                    actor_root[0]
+                    - actor_canvas_size * 0.5 * actor_scale
+                ),
+                round(
+                    actor_root[1]
+                    - float(
+                        app.assets.cinematic_poc2_motion[
+                            "canvas_ground_y"
+                        ]
+                    )
+                    * actor_scale
+                ),
+                actor_size,
+                actor_size,
+            )
+        else:
+            actor_rect = pygame.Rect(
+                round(
+                    actor_root[0]
+                    - POC_RUNNER_ROOT[0] * actor_scale
+                ),
+                round(
+                    actor_root[1]
+                    - POC_RUNNER_ROOT[1] * actor_scale
+                ),
+                actor_size,
+                actor_size,
+            )
         app.screen.fill(background)
         app.draw_cinematic_poc_actor(actor_state)
         assert_source_materialized(
@@ -1213,17 +1607,13 @@ def validate_framebuffer_materialization(
             float(impact_state["poc_elapsed"]),
             team,
         ):
-            ball_frame_index = (
-                int(
-                    (layer_sample.ball_rotation % 360.0)
-                    / 360.0
-                    * len(app.assets.balls)
-                )
-                % len(app.assets.balls)
-            )
-            ball_layer = pygame.transform.smoothscale(
-                app.assets.balls[ball_frame_index],
-                (ball_size, ball_size),
+            ball_layer = app.cached_cinematic_ball_material(
+                ball_size,
+                app.cinematic_poc2_ball_rotation(
+                    sequence,
+                    layer_sample,
+                    team,
+                ),
             )
             if alpha < 255:
                 ball_layer.set_alpha(alpha)
@@ -1231,12 +1621,19 @@ def validate_framebuffer_materialization(
                 sequence,
                 layer_sample,
                 team,
-                impact_viewport,  # type: ignore[arg-type]
-                impact_sample,  # type: ignore[arg-type]
+            )
+            ball_y = (
+                app.cinematic_poc2_sequence_sample(
+                    sequence,
+                    layer_sample,
+                    team,
+                ).ball.scene_center_y
+                if layer_sample.actor_source == 0
+                else layer_sample.ball_y
             )
             ball_center = impact_viewport.point(  # type: ignore[union-attr]
                 ball_x,
-                layer_sample.ball_y,
+                ball_y,
             )
             ball_rect = ball_layer.get_rect(
                 center=(
@@ -1324,13 +1721,6 @@ def validate_framebuffer_materialization(
             sequence.net_static_back,
             sequence.net_static_back_sha256,
         )
-        expected.blit(
-            pygame.transform.smoothscale(
-                static_back,
-                goal_rect.size,
-            ),
-            goal_rect,
-        )
         net_frame = bank.nearest_net_keyframe(
             sequence,
             goal_sample.elapsed,  # type: ignore[union-attr]
@@ -1345,16 +1735,32 @@ def validate_framebuffer_materialization(
             net_frame.back_roi_sha256,
             net_frame.back_roi_source_rect,
         )
-        net_rect = app.cinematic_poc_goal_subrect(
-            goal_rect,
-            net_frame.back_roi_rect,
+        composite_back = app.cinematic_poc_composite_goal_layer(
+            cache_key=(
+                "back_net",
+                sequence.net_static_back,
+                net_frame.back_roi,
+                net_frame.back_roi_source_rect,
+                net_frame.back_roi_rect,
+            ),
+            canvas_size=static_back.get_size(),
+            patch=net_roi,
+            patch_rect=net_frame.back_roi_rect,
+            base=static_back,
         )
         expected.blit(
             pygame.transform.smoothscale(
-                net_roi,
-                net_rect.size,
+                composite_back,
+                goal_rect.size,
             ),
-            net_rect,
+            goal_rect,
+        )
+        front_asset = bank.goal_front_layers[
+            sequence.goal_side
+        ]
+        front = app.load_cinematic_poc_layer(
+            front_asset.file,
+            front_asset.sha256,
         )
         contact_frame = bank.nearest_net_contact_frame(
             sequence,
@@ -1366,24 +1772,24 @@ def validate_framebuffer_materialization(
                 contact_frame.front_contact_sha256,
                 contact_frame.front_contact_source_rect,
             )
-            contact_rect = app.cinematic_poc_goal_subrect(
-                goal_rect,
-                contact_frame.front_contact_rect,
+            contact_layer = app.cinematic_poc_composite_goal_layer(
+                cache_key=(
+                    "front_contact",
+                    contact_frame.front_contact,
+                    contact_frame.front_contact_source_rect,
+                    contact_frame.front_contact_rect,
+                ),
+                canvas_size=front.get_size(),
+                patch=contact,
+                patch_rect=contact_frame.front_contact_rect,
             )
             expected.blit(
                 pygame.transform.smoothscale(
-                    contact,
-                    contact_rect.size,
+                    contact_layer,
+                    goal_rect.size,
                 ),
-                contact_rect,
+                goal_rect,
             )
-        front_asset = bank.goal_front_layers[
-            sequence.goal_side
-        ]
-        front = app.load_cinematic_poc_layer(
-            front_asset.file,
-            front_asset.sha256,
-        )
         expected.blit(
             pygame.transform.smoothscale(
                 front,
@@ -1600,7 +2006,7 @@ def validate_authored_actor_progression(
                         )
                         if not sample.actor_visible:
                             continue
-                        frame, frame_index, _metadata, actor_scale = (
+                        frame, frame_index, metadata, actor_scale = (
                             app.cinematic_poc_actor_material(
                                 sequence,
                                 sample,
@@ -1614,10 +2020,19 @@ def validate_authored_actor_progression(
                         )
                         if grounding_key in grounding_failures:
                             continue
+                        source_canvas_size = (
+                            int(
+                                app.assets.cinematic_poc2_motion[
+                                    "canvas_size"
+                                ]
+                            )
+                            if sample.actor_source == 0
+                            else POC_RUNNER_CANVAS_SIZE
+                        )
                         target_size = max(
                             1,
                             round(
-                                POC_RUNNER_CANVAS_SIZE
+                                source_canvas_size
                                 * actor_scale
                             ),
                         )
@@ -1629,11 +2044,28 @@ def validate_authored_actor_progression(
                             min_alpha=30
                         )
                         root_y = round(
-                            POC_RUNNER_ROOT[1]
+                            (
+                                float(
+                                    app.assets.cinematic_poc2_motion[
+                                        "canvas_ground_y"
+                                    ]
+                                )
+                                if sample.actor_source == 0
+                                else POC_RUNNER_ROOT[1]
+                            )
                             * actor_scale
                         )
                         ground_gap = root_y - visible.bottom
-                        if not -3 <= ground_gap <= 5:
+                        is_poc2_flight = (
+                            sample.actor_source == 0
+                            and bool(metadata.get("flight"))
+                        )
+                        grounded = (
+                            6 <= ground_gap <= 12
+                            if is_poc2_flight
+                            else -3 <= ground_gap <= 5
+                        )
+                        if not grounded:
                             failures.append(
                                 f"{uniform.code}/{direction}/"
                                 f"{sample.actor_source}:{frame_index}: "
@@ -1642,8 +2074,12 @@ def validate_authored_actor_progression(
                             grounding_failures.add(
                                 grounding_key
                             )
-                expected = set(range(16))
+                expected_by_source = {
+                    0: set(range(8)),
+                    1: set(range(16)),
+                }
                 for source, label in ((0, "run"), (1, "kick")):
+                    expected = expected_by_source[source]
                     if visited[source] != expected:
                         missing = sorted(expected - visited[source])
                         failures.append(
@@ -1736,11 +2172,16 @@ def validate_all_uniform_ball_clearance(
                         )
                     )
                     actor_scale *= viewport.scale
+                    source_canvas_size = (
+                        int(app.assets.cinematic_poc2_motion["canvas_size"])
+                        if sample.actor_source == 0
+                        else POC_RUNNER_CANVAS_SIZE
+                    )
                     actor_size = (
                         max(
                             1,
                             round(
-                                POC_RUNNER_CANVAS_SIZE
+                                source_canvas_size
                                 * actor_scale
                             ),
                         ),
@@ -1753,17 +2194,45 @@ def validate_all_uniform_ball_clearance(
                         float(state["poc_actor_x"]),
                         sample.actor_ground_y,
                     )
-                    actor_rect = pygame.Rect(
-                        round(
-                            root[0]
-                            - POC_RUNNER_ROOT[0] * actor_scale
-                        ),
-                        round(
-                            root[1]
-                            - POC_RUNNER_ROOT[1] * actor_scale
-                        ),
-                        *actor_size,
-                    )
+                    if sample.actor_source == 0:
+                        actor_rect = pygame.Rect(
+                            round(
+                                root[0]
+                                - source_canvas_size
+                                * 0.5
+                                * actor_scale
+                            ),
+                            round(
+                                root[1]
+                                - float(
+                                    app.assets.cinematic_poc2_motion[
+                                        "canvas_ground_y"
+                                    ]
+                                )
+                                * actor_scale
+                            ),
+                            *actor_size,
+                        )
+                    else:
+                        actor_rect = pygame.Rect(
+                            round(
+                                root[0]
+                                - POC_RUNNER_ROOT[0] * actor_scale
+                            ),
+                            round(
+                                root[1]
+                                - POC_RUNNER_ROOT[1] * actor_scale
+                            ),
+                            *actor_size,
+                        )
+                        visible_actor = app.visible_bbox(actor_render)
+                        submersion = (
+                            actor_rect.top
+                            + visible_actor.bottom
+                            - round(root[1])
+                        )
+                        if submersion > 0:
+                            actor_rect.y -= submersion
                     ball_size = int(state["ball_scale"])
                     ball_render = (
                         app.cached_cinematic_ball_material(
@@ -1807,7 +2276,11 @@ def validate_all_uniform_ball_clearance(
                         layer_ball = (
                             app.cached_cinematic_ball_material(
                                 ball_size,
-                                layer_sample.ball_rotation,
+                                app.cinematic_poc2_ball_rotation(
+                                    sequence,
+                                    layer_sample,
+                                    team,
+                                ),
                             ).copy()
                         )
                         layer_ball.set_alpha(alpha)
@@ -1815,13 +2288,17 @@ def validate_all_uniform_ball_clearance(
                             sequence,
                             layer_sample,
                             team,
-                            viewport,
-                            sample,
                         )
-                        layer_center = viewport.point(
-                            layer_x,
-                            layer_sample.ball_y,
+                        layer_y = (
+                            app.cinematic_poc2_sequence_sample(
+                                sequence,
+                                layer_sample,
+                                team,
+                            ).ball.scene_center_y
+                            if layer_sample.actor_source == 0
+                            else layer_sample.ball_y
                         )
+                        layer_center = viewport.point(layer_x, layer_y)
                         layer_rect = layer_ball.get_rect(
                             center=(
                                 round(layer_center[0]),
@@ -2221,6 +2698,10 @@ def evidence_source_paths() -> tuple[Path, ...]:
                 ROOT
                 / "src"
                 / "arena_ai"
+                / "cinematic_dribble_runtime.py",
+                ROOT
+                / "src"
+                / "arena_ai"
                 / "cinematic_uniforms.py",
                 Path(__file__).resolve(),
             }
@@ -2236,6 +2717,7 @@ def evidence_runtime_asset_paths() -> tuple[Path, ...]:
         / "cinematic"
     )
     paths = {
+        cinematic / "poc2_runner_motion.json",
         cinematic / "runner_motion.json",
         cinematic / "keeper_motion.json",
         ROOT
@@ -2266,6 +2748,11 @@ def evidence_runtime_asset_paths() -> tuple[Path, ...]:
             paths.add(
                 cinematic
                 / f"keeper_anim_{direction}_{index}.png"
+            )
+        for uniform in CINEMATIC_UNIFORMS:
+            paths.add(
+                cinematic
+                / f"poc2_runner_{direction}_{uniform.code}.png"
             )
     for uniform in CINEMATIC_UNIFORMS:
         for stem in (
@@ -2363,6 +2850,8 @@ def expected_recorded_report_metrics(
     framebuffer_cases: int,
     preload_assets: int,
     actor_progression_cases: int,
+    poc2_motion_cases: int,
+    poc2_handoff_cases: int,
     clearance_cases: int,
     clearance_max_overlap: float,
     e2e_cases: int,
@@ -2386,6 +2875,10 @@ def expected_recorded_report_metrics(
         "expected_actor_progression_cases": (
             EXPECTED_ACTOR_PROGRESSION_CASES
         ),
+        "poc2_motion_cases": poc2_motion_cases,
+        "expected_poc2_motion_cases": EXPECTED_POC2_MOTION_CASES,
+        "poc2_handoff_cases": poc2_handoff_cases,
+        "expected_poc2_handoff_cases": EXPECTED_POC2_HANDOFF_CASES,
         "uniform_clearance_cases": clearance_cases,
         "expected_uniform_clearance_cases": (
             EXPECTED_CLEARANCE_CASES
@@ -2449,6 +2942,16 @@ def validate_recorded_evidence(
     if contract != expected_contract:
         failures.append(
             "cinematic evidence contract provenance is stale"
+        )
+    dribble_contract = manifest.get("dribble_contract")
+    expected_dribble_contract = {
+        "path": POC2_CONTRACT.relative_to(ROOT).as_posix(),
+        "sha256": sha256(POC2_CONTRACT),
+        "version": CinematicDribbleRuntime.VERSION,
+    }
+    if dribble_contract != expected_dribble_contract:
+        failures.append(
+            "cinematic evidence POC 2 contract provenance is stale"
         )
 
     source_entries = manifest_entry_map(
@@ -2629,6 +3132,9 @@ def main() -> None:
     for key in sorted(expected_keys & set(bank.sequences)):
         validate_sequence(bank, bank.sequences[key], failures)
     validate_profile_ordering(bank, failures)
+    poc2_motion_cases, poc2_handoff_cases = (
+        validate_poc2_dribble_runtime(bank, failures)
+    )
     sequential_net_cases = validate_sequential_net_contract(
         bank,
         payload,
@@ -2708,6 +3214,8 @@ def main() -> None:
                 framebuffer_cases=framebuffer_cases,
                 preload_assets=preload_assets,
                 actor_progression_cases=actor_progression_cases,
+                poc2_motion_cases=poc2_motion_cases,
+                poc2_handoff_cases=poc2_handoff_cases,
                 clearance_cases=clearance_cases,
                 clearance_max_overlap=clearance_max_overlap,
                 e2e_cases=e2e_cases,
@@ -2721,6 +3229,8 @@ def main() -> None:
         "framebuffer": framebuffer_cases,
         "preload assets": preload_assets,
         "actor progression": actor_progression_cases,
+        "POC 2 motion": poc2_motion_cases,
+        "POC 2 handoff": poc2_handoff_cases,
         "clearance": clearance_cases,
         "E2E": e2e_cases,
         "sequential net": sequential_net_cases,
@@ -2731,6 +3241,8 @@ def main() -> None:
         "framebuffer": EXPECTED_FRAMEBUFFER_CASES,
         "preload assets": EXPECTED_PRELOAD_ASSETS,
         "actor progression": EXPECTED_ACTOR_PROGRESSION_CASES,
+        "POC 2 motion": EXPECTED_POC2_MOTION_CASES,
+        "POC 2 handoff": EXPECTED_POC2_HANDOFF_CASES,
         "clearance": EXPECTED_CLEARANCE_CASES,
         "E2E": EXPECTED_E2E_CASES,
         "sequential net": EXPECTED_SEQUENTIAL_NET_CASES,
@@ -2760,6 +3272,10 @@ def main() -> None:
         "expected_actor_progression_cases": (
             EXPECTED_ACTOR_PROGRESSION_CASES
         ),
+        "poc2_motion_cases": poc2_motion_cases,
+        "expected_poc2_motion_cases": EXPECTED_POC2_MOTION_CASES,
+        "poc2_handoff_cases": poc2_handoff_cases,
+        "expected_poc2_handoff_cases": EXPECTED_POC2_HANDOFF_CASES,
         "uniform_clearance_cases": clearance_cases,
         "expected_uniform_clearance_cases": (
             EXPECTED_CLEARANCE_CASES
@@ -2826,6 +3342,11 @@ def main() -> None:
                 "path": CONTRACT.relative_to(ROOT).as_posix(),
                 "sha256": bank.sha256,
                 "version": bank.VERSION,
+            },
+            "dribble_contract": {
+                "path": POC2_CONTRACT.relative_to(ROOT).as_posix(),
+                "sha256": sha256(POC2_CONTRACT),
+                "version": CinematicDribbleRuntime.VERSION,
             },
             "runtime_sources": [
                 {

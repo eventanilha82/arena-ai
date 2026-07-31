@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-30T03:27:46+00:00",
+  "generated_at": "2026-07-31T18:23:50+00:00",
   "method": "Offline convergence audit. Larger volumes reuse the same base seed and extend the smaller sample; champion ranking uses optimized champion-only path, phase/bracket stability uses full knockout simulation.",
   "source_fingerprints": {
     "model_package": {
@@ -49,8 +49,8 @@
       "workers": 8,
       "chunks": 200,
       "chunk_size": 25,
-      "elapsed_seconds": 77.03,
-      "rate_per_second": 64.91,
+      "elapsed_seconds": 61.969,
+      "rate_per_second": 80.686,
       "leader": "Spain",
       "leader_probability": 0.236,
       "top_16": [
@@ -161,8 +161,8 @@
       "workers": 8,
       "chunks": 400,
       "chunk_size": 25,
-      "elapsed_seconds": 147.809,
-      "rate_per_second": 67.655,
+      "elapsed_seconds": 123.817,
+      "rate_per_second": 80.764,
       "leader": "Spain",
       "leader_probability": 0.2366,
       "top_16": [
@@ -284,8 +284,8 @@
       "workers": 8,
       "chunks": 40,
       "chunk_size": 25,
-      "elapsed_seconds": 15.05,
-      "rate_per_second": 66.446,
+      "elapsed_seconds": 12.514,
+      "rate_per_second": 79.909,
       "champions": [
         {
           "rank": 1,
@@ -1452,13 +1452,13 @@
           },
           {
             "rank": 17,
-            "name": "Japan",
+            "name": "Türkiye",
             "appearances": 86,
             "probability": 0.086
           },
           {
             "rank": 18,
-            "name": "Türkiye",
+            "name": "Japan",
             "appearances": 86,
             "probability": 0.086
           },
@@ -1992,13 +1992,13 @@
           },
           {
             "rank": 27,
-            "name": "Ecuador | Senegal",
+            "name": "Canada | Czechia",
             "matches": 125,
             "probability": 0.125
           },
           {
             "rank": 28,
-            "name": "Canada | Czechia",
+            "name": "Ecuador | Senegal",
             "matches": 125,
             "probability": 0.125
           },
@@ -2040,13 +2040,13 @@
           },
           {
             "rank": 35,
-            "name": "Czechia | Switzerland",
+            "name": "France | Tunisia",
             "matches": 104,
             "probability": 0.104
           },
           {
             "rank": 36,
-            "name": "France | Tunisia",
+            "name": "Czechia | Switzerland",
             "matches": 104,
             "probability": 0.104
           },
@@ -2100,13 +2100,13 @@
           },
           {
             "rank": 45,
-            "name": "Brazil | Tunisia",
+            "name": "Australia | IR Iran",
             "matches": 91,
             "probability": 0.091
           },
           {
             "rank": 46,
-            "name": "Australia | IR Iran",
+            "name": "Brazil | Tunisia",
             "matches": 91,
             "probability": 0.091
           },
@@ -2148,13 +2148,13 @@
           },
           {
             "rank": 53,
-            "name": "Canada | Egypt",
+            "name": "Ghana | Portugal",
             "matches": 84,
             "probability": 0.084
           },
           {
             "rank": 54,
-            "name": "Ghana | Portugal",
+            "name": "Canada | Egypt",
             "matches": 84,
             "probability": 0.084
           },
@@ -2172,13 +2172,13 @@
           },
           {
             "rank": 57,
-            "name": "Ecuador | Scotland",
+            "name": "Germany | Morocco",
             "matches": 79,
             "probability": 0.079
           },
           {
             "rank": 58,
-            "name": "Germany | Morocco",
+            "name": "Ecuador | Scotland",
             "matches": 79,
             "probability": 0.079
           },
@@ -2196,13 +2196,13 @@
           },
           {
             "rank": 61,
-            "name": "Bosnia and Herzegovina | Paraguay",
+            "name": "Belgium | Paraguay",
             "matches": 76,
             "probability": 0.076
           },
           {
             "rank": 62,
-            "name": "Belgium | Paraguay",
+            "name": "Bosnia and Herzegovina | Paraguay",
             "matches": 76,
             "probability": 0.076
           },
@@ -2396,7 +2396,7 @@
           },
           {
             "rank": 30,
-            "name": "Czechia | England",
+            "name": "Czechia | Netherlands",
             "matches": 53,
             "probability": 0.053
           },
@@ -2408,7 +2408,7 @@
           },
           {
             "rank": 32,
-            "name": "Czechia | Netherlands",
+            "name": "Czechia | England",
             "matches": 53,
             "probability": 0.053
           },
@@ -2468,13 +2468,13 @@
           },
           {
             "rank": 42,
-            "name": "Brazil | Switzerland",
+            "name": "Ecuador | Netherlands",
             "matches": 43,
             "probability": 0.043
           },
           {
             "rank": 43,
-            "name": "Ecuador | Netherlands",
+            "name": "Brazil | Switzerland",
             "matches": 43,
             "probability": 0.043
           },
@@ -2498,13 +2498,13 @@
           },
           {
             "rank": 47,
-            "name": "Canada | Japan",
+            "name": "Ecuador | Norway",
             "matches": 40,
             "probability": 0.04
           },
           {
             "rank": 48,
-            "name": "Ecuador | Norway",
+            "name": "Canada | Japan",
             "matches": 40,
             "probability": 0.04
           },
@@ -2528,13 +2528,13 @@
           },
           {
             "rank": 52,
-            "name": "Croatia | Korea Republic",
+            "name": "Morocco | Norway",
             "matches": 37,
             "probability": 0.037
           },
           {
             "rank": 53,
-            "name": "Morocco | Norway",
+            "name": "Croatia | Korea Republic",
             "matches": 37,
             "probability": 0.037
           },
@@ -2570,13 +2570,13 @@
           },
           {
             "rank": 59,
-            "name": "Netherlands | Senegal",
+            "name": "Türkiye | Uruguay",
             "matches": 33,
             "probability": 0.033
           },
           {
             "rank": 60,
-            "name": "Türkiye | Uruguay",
+            "name": "Netherlands | Senegal",
             "matches": 33,
             "probability": 0.033
           },
@@ -2588,7 +2588,7 @@
           },
           {
             "rank": 62,
-            "name": "Netherlands | Norway",
+            "name": "France | Scotland",
             "matches": 32,
             "probability": 0.032
           },
@@ -2600,7 +2600,7 @@
           },
           {
             "rank": 64,
-            "name": "France | Scotland",
+            "name": "Netherlands | Norway",
             "matches": 32,
             "probability": 0.032
           }
@@ -2656,13 +2656,13 @@
           },
           {
             "rank": 9,
-            "name": "Germany | Netherlands",
+            "name": "Ecuador | Netherlands",
             "matches": 44,
             "probability": 0.044
           },
           {
             "rank": 10,
-            "name": "Ecuador | Netherlands",
+            "name": "Germany | Netherlands",
             "matches": 44,
             "probability": 0.044
           },
@@ -2686,43 +2686,43 @@
           },
           {
             "rank": 14,
-            "name": "France | Japan",
-            "matches": 36,
-            "probability": 0.036
-          },
-          {
-            "rank": 15,
             "name": "France | Morocco",
             "matches": 36,
             "probability": 0.036
           },
           {
-            "rank": 16,
-            "name": "France | Mexico",
-            "matches": 35,
-            "probability": 0.035
+            "rank": 15,
+            "name": "France | Japan",
+            "matches": 36,
+            "probability": 0.036
           },
           {
-            "rank": 17,
+            "rank": 16,
             "name": "Belgium | Portugal",
             "matches": 35,
             "probability": 0.035
           },
           {
-            "rank": 18,
+            "rank": 17,
             "name": "France | Switzerland",
             "matches": 35,
             "probability": 0.035
           },
           {
+            "rank": 18,
+            "name": "France | Mexico",
+            "matches": 35,
+            "probability": 0.035
+          },
+          {
             "rank": 19,
-            "name": "Ecuador | England",
+            "name": "Brazil | Croatia",
             "matches": 34,
             "probability": 0.034
           },
           {
             "rank": 20,
-            "name": "Brazil | Croatia",
+            "name": "Ecuador | England",
             "matches": 34,
             "probability": 0.034
           },
@@ -2734,13 +2734,13 @@
           },
           {
             "rank": 22,
-            "name": "IR Iran | Spain",
+            "name": "Argentina | Canada",
             "matches": 32,
             "probability": 0.032
           },
           {
             "rank": 23,
-            "name": "Argentina | Canada",
+            "name": "IR Iran | Spain",
             "matches": 32,
             "probability": 0.032
           },
@@ -2764,25 +2764,25 @@
           },
           {
             "rank": 27,
-            "name": "Spain | Switzerland",
-            "matches": 30,
-            "probability": 0.03
-          },
-          {
-            "rank": 28,
             "name": "Ecuador | Mexico",
             "matches": 30,
             "probability": 0.03
           },
           {
+            "rank": 28,
+            "name": "Spain | Switzerland",
+            "matches": 30,
+            "probability": 0.03
+          },
+          {
             "rank": 29,
-            "name": "Portugal | Türkiye",
+            "name": "Spain | USA",
             "matches": 29,
             "probability": 0.029
           },
           {
             "rank": 30,
-            "name": "Spain | USA",
+            "name": "Portugal | Türkiye",
             "matches": 29,
             "probability": 0.029
           },
@@ -2842,37 +2842,37 @@
           },
           {
             "rank": 40,
-            "name": "Germany | Mexico",
-            "matches": 24,
-            "probability": 0.024
-          },
-          {
-            "rank": 41,
             "name": "Colombia | Uruguay",
             "matches": 24,
             "probability": 0.024
           },
           {
-            "rank": 42,
-            "name": "Germany | Morocco",
-            "matches": 23,
-            "probability": 0.023
+            "rank": 41,
+            "name": "Germany | Mexico",
+            "matches": 24,
+            "probability": 0.024
           },
           {
-            "rank": 43,
+            "rank": 42,
             "name": "Argentina | Belgium",
             "matches": 23,
             "probability": 0.023
           },
           {
-            "rank": 44,
+            "rank": 43,
             "name": "Belgium | England",
             "matches": 23,
             "probability": 0.023
           },
           {
-            "rank": 45,
+            "rank": 44,
             "name": "Colombia | Türkiye",
+            "matches": 23,
+            "probability": 0.023
+          },
+          {
+            "rank": 45,
+            "name": "Germany | Morocco",
             "matches": 23,
             "probability": 0.023
           },
@@ -2884,61 +2884,61 @@
           },
           {
             "rank": 47,
-            "name": "France | Korea Republic",
-            "matches": 21,
-            "probability": 0.021
-          },
-          {
-            "rank": 48,
-            "name": "Portugal | Spain",
-            "matches": 21,
-            "probability": 0.021
-          },
-          {
-            "rank": 49,
-            "name": "Croatia | Norway",
-            "matches": 21,
-            "probability": 0.021
-          },
-          {
-            "rank": 50,
             "name": "Colombia | Spain",
             "matches": 21,
             "probability": 0.021
           },
           {
-            "rank": 51,
+            "rank": 48,
             "name": "Germany | Switzerland",
             "matches": 21,
             "probability": 0.021
           },
           {
+            "rank": 49,
+            "name": "France | Korea Republic",
+            "matches": 21,
+            "probability": 0.021
+          },
+          {
+            "rank": 50,
+            "name": "Portugal | Spain",
+            "matches": 21,
+            "probability": 0.021
+          },
+          {
+            "rank": 51,
+            "name": "Croatia | Norway",
+            "matches": 21,
+            "probability": 0.021
+          },
+          {
             "rank": 52,
-            "name": "Switzerland | Uruguay",
-            "matches": 19,
-            "probability": 0.019
-          },
-          {
-            "rank": 53,
-            "name": "France | Scotland",
-            "matches": 19,
-            "probability": 0.019
-          },
-          {
-            "rank": 54,
             "name": "Netherlands | Norway",
             "matches": 19,
             "probability": 0.019
           },
           {
-            "rank": 55,
+            "rank": 53,
+            "name": "Switzerland | Uruguay",
+            "matches": 19,
+            "probability": 0.019
+          },
+          {
+            "rank": 54,
             "name": "England | Morocco",
             "matches": 19,
             "probability": 0.019
           },
           {
-            "rank": 56,
+            "rank": 55,
             "name": "Czechia | Spain",
+            "matches": 19,
+            "probability": 0.019
+          },
+          {
+            "rank": 56,
+            "name": "France | Scotland",
             "matches": 19,
             "probability": 0.019
           },
@@ -2950,25 +2950,25 @@
           },
           {
             "rank": 58,
-            "name": "Canada | Spain",
-            "matches": 18,
-            "probability": 0.018
-          },
-          {
-            "rank": 59,
             "name": "Croatia | Ecuador",
             "matches": 18,
             "probability": 0.018
           },
           {
+            "rank": 59,
+            "name": "Germany | Korea Republic",
+            "matches": 18,
+            "probability": 0.018
+          },
+          {
             "rank": 60,
-            "name": "Brazil | Scotland",
+            "name": "Canada | Spain",
             "matches": 18,
             "probability": 0.018
           },
           {
             "rank": 61,
-            "name": "Germany | Korea Republic",
+            "name": "Brazil | Scotland",
             "matches": 18,
             "probability": 0.018
           },
@@ -3090,19 +3090,19 @@
           },
           {
             "rank": 17,
-            "name": "Brazil | Colombia",
-            "matches": 22,
-            "probability": 0.022
-          },
-          {
-            "rank": 18,
             "name": "Argentina | Mexico",
             "matches": 22,
             "probability": 0.022
           },
           {
-            "rank": 19,
+            "rank": 18,
             "name": "Belgium | France",
+            "matches": 22,
+            "probability": 0.022
+          },
+          {
+            "rank": 19,
+            "name": "Brazil | Colombia",
             "matches": 22,
             "probability": 0.022
           },
@@ -3114,13 +3114,13 @@
           },
           {
             "rank": 21,
-            "name": "Netherlands | Portugal",
+            "name": "England | France",
             "matches": 19,
             "probability": 0.019
           },
           {
             "rank": 22,
-            "name": "England | France",
+            "name": "Netherlands | Portugal",
             "matches": 19,
             "probability": 0.019
           },
@@ -3144,61 +3144,61 @@
           },
           {
             "rank": 26,
-            "name": "Germany | Portugal",
-            "matches": 15,
-            "probability": 0.015
-          },
-          {
-            "rank": 27,
             "name": "France | Uruguay",
             "matches": 15,
             "probability": 0.015
           },
           {
-            "rank": 28,
-            "name": "Norway | Spain",
-            "matches": 15,
-            "probability": 0.015
-          },
-          {
-            "rank": 29,
+            "rank": 27,
             "name": "France | Portugal",
             "matches": 15,
             "probability": 0.015
           },
           {
-            "rank": 30,
-            "name": "Colombia | Germany",
-            "matches": 15,
-            "probability": 0.015
-          },
-          {
-            "rank": 31,
+            "rank": 28,
             "name": "England | Spain",
             "matches": 15,
             "probability": 0.015
           },
           {
-            "rank": 32,
+            "rank": 29,
+            "name": "Germany | Portugal",
+            "matches": 15,
+            "probability": 0.015
+          },
+          {
+            "rank": 30,
+            "name": "Norway | Spain",
+            "matches": 15,
+            "probability": 0.015
+          },
+          {
+            "rank": 31,
             "name": "Belgium | Brazil",
             "matches": 15,
             "probability": 0.015
           },
           {
-            "rank": 33,
-            "name": "Mexico | Spain",
-            "matches": 14,
-            "probability": 0.014
+            "rank": 32,
+            "name": "Colombia | Germany",
+            "matches": 15,
+            "probability": 0.015
           },
           {
-            "rank": 34,
+            "rank": 33,
             "name": "England | Uruguay",
             "matches": 14,
             "probability": 0.014
           },
           {
-            "rank": 35,
+            "rank": 34,
             "name": "Brazil | Switzerland",
+            "matches": 14,
+            "probability": 0.014
+          },
+          {
+            "rank": 35,
+            "name": "Mexico | Spain",
             "matches": 14,
             "probability": 0.014
           },
@@ -3216,25 +3216,25 @@
           },
           {
             "rank": 38,
-            "name": "Colombia | Ecuador",
-            "matches": 12,
-            "probability": 0.012
-          },
-          {
-            "rank": 39,
             "name": "Netherlands | Türkiye",
             "matches": 12,
             "probability": 0.012
           },
           {
-            "rank": 40,
+            "rank": 39,
             "name": "Japan | Portugal",
             "matches": 12,
             "probability": 0.012
           },
           {
-            "rank": 41,
+            "rank": 40,
             "name": "England | Switzerland",
+            "matches": 12,
+            "probability": 0.012
+          },
+          {
+            "rank": 41,
+            "name": "Colombia | Ecuador",
             "matches": 12,
             "probability": 0.012
           },
@@ -3246,37 +3246,37 @@
           },
           {
             "rank": 43,
-            "name": "England | Germany",
-            "matches": 11,
-            "probability": 0.011
-          },
-          {
-            "rank": 44,
             "name": "France | Türkiye",
             "matches": 11,
             "probability": 0.011
           },
           {
-            "rank": 45,
-            "name": "Croatia | Switzerland",
-            "matches": 11,
-            "probability": 0.011
-          },
-          {
-            "rank": 46,
+            "rank": 44,
             "name": "England | Netherlands",
             "matches": 11,
             "probability": 0.011
           },
           {
+            "rank": 45,
+            "name": "England | Germany",
+            "matches": 11,
+            "probability": 0.011
+          },
+          {
+            "rank": 46,
+            "name": "Croatia | Switzerland",
+            "matches": 11,
+            "probability": 0.011
+          },
+          {
             "rank": 47,
-            "name": "Argentina | Japan",
+            "name": "Scotland | Spain",
             "matches": 10,
             "probability": 0.01
           },
           {
             "rank": 48,
-            "name": "Scotland | Spain",
+            "name": "France | Paraguay",
             "matches": 10,
             "probability": 0.01
           },
@@ -3288,7 +3288,7 @@
           },
           {
             "rank": 50,
-            "name": "France | Paraguay",
+            "name": "Argentina | Japan",
             "matches": 10,
             "probability": 0.01
           },
@@ -3300,13 +3300,13 @@
           },
           {
             "rank": 52,
-            "name": "Belgium | Netherlands",
+            "name": "Croatia | Portugal",
             "matches": 9,
             "probability": 0.009
           },
           {
             "rank": 53,
-            "name": "Croatia | Portugal",
+            "name": "Belgium | England",
             "matches": 9,
             "probability": 0.009
           },
@@ -3318,19 +3318,19 @@
           },
           {
             "rank": 55,
-            "name": "Korea Republic | Spain",
+            "name": "Belgium | Netherlands",
             "matches": 9,
             "probability": 0.009
           },
           {
             "rank": 56,
-            "name": "Brazil | Uruguay",
+            "name": "Korea Republic | Spain",
             "matches": 9,
             "probability": 0.009
           },
           {
             "rank": 57,
-            "name": "Belgium | England",
+            "name": "Brazil | Uruguay",
             "matches": 9,
             "probability": 0.009
           },
@@ -3360,19 +3360,19 @@
           },
           {
             "rank": 62,
-            "name": "Argentina | Morocco",
+            "name": "Belgium | Ecuador",
             "matches": 8,
             "probability": 0.008
           },
           {
             "rank": 63,
-            "name": "Brazil | Türkiye",
+            "name": "Argentina | Morocco",
             "matches": 8,
             "probability": 0.008
           },
           {
             "rank": 64,
-            "name": "Belgium | Ecuador",
+            "name": "Brazil | Türkiye",
             "matches": 8,
             "probability": 0.008
           }
@@ -3458,13 +3458,13 @@
           },
           {
             "rank": 14,
-            "name": "Brazil | France",
+            "name": "Ecuador | Spain",
             "matches": 14,
             "probability": 0.014
           },
           {
             "rank": 15,
-            "name": "Ecuador | Spain",
+            "name": "Brazil | France",
             "matches": 14,
             "probability": 0.014
           },
@@ -3482,13 +3482,13 @@
           },
           {
             "rank": 18,
-            "name": "France | Portugal",
+            "name": "Argentina | Ecuador",
             "matches": 11,
             "probability": 0.011
           },
           {
             "rank": 19,
-            "name": "Argentina | Ecuador",
+            "name": "France | Portugal",
             "matches": 11,
             "probability": 0.011
           },
@@ -3536,25 +3536,25 @@
           },
           {
             "rank": 27,
-            "name": "Argentina | Belgium",
-            "matches": 8,
-            "probability": 0.008
-          },
-          {
-            "rank": 28,
-            "name": "Argentina | Türkiye",
-            "matches": 8,
-            "probability": 0.008
-          },
-          {
-            "rank": 29,
             "name": "Argentina | Germany",
             "matches": 8,
             "probability": 0.008
           },
           {
-            "rank": 30,
+            "rank": 28,
             "name": "Ecuador | France",
+            "matches": 8,
+            "probability": 0.008
+          },
+          {
+            "rank": 29,
+            "name": "Argentina | Türkiye",
+            "matches": 8,
+            "probability": 0.008
+          },
+          {
+            "rank": 30,
+            "name": "Argentina | Belgium",
             "matches": 8,
             "probability": 0.008
           },
@@ -3572,31 +3572,31 @@
           },
           {
             "rank": 33,
-            "name": "Argentina | Mexico",
-            "matches": 7,
-            "probability": 0.007
-          },
-          {
-            "rank": 34,
-            "name": "Belgium | England",
-            "matches": 7,
-            "probability": 0.007
-          },
-          {
-            "rank": 35,
             "name": "Spain | Switzerland",
             "matches": 7,
             "probability": 0.007
           },
           {
-            "rank": 36,
+            "rank": 34,
             "name": "England | Netherlands",
             "matches": 7,
             "probability": 0.007
           },
           {
-            "rank": 37,
+            "rank": 35,
+            "name": "Belgium | England",
+            "matches": 7,
+            "probability": 0.007
+          },
+          {
+            "rank": 36,
             "name": "France | Norway",
+            "matches": 7,
+            "probability": 0.007
+          },
+          {
+            "rank": 37,
+            "name": "Argentina | Mexico",
             "matches": 7,
             "probability": 0.007
           },
@@ -3620,25 +3620,25 @@
           },
           {
             "rank": 41,
-            "name": "Brazil | Germany",
-            "matches": 6,
-            "probability": 0.006
-          },
-          {
-            "rank": 42,
-            "name": "France | Japan",
-            "matches": 6,
-            "probability": 0.006
-          },
-          {
-            "rank": 43,
             "name": "Ecuador | England",
             "matches": 6,
             "probability": 0.006
           },
           {
-            "rank": 44,
+            "rank": 42,
+            "name": "Brazil | Germany",
+            "matches": 6,
+            "probability": 0.006
+          },
+          {
+            "rank": 43,
             "name": "Brazil | Croatia",
+            "matches": 6,
+            "probability": 0.006
+          },
+          {
+            "rank": 44,
+            "name": "France | Japan",
             "matches": 6,
             "probability": 0.006
           },
@@ -3728,31 +3728,31 @@
           },
           {
             "rank": 59,
-            "name": "Argentina | Scotland",
-            "matches": 4,
-            "probability": 0.004
-          },
-          {
-            "rank": 60,
-            "name": "England | Uruguay",
-            "matches": 4,
-            "probability": 0.004
-          },
-          {
-            "rank": 61,
-            "name": "England | Portugal",
-            "matches": 4,
-            "probability": 0.004
-          },
-          {
-            "rank": 62,
             "name": "Argentina | Colombia",
             "matches": 4,
             "probability": 0.004
           },
           {
-            "rank": 63,
+            "rank": 60,
             "name": "Argentina | Japan",
+            "matches": 4,
+            "probability": 0.004
+          },
+          {
+            "rank": 61,
+            "name": "Argentina | Scotland",
+            "matches": 4,
+            "probability": 0.004
+          },
+          {
+            "rank": 62,
+            "name": "England | Uruguay",
+            "matches": 4,
+            "probability": 0.004
+          },
+          {
+            "rank": 63,
+            "name": "England | Portugal",
             "matches": 4,
             "probability": 0.004
           },
@@ -3774,8 +3774,8 @@
       "workers": 8,
       "chunks": 80,
       "chunk_size": 25,
-      "elapsed_seconds": 30.513,
-      "rate_per_second": 65.545,
+      "elapsed_seconds": 24.82,
+      "rate_per_second": 80.579,
       "champions": [
         {
           "rank": 1,
@@ -6096,19 +6096,19 @@
           },
           {
             "rank": 58,
-            "name": "Japan | Switzerland",
+            "name": "Germany | Senegal",
             "matches": 65,
             "probability": 0.0325
           },
           {
             "rank": 59,
-            "name": "Morocco | Switzerland",
+            "name": "Japan | Switzerland",
             "matches": 65,
             "probability": 0.0325
           },
           {
             "rank": 60,
-            "name": "Germany | Senegal",
+            "name": "Morocco | Switzerland",
             "matches": 65,
             "probability": 0.0325
           },
@@ -6284,13 +6284,13 @@
           },
           {
             "rank": 25,
-            "name": "Brazil | Germany",
+            "name": "Spain | Switzerland",
             "matches": 57,
             "probability": 0.0285
           },
           {
             "rank": 26,
-            "name": "Spain | Switzerland",
+            "name": "Brazil | Germany",
             "matches": 57,
             "probability": 0.0285
           },
@@ -6314,13 +6314,13 @@
           },
           {
             "rank": 30,
-            "name": "England | Netherlands",
+            "name": "Portugal | Türkiye",
             "matches": 54,
             "probability": 0.027
           },
           {
             "rank": 31,
-            "name": "Portugal | Türkiye",
+            "name": "England | Netherlands",
             "matches": 54,
             "probability": 0.027
           },
@@ -6368,25 +6368,25 @@
           },
           {
             "rank": 39,
-            "name": "Colombia | Paraguay",
-            "matches": 49,
-            "probability": 0.0245
-          },
-          {
-            "rank": 40,
             "name": "Germany | Japan",
             "matches": 49,
             "probability": 0.0245
           },
           {
+            "rank": 40,
+            "name": "Colombia | Paraguay",
+            "matches": 49,
+            "probability": 0.0245
+          },
+          {
             "rank": 41,
-            "name": "Colombia | Türkiye",
+            "name": "Australia | Spain",
             "matches": 49,
             "probability": 0.0245
           },
           {
             "rank": 42,
-            "name": "Australia | Spain",
+            "name": "Colombia | Türkiye",
             "matches": 49,
             "probability": 0.0245
           },
@@ -6446,13 +6446,13 @@
           },
           {
             "rank": 52,
-            "name": "France | Scotland",
+            "name": "Croatia | Ecuador",
             "matches": 41,
             "probability": 0.0205
           },
           {
             "rank": 53,
-            "name": "Croatia | Ecuador",
+            "name": "France | Scotland",
             "matches": 41,
             "probability": 0.0205
           },
@@ -6592,25 +6592,25 @@
           },
           {
             "rank": 12,
-            "name": "Argentina | Ecuador",
-            "matches": 52,
-            "probability": 0.026
-          },
-          {
-            "rank": 13,
             "name": "England | Portugal",
             "matches": 52,
             "probability": 0.026
           },
           {
+            "rank": 13,
+            "name": "Argentina | Ecuador",
+            "matches": 52,
+            "probability": 0.026
+          },
+          {
             "rank": 14,
-            "name": "Argentina | Croatia",
+            "name": "Japan | Spain",
             "matches": 47,
             "probability": 0.0235
           },
           {
             "rank": 15,
-            "name": "Japan | Spain",
+            "name": "Argentina | Croatia",
             "matches": 47,
             "probability": 0.0235
           },
@@ -6724,19 +6724,19 @@
           },
           {
             "rank": 34,
-            "name": "Croatia | France",
+            "name": "Colombia | Ecuador",
             "matches": 26,
             "probability": 0.013
           },
           {
             "rank": 35,
-            "name": "Belgium | Brazil",
+            "name": "Croatia | France",
             "matches": 26,
             "probability": 0.013
           },
           {
             "rank": 36,
-            "name": "Colombia | Ecuador",
+            "name": "Belgium | Brazil",
             "matches": 26,
             "probability": 0.013
           },
@@ -6754,37 +6754,37 @@
           },
           {
             "rank": 39,
-            "name": "Colombia | Netherlands",
-            "matches": 23,
-            "probability": 0.0115
-          },
-          {
-            "rank": 40,
             "name": "Norway | Spain",
             "matches": 23,
             "probability": 0.0115
           },
           {
-            "rank": 41,
+            "rank": 40,
             "name": "England | Uruguay",
             "matches": 23,
             "probability": 0.0115
           },
           {
-            "rank": 42,
+            "rank": 41,
             "name": "Korea Republic | Spain",
             "matches": 23,
             "probability": 0.0115
           },
           {
+            "rank": 42,
+            "name": "Colombia | Netherlands",
+            "matches": 23,
+            "probability": 0.0115
+          },
+          {
             "rank": 43,
-            "name": "Brazil | Switzerland",
+            "name": "Argentina | Japan",
             "matches": 21,
             "probability": 0.0105
           },
           {
             "rank": 44,
-            "name": "Argentina | Japan",
+            "name": "Brazil | Switzerland",
             "matches": 21,
             "probability": 0.0105
           },
@@ -6802,13 +6802,13 @@
           },
           {
             "rank": 47,
-            "name": "Belgium | Germany",
+            "name": "Croatia | Switzerland",
             "matches": 20,
             "probability": 0.01
           },
           {
             "rank": 48,
-            "name": "Croatia | Switzerland",
+            "name": "Belgium | Germany",
             "matches": 20,
             "probability": 0.01
           },
@@ -6820,13 +6820,13 @@
           },
           {
             "rank": 50,
-            "name": "Argentina | Morocco",
+            "name": "Belgium | Netherlands",
             "matches": 19,
             "probability": 0.0095
           },
           {
             "rank": 51,
-            "name": "Belgium | Netherlands",
+            "name": "England | Germany",
             "matches": 19,
             "probability": 0.0095
           },
@@ -6838,13 +6838,13 @@
           },
           {
             "rank": 53,
-            "name": "Japan | Portugal",
+            "name": "Argentina | Morocco",
             "matches": 19,
             "probability": 0.0095
           },
           {
             "rank": 54,
-            "name": "England | Germany",
+            "name": "Japan | Portugal",
             "matches": 19,
             "probability": 0.0095
           },
@@ -6856,37 +6856,37 @@
           },
           {
             "rank": 56,
-            "name": "Belgium | England",
-            "matches": 18,
-            "probability": 0.009
-          },
-          {
-            "rank": 57,
             "name": "Argentina | Korea Republic",
             "matches": 18,
             "probability": 0.009
           },
           {
-            "rank": 58,
-            "name": "Brazil | England",
-            "matches": 17,
-            "probability": 0.0085
+            "rank": 57,
+            "name": "Belgium | England",
+            "matches": 18,
+            "probability": 0.009
           },
           {
-            "rank": 59,
+            "rank": 58,
             "name": "England | Norway",
             "matches": 17,
             "probability": 0.0085
           },
           {
+            "rank": 59,
+            "name": "Brazil | England",
+            "matches": 17,
+            "probability": 0.0085
+          },
+          {
             "rank": 60,
-            "name": "France | Paraguay",
+            "name": "Brazil | Türkiye",
             "matches": 16,
             "probability": 0.008
           },
           {
             "rank": 61,
-            "name": "Brazil | Türkiye",
+            "name": "France | Paraguay",
             "matches": 16,
             "probability": 0.008
           },
@@ -7020,13 +7020,13 @@
           },
           {
             "rank": 19,
-            "name": "Argentina | Germany",
+            "name": "France | Portugal",
             "matches": 21,
             "probability": 0.0105
           },
           {
             "rank": 20,
-            "name": "France | Portugal",
+            "name": "Argentina | Germany",
             "matches": 21,
             "probability": 0.0105
           },
@@ -7098,37 +7098,37 @@
           },
           {
             "rank": 32,
-            "name": "France | Netherlands",
-            "matches": 15,
-            "probability": 0.0075
-          },
-          {
-            "rank": 33,
             "name": "Argentina | Belgium",
             "matches": 15,
             "probability": 0.0075
           },
           {
-            "rank": 34,
-            "name": "France | Norway",
-            "matches": 14,
-            "probability": 0.007
+            "rank": 33,
+            "name": "France | Netherlands",
+            "matches": 15,
+            "probability": 0.0075
           },
           {
-            "rank": 35,
+            "rank": 34,
             "name": "France | Japan",
             "matches": 14,
             "probability": 0.007
           },
           {
+            "rank": 35,
+            "name": "France | Norway",
+            "matches": 14,
+            "probability": 0.007
+          },
+          {
             "rank": 36,
-            "name": "Belgium | England",
+            "name": "Brazil | Germany",
             "matches": 13,
             "probability": 0.0065
           },
           {
             "rank": 37,
-            "name": "Brazil | Germany",
+            "name": "Belgium | England",
             "matches": 13,
             "probability": 0.0065
           },
@@ -7194,7 +7194,7 @@
           },
           {
             "rank": 48,
-            "name": "England | Germany",
+            "name": "Argentina | Mexico",
             "matches": 10,
             "probability": 0.005
           },
@@ -7206,7 +7206,7 @@
           },
           {
             "rank": 50,
-            "name": "Argentina | Mexico",
+            "name": "England | Germany",
             "matches": 10,
             "probability": 0.005
           },
@@ -7272,19 +7272,19 @@
           },
           {
             "rank": 61,
-            "name": "Brazil | Türkiye",
+            "name": "Ecuador | England",
             "matches": 8,
             "probability": 0.004
           },
           {
             "rank": 62,
-            "name": "Belgium | Colombia",
+            "name": "Brazil | Türkiye",
             "matches": 8,
             "probability": 0.004
           },
           {
             "rank": 63,
-            "name": "Ecuador | England",
+            "name": "Belgium | Colombia",
             "matches": 8,
             "probability": 0.004
           },
@@ -7433,8 +7433,8 @@
       "workers": 8,
       "chunks": 200,
       "chunk_size": 25,
-      "elapsed_seconds": 78.768,
-      "rate_per_second": 63.478,
+      "elapsed_seconds": 62.062,
+      "rate_per_second": 80.565,
       "champions": [
         {
           "rank": 1,
@@ -8377,13 +8377,13 @@
           },
           {
             "rank": 28,
-            "name": "Austria",
+            "name": "Australia",
             "appearances": 448,
             "probability": 0.0896
           },
           {
             "rank": 29,
-            "name": "Australia",
+            "name": "Austria",
             "appearances": 448,
             "probability": 0.0896
           },
@@ -9219,13 +9219,13 @@
           },
           {
             "rank": 27,
-            "name": "Canada | Czechia",
+            "name": "Ecuador | Senegal",
             "matches": 621,
             "probability": 0.1242
           },
           {
             "rank": 28,
-            "name": "Ecuador | Senegal",
+            "name": "Canada | Czechia",
             "matches": 621,
             "probability": 0.1242
           },
@@ -9417,13 +9417,13 @@
           },
           {
             "rank": 60,
-            "name": "Mexico | Saudi Arabia",
+            "name": "Côte d'Ivoire | Norway",
             "matches": 368,
             "probability": 0.0736
           },
           {
             "rank": 61,
-            "name": "Côte d'Ivoire | Norway",
+            "name": "Mexico | Saudi Arabia",
             "matches": 368,
             "probability": 0.0736
           },
@@ -9515,13 +9515,13 @@
           },
           {
             "rank": 12,
-            "name": "Argentina | Belgium",
+            "name": "Brazil | Germany",
             "matches": 487,
             "probability": 0.0974
           },
           {
             "rank": 13,
-            "name": "Brazil | Germany",
+            "name": "Argentina | Belgium",
             "matches": 487,
             "probability": 0.0974
           },
@@ -9791,13 +9791,13 @@
           },
           {
             "rank": 58,
-            "name": "Canada | Morocco",
+            "name": "Croatia | Uruguay",
             "matches": 168,
             "probability": 0.0336
           },
           {
             "rank": 59,
-            "name": "Croatia | Uruguay",
+            "name": "Canada | Morocco",
             "matches": 168,
             "probability": 0.0336
           },
@@ -10099,13 +10099,13 @@
           },
           {
             "rank": 45,
-            "name": "Colombia | Paraguay",
+            "name": "Belgium | Croatia",
             "matches": 113,
             "probability": 0.0226
           },
           {
             "rank": 46,
-            "name": "Belgium | Croatia",
+            "name": "Colombia | Paraguay",
             "matches": 113,
             "probability": 0.0226
           },
@@ -10183,13 +10183,13 @@
           },
           {
             "rank": 59,
-            "name": "Croatia | Ecuador",
+            "name": "Canada | Spain",
             "matches": 88,
             "probability": 0.0176
           },
           {
             "rank": 60,
-            "name": "Canada | Spain",
+            "name": "Croatia | Ecuador",
             "matches": 88,
             "probability": 0.0176
           },
@@ -10485,13 +10485,13 @@
           },
           {
             "rank": 45,
-            "name": "Brazil | Switzerland",
+            "name": "Korea Republic | Spain",
             "matches": 53,
             "probability": 0.0106
           },
           {
             "rank": 46,
-            "name": "Korea Republic | Spain",
+            "name": "Brazil | Switzerland",
             "matches": 53,
             "probability": 0.0106
           },
@@ -10509,13 +10509,13 @@
           },
           {
             "rank": 49,
-            "name": "Scotland | Spain",
+            "name": "Belgium | Netherlands",
             "matches": 46,
             "probability": 0.0092
           },
           {
             "rank": 50,
-            "name": "Belgium | Netherlands",
+            "name": "Scotland | Spain",
             "matches": 46,
             "probability": 0.0092
           },
@@ -10581,25 +10581,25 @@
           },
           {
             "rank": 61,
-            "name": "Croatia | Switzerland",
-            "matches": 38,
-            "probability": 0.0076
-          },
-          {
-            "rank": 62,
             "name": "Japan | Portugal",
             "matches": 38,
             "probability": 0.0076
           },
           {
+            "rank": 62,
+            "name": "Croatia | Switzerland",
+            "matches": 38,
+            "probability": 0.0076
+          },
+          {
             "rank": 63,
-            "name": "Morocco | Portugal",
+            "name": "Ecuador | England",
             "matches": 37,
             "probability": 0.0074
           },
           {
             "rank": 64,
-            "name": "Ecuador | England",
+            "name": "Netherlands | Türkiye",
             "matches": 37,
             "probability": 0.0074
           }
@@ -10799,13 +10799,13 @@
           },
           {
             "rank": 33,
-            "name": "England | Portugal",
+            "name": "Argentina | Türkiye",
             "matches": 34,
             "probability": 0.0068
           },
           {
             "rank": 34,
-            "name": "Argentina | Türkiye",
+            "name": "England | Portugal",
             "matches": 34,
             "probability": 0.0068
           },
@@ -10829,13 +10829,13 @@
           },
           {
             "rank": 38,
-            "name": "Norway | Spain",
+            "name": "Brazil | Netherlands",
             "matches": 30,
             "probability": 0.006
           },
           {
             "rank": 39,
-            "name": "Brazil | Netherlands",
+            "name": "Norway | Spain",
             "matches": 30,
             "probability": 0.006
           },
@@ -10865,19 +10865,19 @@
           },
           {
             "rank": 44,
-            "name": "France | Germany",
+            "name": "Ecuador | England",
             "matches": 28,
             "probability": 0.0056
           },
           {
             "rank": 45,
-            "name": "Argentina | Norway",
+            "name": "France | Germany",
             "matches": 28,
             "probability": 0.0056
           },
           {
             "rank": 46,
-            "name": "Ecuador | England",
+            "name": "Argentina | Norway",
             "matches": 28,
             "probability": 0.0056
           },
@@ -10925,19 +10925,19 @@
           },
           {
             "rank": 54,
-            "name": "France | Japan",
-            "matches": 23,
-            "probability": 0.0046
-          },
-          {
-            "rank": 55,
             "name": "Brazil | Germany",
             "matches": 23,
             "probability": 0.0046
           },
           {
-            "rank": 56,
+            "rank": 55,
             "name": "Belgium | France",
+            "matches": 23,
+            "probability": 0.0046
+          },
+          {
+            "rank": 56,
+            "name": "France | Japan",
             "matches": 23,
             "probability": 0.0046
           },

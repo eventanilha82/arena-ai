@@ -20,6 +20,7 @@ from release_provenance import (
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE_SOURCE_INTEGRITY_PATHS = (
     "src/arena_ai/main.py",
+    "src/arena_ai/cinematic_dribble_runtime.py",
     "src/arena_ai/cinematic_poc_runtime.py",
     "src/arena_ai/worldcup_model.py",
     "modeling/worldcup_2026_ml/src/sota_pipeline.py",
@@ -28,6 +29,7 @@ RELEASE_SOURCE_INTEGRITY_PATHS = (
     "modeling/worldcup_2026_ml/reports/sota_model_report.json",
     "Makefile",
     "assets/asset_manifest.json",
+    "assets/generated/cinematic/poc2_runner_motion.json",
     "scripts/build_from_snapshot.py",
     "scripts/build_assets_qa.py",
     "scripts/package_release_artifacts.py",
@@ -35,6 +37,9 @@ RELEASE_SOURCE_INTEGRITY_PATHS = (
     "pyproject.toml",
     "uv.lock",
 )
+RELEASE_SOURCE_INTEGRITY_GLOBS = {
+    "assets/generated/cinematic/poc2_runner_*.png": 18,
+}
 
 
 def sha256(path: Path) -> str:
@@ -91,7 +96,19 @@ def file_entry(path: Path, role: str) -> dict[str, object]:
 def source_integrity() -> dict[str, object]:
     status = run_text(["git", "status", "--porcelain=v1"])
     files = []
-    for relative_path in RELEASE_SOURCE_INTEGRITY_PATHS:
+    relative_paths = list(RELEASE_SOURCE_INTEGRITY_PATHS)
+    for pattern, expected_count in RELEASE_SOURCE_INTEGRITY_GLOBS.items():
+        matches = sorted(ROOT.glob(pattern))
+        if len(matches) != expected_count:
+            raise SystemExit(
+                "release source integrity glob drift: "
+                f"{pattern}={len(matches)}/{expected_count}"
+            )
+        relative_paths.extend(
+            path.relative_to(ROOT).as_posix()
+            for path in matches
+        )
+    for relative_path in relative_paths:
         path = ROOT / relative_path
         if not path.is_file():
             raise SystemExit(f"missing release source file: {path}")

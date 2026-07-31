@@ -329,6 +329,7 @@ Critérios duros do carimbo:
   "runtime_log_loss_beats_same_window_elo": true,
   "runtime_rps_beats_same_window_elo": true,
   "runtime_near_ablation_frontier": true,
+  "runtime_near_draw_policy_frontier_without_retrofit": true,
   "dixon_coles_near_rho_frontier": true,
   "monte_carlo_uncertainty_reported": true,
   "stage_uncertainty_reported": true,
@@ -337,12 +338,14 @@ Critérios duros do carimbo:
   "class_calibration_reported": true,
   "block_bootstrap_reported": true,
   "runtime_adjustment_audit_reported": true,
+  "runtime_adjustment_direct_1x2_removed": true,
   "runtime_neutral_order_invariant": true,
   "runtime_adjustment_max_shift_lte_35pp": true,
   "runtime_adjustment_p95_shift_lte_18pp": true,
   "raw_data_manifest_reported": true,
   "raw_data_manifest_hash_reported": true,
   "raw_data_semantic_sanity_passed": true,
+  "neutral_orientation_invariant": true,
   "source_fingerprints_reported": true,
   "external_elo_parse_complete": true,
   "external_elo_current": true,
@@ -358,11 +361,11 @@ Freshness dos artefatos que sustentam esse carimbo:
 
 | Artefato | SHA-256 | Tamanho |
 | --- | --- | ---: |
-| `modeling/worldcup_2026_ml/models/model_sota.pkl` | `82274d68fd54b3aee18dcd2db137f087a99a516a9850ab73aea105d462d11e78` | `4565106` |
-| `modeling/worldcup_2026_ml/reports/sota_model_report.json` | `5192ec1147f2d774e34562a79ebeca0a38d5d6d1092f9e8f13ef204c554b8196` | `97095` |
-| `modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv` | `652da5722831d8ed4ba3bddab1032e1f71d1f328db7484fb0c41929c111038b6` | `12323223` |
-| `modeling/worldcup_2026_ml/src/sota_pipeline.py` | `124cf8ff7dad64d6b3fdc175be48160c395b759b210acf803cfa5bb535b29f9d` | `167197` |
-| `scripts/model_stats_qa.py` | `e3a2e4e3a9c31d45b8ed79796bece5b8329c58731eb7d471d2b16b4b491e8a0b` | `85643` |
+| `modeling/worldcup_2026_ml/models/model_sota.pkl` | `8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a` | `4091805` |
+| `modeling/worldcup_2026_ml/reports/sota_model_report.json` | `0a9d844b0a3af028cd4007c2427571c5ef8dc957ae246061352dfe62252cd454` | `96850` |
+| `modeling/worldcup_2026_ml/data/processed/sota_training_matches.csv` | `bf67d740e988fa3d38310e3b97c201844dab618bcdff689dbbe251dea88e6a25` | `15868527` |
+| `modeling/worldcup_2026_ml/src/sota_pipeline.py` | `bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770` | `205834` |
+| `scripts/model_stats_qa.py` | `d50ab54e36ea946a774683e18abf217ad029ae44eb4bac98760711c2e77793ec` | `95391` |
 
 Manifesto bruto:
 
@@ -371,8 +374,8 @@ path = modeling/worldcup_2026_ml/reports/sota_raw_data_manifest.json
 csv_path = modeling/worldcup_2026_ml/reports/sota_raw_data_manifest.csv
 file_count = 14
 csv_file_count = 14
-total_size_bytes = 81082917
-manifest_sha256 = 508a0b0651216d38d516c37dc22adc8930c9cc1a498cc6718aa912621ea64429
+total_size_bytes = 81082901
+manifest_sha256 = 70ab1b3e3c816e37da3fff9a46c31abe5e5eb604c10300a5e6da1167cbe7e14e
 ```
 
 ## Ablação
@@ -583,12 +586,12 @@ Resumo atual:
 ```text
 file_count = 14
 csv_file_count = 14
-total_size_bytes = 81082917
+total_size_bytes = 81082901
 required_files_present = true
 checked_file_count = 14
 passed_file_count = 14
 semantic_passed = true
-manifest_sha256 = 508a0b0651216d38d516c37dc22adc8930c9cc1a498cc6718aa912621ea64429
+manifest_sha256 = 70ab1b3e3c816e37da3fff9a46c31abe5e5eb604c10300a5e6da1167cbe7e14e
 ```
 
 Checks semânticos:
@@ -625,7 +628,7 @@ Volumes:
 | `1000` | UI do jogo e snapshot atual |
 | `10000` | default do CLI de rebuild completo |
 | `5k/10k` | estabilidade offline do ranking |
-| `1k/2k` | estabilidade offline por fase, finalistas e confrontos de chave |
+| `1k/2k/5k` | estabilidade offline por fase, finalistas e confrontos de chave |
 
 No Pygame:
 
@@ -669,21 +672,23 @@ Snapshot de Monte Carlo no model card:
 
 ```text
 runs = 1000
-sample champion seed 2026 = Netherlands
+sample champion seed 2026 = Spain
 ```
 
 Top odds do snapshot:
 
 | Seleção | Probabilidade | Vitórias |
 | --- | ---: | ---: |
-| Spain | `18.50%` | `185` |
-| Brazil | `12.80%` | `128` |
-| Germany | `11.70%` | `117` |
-| Mexico | `11.20%` | `112` |
-| Czechia | `9.60%` | `96` |
-| Netherlands | `7.30%` | `73` |
-| Korea Republic | `6.70%` | `67` |
-| Uruguay | `3.60%` | `36` |
+| Spain | `23.20%` | `232` |
+| Argentina | `16.40%` | `164` |
+| France | `10.40%` | `104` |
+| England | `9.40%` | `94` |
+| Brazil | `6.60%` | `66` |
+| Netherlands | `4.80%` | `48` |
+| Portugal | `4.40%` | `44` |
+| Colombia | `3.60%` | `36` |
+| Germany | `3.40%` | `34` |
+| Croatia | `2.50%` | `25` |
 
 ### Estabilidade Offline
 
@@ -701,13 +706,13 @@ fresh = true
 passed = true
 stage_bracket_passed = true
 runs = 5000, 10000
-stage_bracket_runs = 1000, 2000
+stage_bracket_runs = 1000, 2000, 5000
 leader_at_max_runs = Spain
-leader_probability_at_max_runs = 0.16
-max_top16_abs_delta = 0.0106
-top16_churn_count = 2
-max_stage_top16_abs_delta = 0.026
-max_pair_top8_abs_delta = 0.0125
+leader_probability_at_max_runs = 0.2366
+max_top16_abs_delta = 0.0056
+top16_churn_count = 0
+max_stage_top16_abs_delta = 0.0169
+max_pair_top8_abs_delta = 0.0108
 ```
 
 ## Campanha Em Destaque
@@ -901,7 +906,7 @@ make audio-qa
 
 O `validate` fica leve o bastante para iteração diária, mas reprova artefatos estatísticos stale, manifesto bruto stale, Monte Carlo stale, assets faltantes, pureza de render e contrato básico de áudio.
 
-O `aaa-qa` é o gate pesado de cinematics, sprites, 60 FPS, partida completa, uniformes e tela da Copa.
+O `aaa-qa` é o gate pesado de cinematics, sprites, 60 FPS, partida completa, uniformes e tela da Copa. A condução usa o contrato POC2 promovido; chute, trajetória, goleiro, rede e áudio usam o contrato POC7 promovido.
 
 ## Limitações
 

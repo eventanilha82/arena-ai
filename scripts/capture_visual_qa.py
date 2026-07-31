@@ -45,6 +45,9 @@ from arena_ai.main import (  # noqa: E402
     font,
 )
 from arena_ai.cinematic_uniforms import CINEMATIC_UNIFORMS  # noqa: E402
+from arena_ai.cinematic_dribble_runtime import (  # noqa: E402
+    Poc2DribbleSample,
+)
 from arena_ai.cinematic_poc_runtime import (  # noqa: E402
     POC_RUNNER_CANVAS_SIZE,
     POC_RUNNER_ROOT,
@@ -105,6 +108,230 @@ def locomotion_metrics(
     sequence = state.get("poc_contract_sequence")
     sample = state.get("poc_contract_sample")
     viewport = state.get("poc_viewport")
+    poc2_sample = state.get("poc2_dribble_sample")
+    if (
+        isinstance(poc2_sample, Poc2DribbleSample)
+        and not isinstance(sequence, PocSequence)
+    ):
+        player = poc2_sample.player
+        frame = poc2_sample.frame
+        metadata = frame.metadata
+
+        def scene_point(
+            point: tuple[float, float],
+        ) -> tuple[float, float]:
+            return (
+                player.scene_left + point[0] * player.scale,
+                player.scene_top + point[1] * player.scale,
+            )
+
+        bbox_x, bbox_y, bbox_w, bbox_h = metadata.visible_bbox
+        runner_surface, runner_rect = runner_render_for_state(
+            app,
+            app.home
+            if state.get("possession") == "home"
+            else app.away,
+            state,
+            1 if poc2_sample.direction == "right" else -1,
+        )
+        visible = runner_surface.get_bounding_rect(min_alpha=30)
+        visible_ground_y = runner_rect.top + visible.bottom
+        support = (
+            scene_point(metadata.support_foot)
+            if metadata.support_foot is not None
+            else (
+                player.scene_center_x,
+                float(visible_ground_y),
+            )
+        )
+        pelvis = scene_point(
+            (
+                metadata.pelvis_x,
+                bbox_y + bbox_h * 0.48,
+            )
+        )
+        toe = (
+            support
+            if metadata.support_foot is not None
+            else scene_point(
+                (
+                    bbox_x + bbox_w
+                    if poc2_sample.direction == "right"
+                    else bbox_x,
+                    bbox_y + bbox_h,
+                )
+            )
+        )
+        next_sample = app.poc2_dribble.sample(
+            poc2_sample.uniform_code,
+            poc2_sample.direction == "left",
+            poc2_sample.elapsed_seconds + 1.0 / FPS,
+            player.scene_center_x,
+            player.scene_ground_y,
+            player.scale,
+        )
+        ball_x, ball_y = state["ball_pos"]  # type: ignore[misc]
+        landmark_gap = max(
+            0.0,
+            hypot(
+                float(ball_x) - toe[0],
+                float(ball_y) - toe[1],
+            )
+            - visible_ball_radius(
+                app,
+                int(state["ball_scale"]),
+            ),
+        )
+        rendered_gap = rendered_ball_runner_gap(app, state)
+        return {
+            "runner_frame": frame.index,
+            "runner_next_frame": next_sample.frame.index,
+            "runner_frame_blend": 0.0,
+            "runner_render_frame": frame.index,
+            "runner_phase": frame.cycle_phase,
+            "support": metadata.support or "flight",
+            "support_weight": 0.0 if frame.flight else 1.0,
+            "support_pos": support,
+            "sole_ground_gap_px": (
+                player.scene_ground_y - visible_ground_y
+            ),
+            "pelvis_pos": pelvis,
+            "toe_pos": toe,
+            "dribble_touch_phase": poc2_sample.ball.touch_phase,
+            "dribble_pose_phase": metadata.phase,
+            "dribble_touch_slot": poc2_sample.ball.touch_slot,
+            "landmark_dribble_contact_gap_px": landmark_gap,
+            "landmark_ball_foot_gap_px": landmark_gap,
+            "visible_ball_foot_gap_px": rendered_gap,
+            "rendered_ball_runner_gap_px": rendered_gap,
+            "kick_foot_pos": toe,
+            "keeper_frame_first": state.get("keeper_frame_first", 0),
+            "keeper_frame_following": state.get(
+                "keeper_frame_following",
+                0,
+            ),
+            "keeper_frame_blend": float(
+                state.get("keeper_frame_blend", 0.0)
+            ),
+            "keeper_render_frame": state.get("keeper_render_frame", 0),
+            "following_render_frame": next_sample.frame.index,
+            "actor_canvas_size": max(1, round(player.scene_size)),
+        }
+    if (
+        isinstance(sequence, PocSequence)
+        and isinstance(sample, PocSequenceSample)
+        and isinstance(viewport, PocViewport)
+        and isinstance(poc2_sample, Poc2DribbleSample)
+        and sample.actor_source == 0
+    ):
+        possession = str(state.get("possession", "home"))
+        team = app.home if possession == "home" else app.away
+        frame = poc2_sample.frame
+        metadata = frame.metadata
+        actor_root = viewport.point(
+            poc2_sample.player.scene_center_x,
+            poc2_sample.player.scene_ground_y,
+        )
+        actor_scale = viewport.scale
+        canvas_size = poc2_sample.player.canvas_size_px
+        actor_left = actor_root[0] - canvas_size * 0.5 * actor_scale
+        actor_top = (
+            actor_root[1]
+            - poc2_sample.player.canvas_ground_y_px * actor_scale
+        )
+
+        def poc2_screen_point(
+            point: tuple[float, float],
+        ) -> tuple[float, float]:
+            return (
+                actor_left + point[0] * actor_scale,
+                actor_top + point[1] * actor_scale,
+            )
+
+        bbox_x, bbox_y, bbox_w, bbox_h = metadata.visible_bbox
+        runner_surface, runner_rect = runner_render_for_state(
+            app,
+            team,
+            state,
+            1 if sequence.attack_direction == "right" else -1,
+        )
+        visible = runner_surface.get_bounding_rect(min_alpha=30)
+        visible_ground_y = runner_rect.top + visible.bottom
+        support = (
+            poc2_screen_point(metadata.support_foot)
+            if metadata.support_foot is not None
+            else (actor_root[0], float(visible_ground_y))
+        )
+        pelvis = poc2_screen_point(
+            (
+                metadata.pelvis_x,
+                bbox_y + bbox_h * 0.48,
+            )
+        )
+        toe = (
+            support
+            if metadata.support_foot is not None
+            else poc2_screen_point(
+                (
+                    bbox_x + bbox_w
+                    if sequence.attack_direction == "right"
+                    else bbox_x,
+                    bbox_y + bbox_h,
+                )
+            )
+        )
+        following_sample = app.poc_sequences.sample(
+            sequence,
+            min(
+                sequence.duration_seconds,
+                sample.elapsed + 1.0 / app.poc_sequences.sample_hz,
+            ),
+        )
+        following_render_frame = app.cinematic_poc_actor_material(
+            sequence,
+            following_sample,
+            team,
+        )[1]
+        ball_x, ball_y = state["ball_pos"]  # type: ignore[misc]
+        landmark_gap = max(
+            0.0,
+            hypot(
+                float(ball_x) - toe[0],
+                float(ball_y) - toe[1],
+            )
+            - visible_ball_radius(app, int(state["ball_scale"])),
+        )
+        rendered_gap = rendered_ball_runner_gap(app, state)
+        return {
+            "runner_frame": frame.index,
+            "runner_next_frame": following_sample.actor_frame,
+            "runner_frame_blend": 0.0,
+            "runner_render_frame": frame.index,
+            "runner_phase": frame.cycle_phase,
+            "support": metadata.support or "flight",
+            "support_weight": 0.0 if frame.flight else 1.0,
+            "support_pos": support,
+            "sole_ground_gap_px": actor_root[1] - visible_ground_y,
+            "pelvis_pos": pelvis,
+            "toe_pos": toe,
+            "dribble_touch_phase": poc2_sample.ball.touch_phase,
+            "dribble_pose_phase": metadata.phase,
+            "dribble_touch_slot": poc2_sample.ball.touch_slot,
+            "landmark_dribble_contact_gap_px": landmark_gap,
+            "landmark_ball_foot_gap_px": landmark_gap,
+            "visible_ball_foot_gap_px": rendered_gap,
+            "rendered_ball_runner_gap_px": rendered_gap,
+            "kick_foot_pos": toe,
+            "keeper_frame_first": sample.keeper_frame,
+            "keeper_frame_following": sample.keeper_frame,
+            "keeper_frame_blend": 0.0,
+            "keeper_render_frame": sample.keeper_frame,
+            "following_render_frame": following_render_frame,
+            "actor_canvas_size": max(
+                1,
+                round(canvas_size * actor_scale),
+            ),
+        }
     if not (
         isinstance(sequence, PocSequence)
         and isinstance(sample, PocSequenceSample)
@@ -134,6 +361,9 @@ def locomotion_metrics(
             "toe_pos": toe,
             "dribble_touch_phase": float(
                 state["dribble_touch_phase"]
+            ),
+            "dribble_pose_phase": str(
+                state.get("support_phase") or ""
             ),
             "dribble_touch_slot": int(
                 state["dribble_touch_slot"]
@@ -254,8 +484,9 @@ def locomotion_metrics(
         "pelvis_pos": pelvis,
         "toe_pos": toe,
         "dribble_touch_phase": float(
-            metadata.get("phase", 0.0)
+            state.get("dribble_touch_phase", 0.0)
         ),
+        "dribble_pose_phase": str(metadata.get("phase", "")),
         "dribble_touch_slot": render_frame,
         "landmark_dribble_contact_gap_px": landmark_gap,
         "landmark_ball_foot_gap_px": landmark_gap,
@@ -950,6 +1181,7 @@ def capture_dribble_flow_sequence(
                 "ball_ground_pos": state.get("ball_ground_pos"),
                 "ball_rotation_degrees": state.get("ball_rotation_degrees"),
                 "dribble_touch_phase": metrics["dribble_touch_phase"],
+                "dribble_pose_phase": metrics["dribble_pose_phase"],
                 "dribble_touch_slot": metrics["dribble_touch_slot"],
                 "landmark_dribble_contact_gap_px": metrics["landmark_dribble_contact_gap_px"],
                 "dribble_contact_gap_px": metrics["landmark_dribble_contact_gap_px"],
@@ -1210,6 +1442,7 @@ def capture_locomotion_video(
                     "ball_x": round(float(ball_x), 4),
                     "ball_y": round(float(ball_y), 4),
                     "dribble_touch_phase": round(float(metrics["dribble_touch_phase"]), 6),
+                    "dribble_pose_phase": str(metrics["dribble_pose_phase"]),
                     "dribble_touch_slot": int(metrics["dribble_touch_slot"]),
                     "landmark_dribble_contact_gap_px": round(
                         float(metrics["landmark_dribble_contact_gap_px"]), 4
@@ -1450,15 +1683,18 @@ def capture_cinematic_variants(app: App, label_font: pygame.font.Font) -> dict[s
 
 def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> dict[str, object]:
     motion = app.assets.cinematic_runner_motion
+    poc2_motion = app.assets.cinematic_poc2_motion
     frame_size = int(motion["frame_size"])
+    poc2_frame_size = int(poc2_motion["canvas_size"])
+    cell_size = max(frame_size, poc2_frame_size)
     label_height = 34
     phases = (
-        ("direita | contato", "runner", 0),
-        ("direita | voo", "runner", 7),
+        ("direita | contato", "poc2_runner_right", 0),
+        ("direita | voo", "poc2_runner_right", 7),
         ("direita | chute", "runner_kick", 9),
         ("direita | parado", "runner_stop", CINEMATIC_STOP_FRAME_COUNT - 1),
-        ("esquerda | contato", "runner_left", 0),
-        ("esquerda | voo", "runner_left", 7),
+        ("esquerda | contato", "poc2_runner_left", 0),
+        ("esquerda | voo", "poc2_runner_left", 7),
         ("esquerda | chute", "runner_left_kick", 9),
         ("esquerda | parado", "runner_left_stop", CINEMATIC_STOP_FRAME_COUNT - 1),
     )
@@ -1471,7 +1707,7 @@ def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> d
         raise RuntimeError(f"runner uniform QA found an unused profile: {team_codes}")
 
     sheet = pygame.Surface(
-        (len(phases) * frame_size, len(CINEMATIC_UNIFORMS) * (frame_size + label_height)),
+        (len(phases) * cell_size, len(CINEMATIC_UNIFORMS) * (cell_size + label_height)),
         pygame.SRCALPHA,
     )
     sheet.fill(BG)
@@ -1479,32 +1715,43 @@ def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> d
     cells: list[dict[str, object]] = []
     for row, uniform in enumerate(CINEMATIC_UNIFORMS):
         for column, (phase_label, stem, frame_index) in enumerate(phases):
-            x = column * frame_size
-            y = row * (frame_size + label_height)
-            cell = pygame.Rect(x, y + label_height, frame_size, frame_size)
+            x = column * cell_size
+            y = row * (cell_size + label_height)
+            cell = pygame.Rect(x, y + label_height, cell_size, cell_size)
             pygame.draw.rect(sheet, (14, 62, 31), cell)
             pygame.draw.line(sheet, (86, 132, 65), (cell.x, cell.bottom - 14), (cell.right, cell.bottom - 14), 2)
-            source = base / f"{stem}_smooth_{uniform.code}.png"
+            is_poc2 = stem.startswith("poc2_")
+            source = base / (
+                f"{stem}_{uniform.code}.png"
+                if is_poc2
+                else f"{stem}_smooth_{uniform.code}.png"
+            )
             spritesheet = pygame.image.load(source).convert_alpha()
-            sheet_columns = int(
-                motion[
-                    "stop_sheet_columns"
-                    if "stop" in stem
-                    else "kick_sheet_columns"
-                    if "kick" in stem
-                    else "sheet_columns"
-                ]
+            source_frame_size = poc2_frame_size if is_poc2 else frame_size
+            sheet_columns = (
+                int(poc2_motion["sheet_columns"])
+                if is_poc2
+                else int(
+                    motion[
+                        "stop_sheet_columns"
+                        if "stop" in stem
+                        else "kick_sheet_columns"
+                        if "kick" in stem
+                        else "sheet_columns"
+                    ]
+                )
             )
             frame = spritesheet.subsurface(
                 pygame.Rect(
-                    (frame_index % sheet_columns) * frame_size,
-                    (frame_index // sheet_columns) * frame_size,
-                    frame_size,
-                    frame_size,
+                    (frame_index % sheet_columns) * source_frame_size,
+                    (frame_index // sheet_columns) * source_frame_size,
+                    source_frame_size,
+                    source_frame_size,
                 )
             )
-            sheet.blit(frame, cell.topleft)
-            pygame.draw.rect(sheet, (0, 7, 10), (x, y, frame_size, label_height))
+            frame_rect = frame.get_rect(center=cell.center)
+            sheet.blit(frame, frame_rect)
+            pygame.draw.rect(sheet, (0, 7, 10), (x, y, cell_size, label_height))
             label = f"{uniform.code} | {phase_label}"
             sheet.blit(label_font.render(label, True, GOLD), (x + 10, y + 8))
             cells.append(
@@ -1526,17 +1773,21 @@ def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> d
     stop_cycle_sheets: dict[str, dict[str, str]] = {}
     cycle_frame_size = 128
     cycle_label_height = 24
-    for direction, stem in (("right", "runner"), ("left", "runner_left")):
+    poc2_frame_count = int(poc2_motion["frame_count"])
+    for direction, stem in (
+        ("right", "poc2_runner_right"),
+        ("left", "poc2_runner_left"),
+    ):
         cycle_sheet = pygame.Surface(
             (
-                CINEMATIC_RUNNER_FRAME_COUNT * cycle_frame_size,
+                poc2_frame_count * cycle_frame_size,
                 len(CINEMATIC_UNIFORMS) * (cycle_frame_size + cycle_label_height),
             ),
             pygame.SRCALPHA,
         )
         cycle_sheet.fill(BG)
         for row, uniform in enumerate(CINEMATIC_UNIFORMS):
-            source = base / f"{stem}_smooth_{uniform.code}.png"
+            source = base / f"{stem}_{uniform.code}.png"
             spritesheet = pygame.image.load(source).convert_alpha()
             label_y = row * (cycle_frame_size + cycle_label_height)
             pygame.draw.rect(
@@ -1548,13 +1799,13 @@ def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> d
                 label_font.render(f"{uniform.code} | {direction}", True, GOLD),
                 (8, label_y + 3),
             )
-            for frame_index in range(CINEMATIC_RUNNER_FRAME_COUNT):
+            for frame_index in range(poc2_frame_count):
                 frame = spritesheet.subsurface(
                     pygame.Rect(
-                        (frame_index % int(motion["sheet_columns"])) * frame_size,
-                        (frame_index // int(motion["sheet_columns"])) * frame_size,
-                        frame_size,
-                        frame_size,
+                        (frame_index % int(poc2_motion["sheet_columns"])) * poc2_frame_size,
+                        (frame_index // int(poc2_motion["sheet_columns"])) * poc2_frame_size,
+                        poc2_frame_size,
+                        poc2_frame_size,
                     )
                 ).copy()
                 frame = pygame.transform.smoothscale(frame, (cycle_frame_size, cycle_frame_size))
@@ -1661,7 +1912,15 @@ def capture_runner_uniform_coverage(app: App, label_font: pygame.font.Font) -> d
         "uniform_profile_count": len(CINEMATIC_UNIFORMS),
         "team_count": len(app.teams),
         "directions": ["right", "left"],
-        "authored_run_frames_per_direction": CINEMATIC_RUNNER_FRAME_COUNT,
+        "run_contract": {
+            "path": str(
+                (base / "poc2_runner_motion.json").relative_to(ROOT)
+            ),
+            "sha256": file_sha256(base / "poc2_runner_motion.json"),
+            "status": poc2_motion["status"],
+            "cycle_seconds": poc2_motion["cycle_seconds"],
+        },
+        "authored_run_frames_per_direction": poc2_frame_count,
         "authored_kick_frames_per_direction": CINEMATIC_KICK_FRAME_COUNT,
         "authored_stop_frames_per_direction": CINEMATIC_STOP_FRAME_COUNT,
         "all_frame_sheets": cycle_sheets,
