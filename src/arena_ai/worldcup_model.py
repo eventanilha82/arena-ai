@@ -44,6 +44,58 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def mirrored_neutral_base_cache_key(key: object) -> tuple[object, ...] | None:
+    if not isinstance(key, tuple) or len(key) != 4 or not bool(key[2]):
+        return None
+    return (key[1], key[0], key[2], key[3])
+
+
+def mirrored_neutral_context_key(context_key: object) -> tuple[object, ...] | None:
+    if not isinstance(context_key, tuple):
+        return None
+    mirrored: list[tuple[object, object]] = []
+    for item in context_key:
+        if not isinstance(item, tuple) or len(item) != 2:
+            return None
+        name, value = item
+        if isinstance(name, str) and name.startswith("home_"):
+            name = f"away_{name[5:]}"
+        elif isinstance(name, str) and name.startswith("away_"):
+            name = f"home_{name[5:]}"
+        mirrored.append((name, value))
+    return tuple(sorted(mirrored, key=lambda item: str(item[0])))
+
+
+def mirrored_neutral_prediction_cache_key(key: object) -> tuple[object, ...] | None:
+    if not isinstance(key, tuple) or len(key) != 5 or not bool(key[2]):
+        return None
+    mirrored_context = mirrored_neutral_context_key(key[4])
+    if mirrored_context is None:
+        return None
+    return (key[1], key[0], key[2], key[3], mirrored_context)
+
+
+def incomplete_neutral_cache_keys(
+    cache: dict[object, object],
+    mirror_key: Callable[[object], tuple[object, ...] | None],
+) -> tuple[object, ...]:
+    return tuple(
+        key
+        for key in cache
+        if (mirror := mirror_key(key)) is not None and mirror not in cache
+    )
+
+
+def paired_neutral_cache(
+    cache: dict[object, object],
+    mirror_key: Callable[[object], tuple[object, ...] | None],
+) -> dict[object, object]:
+    incomplete = set(incomplete_neutral_cache_keys(cache, mirror_key))
+    if not incomplete:
+        return cache
+    return {key: value for key, value in cache.items() if key not in incomplete}
+
+
 BASE_FLAGS = {
     "BRA": ((33, 156, 76), (249, 221, 50), (43, 88, 181)),
     "ARG": ((105, 181, 232), (255, 255, 255), (105, 181, 232)),
@@ -234,12 +286,14 @@ class MatchAnalysis:
 
 
 class WorldCupModel:
-    def __init__(self):
+    def __init__(self, *, preserve_incomplete_runtime_cache: bool = False):
         if not MODEL_PATH.exists():
             raise FileNotFoundError(f"Modelo SOTA não encontrado: {MODEL_PATH}")
         with MODEL_PATH.open("rb") as file:
             self.package = pickle.load(file)
-        self._load_runtime_prediction_cache()
+        self._load_runtime_prediction_cache(
+            preserve_incomplete=preserve_incomplete_runtime_cache,
+        )
         self.states = sota.ensure_states(self.package)
         self.squad = self.package["squad_strength"].copy()
         self.fixtures = self.package["fixtures"].copy()
@@ -252,7 +306,7 @@ class WorldCupModel:
         self._profiles_cache: list[TeamProfile] | None = None
         self._scenario_bank: list[object] = list(self.package.get("_runtime_scenario_bank", []))
 
-    def _load_runtime_prediction_cache(self) -> None:
+    def _load_runtime_prediction_cache(self, *, preserve_incomplete: bool = False) -> None:
         if not RUNTIME_PREDICTION_CACHE_PATH.exists():
             return
         try:
@@ -268,10 +322,26 @@ class WorldCupModel:
             return
         prediction_cache = payload.get("prediction_cache")
         if isinstance(prediction_cache, dict):
-            self.package["prediction_cache"] = prediction_cache
+            loaded_prediction_cache = dict(prediction_cache)
+            self.package["prediction_cache"] = (
+                loaded_prediction_cache
+                if preserve_incomplete
+                else paired_neutral_cache(
+                    loaded_prediction_cache,
+                    mirrored_neutral_prediction_cache_key,
+                )
+            )
         prediction_base_cache = payload.get("prediction_base_cache")
         if isinstance(prediction_base_cache, dict):
-            self.package["prediction_base_cache"] = prediction_base_cache
+            loaded_prediction_base_cache = dict(prediction_base_cache)
+            self.package["prediction_base_cache"] = (
+                loaded_prediction_base_cache
+                if preserve_incomplete
+                else paired_neutral_cache(
+                    loaded_prediction_base_cache,
+                    mirrored_neutral_base_cache_key,
+                )
+            )
         scenario_bank = payload.get("scenario_bank")
         if isinstance(scenario_bank, list):
             self.package["_runtime_scenario_bank"] = scenario_bank

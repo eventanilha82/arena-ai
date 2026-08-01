@@ -27,7 +27,13 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from arena_ai import bolao  # noqa: E402
-from arena_ai.worldcup_model import WorldCupModel, sota  # noqa: E402
+from arena_ai.worldcup_model import (  # noqa: E402
+    WorldCupModel,
+    incomplete_neutral_cache_keys,
+    mirrored_neutral_base_cache_key,
+    mirrored_neutral_prediction_cache_key,
+    sota,
+)
 
 
 EXPECTED_GROUPS = tuple("ABCDEFGHIJKL")
@@ -150,6 +156,27 @@ EXPECTED_MEDAL_RESULTS = {
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
+
+
+def validate_loaded_runtime_cache_pairing(model: WorldCupModel) -> None:
+    prediction_cache = model.package.get("prediction_cache", {})
+    prediction_base_cache = model.package.get("prediction_base_cache", {})
+    require(isinstance(prediction_cache, dict), "prediction_cache runtime inválido")
+    require(isinstance(prediction_base_cache, dict), "prediction_base_cache runtime inválido")
+    require(
+        not incomplete_neutral_cache_keys(
+            prediction_cache,
+            mirrored_neutral_prediction_cache_key,
+        ),
+        "prediction_cache carregou um confronto neutro sem espelho",
+    )
+    require(
+        not incomplete_neutral_cache_keys(
+            prediction_base_cache,
+            mirrored_neutral_base_cache_key,
+        ),
+        "prediction_base_cache carregou um confronto neutro sem espelho",
+    )
 
 
 def csv_rows() -> list[dict[str, str]]:
@@ -1259,6 +1286,7 @@ def main() -> int:
     require(args.runs > 0, "--runs deve ser positivo")
     rows = csv_rows()
     model = WorldCupModel()
+    validate_loaded_runtime_cache_pairing(model)
     validate_official_knockout_bracket(model)
     board = validate_group_stage(model)
     validate_annex_c_third_place_matrix(model, board)

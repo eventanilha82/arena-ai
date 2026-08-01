@@ -18,6 +18,7 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
 MODEL_ROOT = ROOT / "modeling" / "worldcup_2026_ml"
 SOTA_SRC = MODEL_ROOT / "src"
 MODEL_PATH = MODEL_ROOT / "models" / "model_sota.pkl"
@@ -29,8 +30,14 @@ REPORT_JSON = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.json"
 REPORT_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.csv"
 REPORT_STAGE_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stage_bracket_stability.csv"
 sys.path.insert(0, str(SOTA_SRC))
+sys.path.insert(0, str(SRC))
 
 import sota_pipeline as sota  # noqa: E402
+from arena_ai.worldcup_model import (  # noqa: E402
+    mirrored_neutral_base_cache_key,
+    mirrored_neutral_prediction_cache_key,
+    paired_neutral_cache,
+)
 
 
 PACKAGE: dict[str, Any] | None = None
@@ -70,10 +77,16 @@ def load_runtime_prediction_cache(package: dict[str, Any]) -> bool:
         return False
     prediction_cache = payload.get("prediction_cache")
     if isinstance(prediction_cache, dict):
-        package["prediction_cache"] = dict(prediction_cache)
+        package["prediction_cache"] = paired_neutral_cache(
+            dict(prediction_cache),
+            mirrored_neutral_prediction_cache_key,
+        )
     prediction_base_cache = payload.get("prediction_base_cache")
     if isinstance(prediction_base_cache, dict):
-        package["prediction_base_cache"] = dict(prediction_base_cache)
+        package["prediction_base_cache"] = paired_neutral_cache(
+            dict(prediction_base_cache),
+            mirrored_neutral_base_cache_key,
+        )
     return bool(isinstance(prediction_cache, dict) or isinstance(prediction_base_cache, dict))
 
 

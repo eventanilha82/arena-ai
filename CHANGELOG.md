@@ -7,6 +7,7 @@
 - Mais variedade de gols, defesas e chutes para fora, com continuidade validada em 270 handoffs e 150 checkpoints visuais.
 - Bolão atualizado com os 104 resultados observados, auditorias temporais e Monte Carlo estável.
 - Runtime, caches, assets e proveniência de release reforçados para os builds macOS e Windows.
+- Cache neutro agora exige pares espelhados completos, eliminando deriva numérica entre macOS e Windows.
 
 ## v0.1.0 - 2026-05-19
 

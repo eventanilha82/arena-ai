@@ -58,6 +58,72 @@ MODEL_RUNTIME_FILES = (
     OBSERVED_SNAPSHOT_METADATA_REL,
 )
 MIN_RUNTIME_CACHE_RUNS = 1000
+NEUTRAL_CACHE_TOLERANCE = 1e-10
+
+
+def mirrored_neutral_cache_key(key: object, *, prediction: bool) -> tuple[object, ...] | None:
+    expected_length = 5 if prediction else 4
+    if not isinstance(key, tuple) or len(key) != expected_length or not bool(key[2]):
+        return None
+    if not prediction:
+        return (key[1], key[0], key[2], key[3])
+    if not isinstance(key[4], tuple):
+        return None
+    mirrored_context: list[tuple[object, object]] = []
+    for item in key[4]:
+        if not isinstance(item, tuple) or len(item) != 2:
+            return None
+        name, value = item
+        if isinstance(name, str) and name.startswith("home_"):
+            name = f"away_{name[5:]}"
+        elif isinstance(name, str) and name.startswith("away_"):
+            name = f"home_{name[5:]}"
+        mirrored_context.append((name, value))
+    context_key = tuple(sorted(mirrored_context, key=lambda item: str(item[0])))
+    return (key[1], key[0], key[2], key[3], context_key)
+
+
+def incomplete_neutral_cache_entries(cache: dict[object, object], *, prediction: bool) -> int:
+    expected_length = 5 if prediction else 4
+    count = 0
+    for key in cache:
+        if not isinstance(key, tuple) or len(key) != expected_length or not bool(key[2]):
+            continue
+        mirror = mirrored_neutral_cache_key(key, prediction=prediction)
+        if mirror is None or mirror not in cache:
+            count += 1
+    return count
+
+
+def neutral_cache_max_delta(cache: dict[object, object], *, prediction: bool) -> float:
+    max_delta = 0.0
+    for key, value in cache.items():
+        mirror_key = mirrored_neutral_cache_key(key, prediction=prediction)
+        if mirror_key is None or mirror_key not in cache:
+            continue
+        mirror = cache[mirror_key]
+        if not isinstance(value, dict) or not isinstance(mirror, dict):
+            return float("inf")
+        if prediction:
+            deltas = (
+                abs(float(value["p_home_win_90"]) - float(mirror["p_away_win_90"])),
+                abs(float(value["p_draw_90"]) - float(mirror["p_draw_90"])),
+                abs(float(value["p_away_win_90"]) - float(mirror["p_home_win_90"])),
+                abs(float(value["home_xg"]) - float(mirror["away_xg"])),
+                abs(float(value["away_xg"]) - float(mirror["home_xg"])),
+            )
+        else:
+            probabilities = tuple(float(item) for item in value["probs_90"])
+            mirror_probabilities = tuple(float(item) for item in mirror["probs_90"])
+            if len(probabilities) != 3 or len(mirror_probabilities) != 3:
+                return float("inf")
+            deltas = (
+                abs(probabilities[0] - mirror_probabilities[2]),
+                abs(probabilities[1] - mirror_probabilities[1]),
+                abs(probabilities[2] - mirror_probabilities[0]),
+            )
+        max_delta = max(max_delta, *deltas)
+    return max_delta
 
 
 def rel(path: Path) -> str:
@@ -168,6 +234,20 @@ def validate_runtime_prediction_cache_bytes(cache_data: bytes, model_sha256: str
         raise AssertionError(
             f"cache runtime com scenario_bank incompleto em {label}: scenario_bank={len(scenario_bank)} < runs={runs}; "
             "rode make runtime-cache"
+        )
+    incomplete_predictions = incomplete_neutral_cache_entries(prediction_cache, prediction=True)
+    incomplete_bases = incomplete_neutral_cache_entries(prediction_base_cache, prediction=False)
+    if incomplete_predictions or incomplete_bases:
+        raise AssertionError(
+            f"cache runtime neutro incompleto em {label}: prediction={incomplete_predictions}, "
+            f"base={incomplete_bases}; rode make runtime-cache"
+        )
+    prediction_delta = neutral_cache_max_delta(prediction_cache, prediction=True)
+    base_delta = neutral_cache_max_delta(prediction_base_cache, prediction=False)
+    if prediction_delta > NEUTRAL_CACHE_TOLERANCE or base_delta > NEUTRAL_CACHE_TOLERANCE:
+        raise AssertionError(
+            f"cache runtime neutro assimétrico em {label}: prediction={prediction_delta:.3e}, "
+            f"base={base_delta:.3e}; rode make runtime-cache"
         )
 
     return (

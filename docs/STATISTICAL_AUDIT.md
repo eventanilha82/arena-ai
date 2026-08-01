@@ -3771,13 +3771,17 @@ Estabilidade Monte Carlo offline:
         "max_nested_z_name": "France | Spain"
       },
       "Final": {
-        "entered": [],
-        "exited": [],
-        "churn_count": 0,
+        "entered": [
+          "Colombia | Spain"
+        ],
+        "exited": [
+          "Argentina | Brazil"
+        ],
+        "churn_count": 2,
         "max_abs_delta": 0.0054,
-        "mean_abs_delta": 0.002987,
-        "max_nested_z": 2.194924,
-        "max_nested_z_name": "England | France"
+        "mean_abs_delta": 0.0032,
+        "max_nested_z": 2.536318,
+        "max_nested_z_name": "Argentina | Brazil"
       }
     },
     "finalist_top16": {
@@ -3793,7 +3797,7 @@ Estabilidade Monte Carlo offline:
     "max_stage_top16_churn": 0,
     "max_pair_top8_abs_delta": 0.0108,
     "max_pair_top8_churn": 2,
-    "max_pair_top8_nested_z": 2.194924,
+    "max_pair_top8_nested_z": 2.536318,
     "max_finalist_top16_abs_delta": 0.0162,
     "max_finalist_top16_churn": 0
   },
@@ -3834,9 +3838,9 @@ Estabilidade Monte Carlo offline:
     },
     "mc_stability_script": {
       "path": "/Users/eventanilha/Projects/arena-ai/scripts/monte_carlo_stability.py",
-      "sha256": "d20e93617818c863c3ac22a4bc60d53ab2636e6ae2ac7854f40d1ed3fbfcf525",
-      "size_bytes": 29605,
-      "mtime_ns": 1782691759529097682
+      "sha256": "2d9390053b88a4618b1b9f4a9fc7a2f3ddb0670ee5272aac06d12e8ef4a13607",
+      "size_bytes": 29999,
+      "mtime_ns": 1785548080244153756
     }
   }
 }

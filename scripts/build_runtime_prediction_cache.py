@@ -11,7 +11,77 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from arena_ai.worldcup_model import MODEL_PATH, RUNTIME_PREDICTION_CACHE_PATH, SOTA_PIPELINE_PATH, WorldCupModel, file_sha256  # noqa: E402
+from arena_ai.worldcup_model import (  # noqa: E402
+    MODEL_PATH,
+    RUNTIME_PREDICTION_CACHE_PATH,
+    SOTA_PIPELINE_PATH,
+    WorldCupModel,
+    file_sha256,
+    incomplete_neutral_cache_keys,
+    mirrored_neutral_base_cache_key,
+    mirrored_neutral_prediction_cache_key,
+)
+
+
+NEUTRAL_CACHE_TOLERANCE = 1e-10
+
+
+def incomplete_cache_pairs(
+    prediction_cache: dict[object, object],
+    prediction_base_cache: dict[object, object],
+) -> tuple[tuple[object, ...], tuple[object, ...]]:
+    return (
+        incomplete_neutral_cache_keys(
+            prediction_cache,
+            mirrored_neutral_prediction_cache_key,
+        ),
+        incomplete_neutral_cache_keys(
+            prediction_base_cache,
+            mirrored_neutral_base_cache_key,
+        ),
+    )
+
+
+def neutral_cache_max_deltas(
+    prediction_cache: dict[object, object],
+    prediction_base_cache: dict[object, object],
+) -> tuple[float, float]:
+    prediction_delta = 0.0
+    for key, value in prediction_cache.items():
+        mirror_key = mirrored_neutral_prediction_cache_key(key)
+        if mirror_key is None or mirror_key not in prediction_cache:
+            continue
+        mirror = prediction_cache[mirror_key]
+        if not isinstance(value, dict) or not isinstance(mirror, dict):
+            return float("inf"), float("inf")
+        prediction_delta = max(
+            prediction_delta,
+            abs(float(value["p_home_win_90"]) - float(mirror["p_away_win_90"])),
+            abs(float(value["p_draw_90"]) - float(mirror["p_draw_90"])),
+            abs(float(value["p_away_win_90"]) - float(mirror["p_home_win_90"])),
+            abs(float(value["home_xg"]) - float(mirror["away_xg"])),
+            abs(float(value["away_xg"]) - float(mirror["home_xg"])),
+        )
+
+    base_delta = 0.0
+    for key, value in prediction_base_cache.items():
+        mirror_key = mirrored_neutral_base_cache_key(key)
+        if mirror_key is None or mirror_key not in prediction_base_cache:
+            continue
+        mirror = prediction_base_cache[mirror_key]
+        if not isinstance(value, dict) or not isinstance(mirror, dict):
+            return float("inf"), float("inf")
+        probabilities = tuple(float(item) for item in value["probs_90"])
+        mirror_probabilities = tuple(float(item) for item in mirror["probs_90"])
+        if len(probabilities) != 3 or len(mirror_probabilities) != 3:
+            return float("inf"), float("inf")
+        base_delta = max(
+            base_delta,
+            abs(probabilities[0] - mirror_probabilities[2]),
+            abs(probabilities[1] - mirror_probabilities[1]),
+            abs(probabilities[2] - mirror_probabilities[0]),
+        )
+    return prediction_delta, base_delta
 
 
 def load_existing_payload() -> dict[str, Any] | None:
@@ -54,6 +124,25 @@ def cache_status(payload: dict[str, Any] | None, runs: int, seed: int, workers: 
         size = len(scenario_bank) if isinstance(scenario_bank, list) else "missing"
         return False, f"scenario_bank incomplete ({size} < {runs})"
 
+    incomplete_predictions, incomplete_bases = incomplete_cache_pairs(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    if incomplete_predictions or incomplete_bases:
+        return False, (
+            "neutral cache pairs incomplete "
+            f"(prediction={len(incomplete_predictions)}, base={len(incomplete_bases)})"
+        )
+    prediction_delta, base_delta = neutral_cache_max_deltas(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    if prediction_delta > NEUTRAL_CACHE_TOLERANCE or base_delta > NEUTRAL_CACHE_TOLERANCE:
+        return False, (
+            "neutral cache values are asymmetric "
+            f"(prediction={prediction_delta:.3e}, base={base_delta:.3e})"
+        )
+
     return (
         True,
         f"runs={runs} seed={seed} workers={workers} "
@@ -61,6 +150,86 @@ def cache_status(payload: dict[str, Any] | None, runs: int, seed: int, workers: 
         f"base_cache={len(prediction_base_cache)} "
         f"scenario_bank={len(scenario_bank)}",
     )
+
+
+def complete_neutral_cache_pairs(model: WorldCupModel) -> None:
+    sota = sys.modules["sota_pipeline"]
+    prediction_cache = model.package.setdefault("prediction_cache", {})
+    prediction_base_cache = model.package.setdefault("prediction_base_cache", {})
+    if not isinstance(prediction_cache, dict) or not isinstance(prediction_base_cache, dict):
+        raise TypeError("runtime prediction caches must be dictionaries")
+
+    incomplete_predictions, incomplete_bases = incomplete_cache_pairs(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    for key in incomplete_bases:
+        home, away, neutral, knockout = key
+        forward_key = (home, away, neutral, knockout, ())
+        reverse_key = (away, home, neutral, knockout, ())
+        prediction_cache.pop(forward_key, None)
+        prediction_cache.pop(reverse_key, None)
+        sota.predict_match(
+            model.package,
+            str(away),
+            str(home),
+            neutral=True,
+            knockout=bool(knockout),
+        )
+        sota.predict_match(
+            model.package,
+            str(home),
+            str(away),
+            neutral=True,
+            knockout=bool(knockout),
+        )
+
+    incomplete_predictions, incomplete_bases = incomplete_cache_pairs(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    for key in incomplete_predictions:
+        home, away, neutral, knockout, context_key = key
+        mirror_key = mirrored_neutral_prediction_cache_key(key)
+        if mirror_key is None:
+            raise RuntimeError(f"invalid neutral prediction cache key: {key!r}")
+        prediction_cache.pop(key, None)
+        prediction_cache.pop(mirror_key, None)
+        sota.predict_match(
+            model.package,
+            str(home),
+            str(away),
+            neutral=True,
+            knockout=bool(knockout),
+            context=dict(context_key),
+        )
+        sota.predict_match(
+            model.package,
+            str(away),
+            str(home),
+            neutral=True,
+            knockout=bool(knockout),
+            context=dict(mirror_key[4]),
+        )
+
+    incomplete_predictions, incomplete_bases = incomplete_cache_pairs(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    if incomplete_predictions or incomplete_bases:
+        raise RuntimeError(
+            "failed to complete neutral runtime cache pairs: "
+            f"prediction={len(incomplete_predictions)} base={len(incomplete_bases)}"
+        )
+    prediction_delta, base_delta = neutral_cache_max_deltas(
+        prediction_cache,
+        prediction_base_cache,
+    )
+    if prediction_delta > NEUTRAL_CACHE_TOLERANCE or base_delta > NEUTRAL_CACHE_TOLERANCE:
+        raise RuntimeError(
+            "failed to symmetrize neutral runtime cache values: "
+            f"prediction={prediction_delta:.3e} base={base_delta:.3e}"
+        )
 
 
 def main() -> None:
@@ -91,7 +260,7 @@ def main() -> None:
     if not args.refresh_predictions:
         print(f"[runtime-cache] rebuild needed: {reason}")
 
-    model = WorldCupModel()
+    model = WorldCupModel(preserve_incomplete_runtime_cache=True)
     if args.refresh_predictions:
         model.package["prediction_cache"] = {}
         model.package["prediction_base_cache"] = {}
@@ -115,6 +284,7 @@ def main() -> None:
         representative_candidates=representative_candidates,
         fast_champion_only=True,
     )
+    complete_neutral_cache_pairs(model)
     scenario_bank = [candidate for candidates in representative_candidates.values() for candidate in candidates]
 
     payload = {
