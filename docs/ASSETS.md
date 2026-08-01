@@ -1,4 +1,4 @@
-# Assets, Áudio, Fontes E Licenças
+# Assets, Áudio, Fontes e Licenças
 
 Este é o documento canônico de assets do Arena AI. Ele consolida as antigas páginas avulsas de áudio, curadoria, imagens FIFA externas e fontes. O manifesto único de áudio aprovado fica em `assets/sounds/audio_manifest.json`.
 
@@ -17,6 +17,12 @@ rejected_assets/ = descartado ou substituído
 ```
 
 Nenhum código deve carregar `assets/sounds/candidates/` diretamente.
+
+### Imagens De Documentação
+
+As capturas em `docs/images/screens/` existem exclusivamente para a galeria pública do README. A cópia em `docs/images/social/` preserva uma imagem aprovada para divulgação. Todas são promovidas da evidência criada por `make visual-qa`, ficam rastreadas no Git e não são carregadas pelo jogo.
+
+Essas imagens não entram em `assets/asset_manifest.json`, em `generated_runtime_globs`, em `release_runtime_globs`, no staging do PyInstaller nem nos ZIPs de release. A captura completa e seu `metadata.json` continuam sendo a autoridade de QA; a galeria versionada é somente uma representação visual do commit declarado em [images/screens/README.md](images/screens/README.md).
 
 Um som só entra no jogo depois de:
 

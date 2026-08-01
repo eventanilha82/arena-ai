@@ -1,10 +1,51 @@
-# Arena AI
+# ArenaAI
 
-Jogo/simulador Pygame de IA aplicada a Copa do Mundo 2026.
+Jogo e simulador em Pygame que aplica IA à Copa do Mundo 2026.
 
 O jogador escolhe duas seleções e decide entre simular um confronto ou simular a Copa inteira.
 
-## O que aparece
+**Release atual:** [ArenaAI v0.2.0](https://github.com/eventanilha82/arena-ai/releases/tag/v0.2.0), com builds validados para macOS e Windows.
+
+## Visão Geral Visual
+
+As imagens abaixo foram capturadas pelo renderer real do jogo no viewport canônico `1280x760`. A folha completa reúne 23 estados visuais da release, incluindo menu, seleção, partida, gol, defesa, empate, placar final, uniformes e Copa completa.
+
+[![Visão geral das 23 capturas do ArenaAI](docs/images/screens/contact_sheet.png)](docs/images/screens/contact_sheet.png)
+
+### Fluxo Principal
+
+| Abertura | Seleção do confronto |
+| --- | --- |
+| [![Tela de abertura](docs/images/screens/00_menu.png)](docs/images/screens/00_menu.png) | [![Seleção do confronto](docs/images/screens/00b_selecao.png)](docs/images/screens/00b_selecao.png) |
+
+| Partida ao vivo | Gol confirmado |
+| --- | --- |
+| [![Partida ao vivo](docs/images/screens/01_posse_inicial.png)](docs/images/screens/01_posse_inicial.png) | [![Gol confirmado](docs/images/screens/05b_gol_overlay.png)](docs/images/screens/05b_gol_overlay.png) |
+
+### Chute e Reação do Goleiro
+
+[![Atacante finaliza, bola viaja e goleiro salta](docs/images/screens/04_bola_em_voo.png)](docs/images/screens/04_bola_em_voo.png)
+
+| Placar final | Monte Carlo em execução |
+| --- | --- |
+| [![Placar final](docs/images/screens/09_placar_final.png)](docs/images/screens/09_placar_final.png) | [![Monte Carlo em execução](docs/images/screens/10_copa_calculando.png)](docs/images/screens/10_copa_calculando.png) |
+
+| Fase de grupos | Mata-mata |
+| --- | --- |
+| [![Fase de grupos](docs/images/screens/11_copa_grupos.png)](docs/images/screens/11_copa_grupos.png) | [![Mata-mata](docs/images/screens/12_copa_mata_mata.png)](docs/images/screens/12_copa_mata_mata.png) |
+
+A origem, o escopo e o processo de atualização desta galeria estão documentados em [docs/images/screens/README.md](docs/images/screens/README.md). A evidência completa, incluindo vídeos a 60 fps e câmera lenta, é descrita em [docs/QUALITY.md](docs/QUALITY.md).
+
+## Download
+
+| Plataforma | Pacote |
+| --- | --- |
+| macOS | [ArenaAI-mac-latest.zip](https://github.com/eventanilha82/arena-ai/releases/download/v0.2.0/ArenaAI-mac-latest.zip) |
+| Windows | [ArenaAI-windows-latest.zip](https://github.com/eventanilha82/arena-ai/releases/download/v0.2.0/ArenaAI-windows-latest.zip) |
+
+Hashes, manifesto e proveniência dos dois builds estão anexados à [GitHub Release v0.2.0](https://github.com/eventanilha82/arena-ai/releases/tag/v0.2.0). Os binários ainda não são assinados nem notarizados; as instruções para macOS Gatekeeper e Windows SmartScreen ficam nas notas da release.
+
+## Experiência Entregue
 
 - Tela de abertura com identidade visual de estádio + IA.
 - Seleção de confronto com as 48 seleções do fixture final da Copa 2026.
@@ -16,6 +57,17 @@ O jogador escolhe duas seleções e decide entre simular um confronto ou simular
 - HUD de confronto em camadas: placar ao vivo, probabilidades 1X2, sinais do modelo e possibilidades Poisson/DC; o placar sorteado só aparece como `PLACAR REVELADO` no 90'.
 - Som em camadas: cama de estádio, air, tensão, chant, chute, rede, bass hit, roar e reveal da Copa sincronizados por timeline de áudio.
 
+## Documentação
+
+| Documento | Escopo canônico |
+| --- | --- |
+| [Modelo](docs/MODEL.md) | arquitetura estatística, dados, política híbrida, validação temporal e limites honestos |
+| [Auditoria estatística](docs/STATISTICAL_AUDIT.md) | métricas, calibração, ablações, estabilidade e evidências quantitativas |
+| [Qualidade](docs/QUALITY.md) | gates do jogo, cinemáticas, física, áudio, performance e evidência visual |
+| [Assets](docs/ASSETS.md) | inventário, promoção, licenças, áudio, sprites e separação runtime/documentação |
+| [Build e release](docs/BUILD.md) | empacotamento reproduzível, proveniência, macOS, Windows e publicação |
+| [Divulgação v0.2.0](docs/social/LINKEDIN_V0.2.0.md) | capa aprovada e texto sugerido para LinkedIn |
+
 ## Modelo
 
 Documentação canônica consolidada: [docs/MODEL.md](docs/MODEL.md).
@@ -24,9 +76,9 @@ O jogo consome o pacote SOTA em `modeling/worldcup_2026_ml/`:
 
 - `models/model_sota.pkl`: pacote carregado pelo Pygame.
 - `src/sota_pipeline.py`: treino, predição, bracket e Monte Carlo.
-- `reports/sota_model_report.json`: metricas e metadados.
+- `reports/sota_model_report.json`: métricas e metadados.
 - `reports/sota_statistical_report.json`: auditoria estatística técnica. A leitura Markdown consolidada fica em [docs/STATISTICAL_AUDIT.md](docs/STATISTICAL_AUDIT.md).
-- `reports/sota_champion_odds.csv`: snapshot de odds quando o pipeline completo e regenerado.
+- `reports/sota_champion_odds.csv`: snapshot de odds quando o pipeline completo é regenerado.
 - `reports/sota_match_probabilities.csv`: probabilidades e xG dos jogos de grupo.
 
 Motores usados no jogo:
@@ -40,7 +92,7 @@ Política atual do sorteio híbrido: `0.88` classificador 1X2 + `0.12` Poisson/D
 
 Na tela da Copa, a lista de campeões prováveis usa `1000` Copas frescas no runtime. O jogo roda a amostra em thread dedicada, usa cache apenas para predições de confronto já aquecidas e mantém a barra de progresso ligada ao cálculo real, sem revelar o resultado de cara. O banco de campanhas em `modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl` existe só como modo turbo explícito (`ARENA_AI_TOURNAMENT_MC_BOOTSTRAP=1 make run`) para builds e auditorias rápidas. O ranking só aparece quando a amostra completa termina, para não misturar prévia com resultado final. O caminho mostrado escolhe um destaque dentro do top 5 de campeões, ponderado pelas odds, e então seleciona uma Copa concreta em que esse destaque foi campeão usando plausibilidade narrativa: finalista com frequência real de final, placar menos caricato e zebra controlada.
 
-Há três volumes diferentes, de propósito:
+Há quatro recortes de volume diferentes, de propósito:
 
 - `1000` Copas: modo jogável/UI e snapshot salvo no relatório atual.
 - `10000` Copas: default do CLI de rebuild completo do pipeline, quando rodado sem `--runs`.

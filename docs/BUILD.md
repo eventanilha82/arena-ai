@@ -1,4 +1,4 @@
-# Build, Empacotamento E Release
+# Build, Empacotamento e Release
 
 Este documento consolida a seção de empacotamento do `README.md` e o antigo `win/README.md`. O `README.md` da raiz fica como capa do projeto; os detalhes de build vivem aqui.
 
@@ -312,7 +312,9 @@ O verificador também rejeita colisões após normalização, por exemplo o mesm
 asset presente simultaneamente em `assets/...` e `_internal/assets/...`, além de
 caminhos absolutos ou com travessia `..`.
 
-## Artefatos De Release Opcionais
+## Artefatos e Publicação de Release
+
+A release pública atual é a [ArenaAI v0.2.0](https://github.com/eventanilha82/arena-ai/releases/tag/v0.2.0). Seus pacotes de macOS e Windows foram gerados a partir do mesmo commit, `37d693fd494c4874952b28a7e9e4da496d542edc`, e publicados junto com hashes SHA-256, manifesto e sidecars de proveniência. Os binários permanecem fora do histórico Git.
 
 Os builds normais ficam ignorados pelo Git:
 
@@ -355,13 +357,13 @@ make release-artifacts
 O bolão é um utilitário Rich executado dentro do projeto por `make bolao`; ele
 não gera binário nem ZIP próprio de release.
 
-Para publicar como GitHub Release, depois de configurar o repositório remoto e
-ter o GitHub CLI autenticado:
+Para publicar uma nova GitHub Release, depois de configurar o repositório remoto e ter o GitHub CLI autenticado, escolha a próxima versão e execute:
 
 ```bash
-git tag -a v0.2.0 -m "ArenaAI v0.2.0"
-git push origin v0.2.0
-make release-github TAG=v0.2.0
+TAG=v0.3.0
+git tag -a "$TAG" -m "ArenaAI $TAG"
+git push origin "$TAG"
+make release-github TAG="$TAG"
 ```
 
 O empacotamento reabre o ZIP macOS, valida CRC, inventário, bytes, launcher,

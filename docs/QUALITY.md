@@ -1,4 +1,4 @@
-# Qualidade, QA E Gates Do Jogo
+# Qualidade, QA e Gates do Jogo
 
 Este é o documento canônico dos gates de qualidade do Arena AI. Ele consolida o antigo `docs/runtime_quality.md` e a seção de validação do `README.md`.
 
@@ -23,8 +23,8 @@ Regra central: `draw_*` só desenha estado pronto. Eventos, áudio, Monte Carlo,
 
 O conteúdo operacional antigo foi consolidado aqui e nos docs canônicos:
 
-- `MODEL.md`: arquitetura do runtime Pygame, separacao `update()`/`draw_*`, gates e performance.
-- `ASSETS.md`: governanca de assets, audio, sprites, z-order, licencas e validacao visual/sonora.
+- `MODEL.md`: arquitetura do runtime Pygame, separação `update()`/`draw_*`, gates e performance.
+- `ASSETS.md`: governança de assets, áudio, sprites, z-order, licenças e validação visual/sonora.
 
 Resumo operacional atual:
 
@@ -36,7 +36,7 @@ make visual-qa
 make aaa-qa
 ```
 
-Regra central: `draw_*` desenha estado pronto; eventos, audio, Monte Carlo e transicoes vivem no `update()`.
+Em toda a stack, `draw_*` desenha estado pronto; eventos, áudio, Monte Carlo e transições vivem no `update()`.
 
 Este arquivo substitui a antiga ponte `docs/runtime_quality.md`.
 
@@ -90,6 +90,12 @@ Os três medoids de cada campanha de gol são selecionados offline a partir de 1
 O gate automatizado comprova integridade do contrato promovido, coerência estrutural e integração. Ele não transforma gosto visual em verdade objetiva, não certifica compositor/GPU ou áudio físico de todo Mac/Windows e não substitui a validação humana antes do build. A implementação continua sendo `screen-space` 2D com sprites discretos, sem rig, IK ou motion capture.
 
 ### Evidência Visual
+
+#### Galeria Pública Versionada
+
+O README apresenta uma seleção pública em `docs/images/screens/`. Ela contém a folha de contato completa com 23 estados e nove capturas individuais do fluxo principal: abertura, seleção, partida, chute com goleiro em extensão, gol, placar final, Monte Carlo em execução, grupos e mata-mata. A galeria atual foi promovida da captura `1280x760` gerada em worktree limpo para a release `v0.2.0`, commit `37d693fd494c4874952b28a7e9e4da496d542edc`.
+
+Esses PNGs são documentação rastreada pelo Git para renderização no GitHub. Eles não pertencem ao manifesto de runtime, não entram no PyInstaller e não substituem a evidência completa em `artifacts/visual_qa/current/`. A proveniência e o procedimento de renovação ficam em [images/screens/README.md](images/screens/README.md). Sempre que a interface ou as cinemáticas mudarem, a captura completa deve ser regenerada, revisada e validada antes que a seleção pública seja atualizada.
 
 `make visual-qa` gera os frames em `artifacts/visual_qa/current/`. A `contact_sheet.png` preserva a razão `1280:760`, com a legenda fora da imagem. A captura também produz:
 
