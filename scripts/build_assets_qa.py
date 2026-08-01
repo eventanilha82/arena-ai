@@ -678,7 +678,9 @@ def validate_mac_launcher(path: Path) -> tuple[dict[str, object], Path]:
         raise AssertionError(f"launcher macOS precisa ser arquivo regular: {launcher}")
     if launcher_stat.st_size <= 0:
         raise AssertionError(f"launcher macOS não pode estar vazio: {launcher}")
-    if not launcher_stat.st_mode & 0o111:
+    # Windows filesystems do not preserve POSIX execute bits. The real macOS
+    # artifact check still enforces this when it runs on macOS.
+    if sys.platform != "win32" and not launcher_stat.st_mode & 0o111:
         raise AssertionError(f"launcher macOS precisa ser executável: {launcher}")
     return plist, launcher
 

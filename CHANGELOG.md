@@ -8,6 +8,7 @@
 - Bolão atualizado com os 104 resultados observados, auditorias temporais e Monte Carlo estável.
 - Runtime, caches, assets e proveniência de release reforçados para os builds macOS e Windows.
 - Cache neutro agora exige pares espelhados completos, eliminando deriva numérica entre macOS e Windows.
+- Gate sintético de bundle macOS agora respeita a ausência de bits POSIX no Windows sem afrouxar a validação no Mac.
 
 ## v0.1.0 - 2026-05-19
 
