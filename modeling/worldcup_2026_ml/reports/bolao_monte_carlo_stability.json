@@ -997,7 +997,7 @@
     },
     "passed": true
   },
-  "generated_at": "2026-07-31T19:11:36.649749Z",
+  "generated_at": "2026-08-01T01:50:28.036772Z",
   "independent_seed_audit": {
     "comparisons": [
       {
@@ -1256,7 +1256,7 @@
     },
     "runtime_cache": {
       "path": "modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl",
-      "sha256": "9d8cebb8af950a90595a9fd1305a5590593b089f20d1aa4cfa051681a6385ea7"
+      "sha256": "4bb04e8ee4763cffcba4262364d357b849039691ee915ff795a786d9cb47137b"
     },
     "sota_pipeline": {
       "path": "modeling/worldcup_2026_ml/src/sota_pipeline.py",
@@ -1268,7 +1268,7 @@
     },
     "worldcup_model": {
       "path": "src/arena_ai/worldcup_model.py",
-      "sha256": "5f06a5602a128cdfed332ea96a2a3ed8c97a491c966ecd944b95923ad88a5ca5"
+      "sha256": "3412dc31f2667879ad951a12963089c89572d7ba7689bc3efb3981fb820b81e9"
     }
   },
   "seed": 20260628,
