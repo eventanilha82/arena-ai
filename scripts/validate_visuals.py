@@ -2906,6 +2906,7 @@ def validate_release_inventory_contract() -> None:
     from scripts.build_assets_qa import (
         is_app_payload_path,
         is_forbidden_release_path,
+        mac_payload_entry_is_regular,
         required_release_paths,
         validate_mac_launcher,
         validate_mac_zip_artifact,
@@ -2930,6 +2931,19 @@ def validate_release_inventory_contract() -> None:
         for path in required
     }
     validate_release_inventory(windows_payload, "complete synthetic Windows zip")
+
+    class SyntheticSymlinkToFile:
+        def is_symlink(self) -> bool:
+            return True
+
+        def is_file(self) -> bool:
+            return True
+
+    if mac_payload_entry_is_regular(SyntheticSymlinkToFile()):
+        raise AssertionError(
+            "macOS app payload inventory follows symlinks as regular files"
+        )
+
     powershell_directory = zipfile.ZipInfo("_internal\\assets\\")
     powershell_directory.create_system = 0
     powershell_directory.external_attr = 0

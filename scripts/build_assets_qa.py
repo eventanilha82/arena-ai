@@ -726,6 +726,10 @@ def mac_app_payload_roots(path: Path) -> list[tuple[str, Path]]:
     return roots
 
 
+def mac_payload_entry_is_regular(path: Path) -> bool:
+    return not path.is_symlink() and path.is_file()
+
+
 def validate_mac_app(path: Path) -> tuple[list[str], tuple[str, ...]]:
     if not path.is_dir():
         raise FileNotFoundError(f"app macOS não encontrado: {path}")
@@ -736,7 +740,7 @@ def validate_mac_app(path: Path) -> tuple[list[str], tuple[str, ...]]:
     for relative_root, payload_root in mac_app_payload_roots(path):
         root_entries = []
         for embedded_path in sorted(payload_root.rglob("*")):
-            if not embedded_path.is_file():
+            if not mac_payload_entry_is_regular(embedded_path):
                 continue
             embedded_relative = embedded_path.relative_to(payload_root).as_posix()
             root_entries.append((embedded_relative, embedded_path))
