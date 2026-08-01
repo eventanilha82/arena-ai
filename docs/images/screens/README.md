@@ -29,8 +29,6 @@ Esta pasta contém a galeria pública usada pelo `README.md`. As imagens foram p
 | `11_copa_grupos.png` | classificação da fase de grupos |
 | `12_copa_mata_mata.png` | chave eliminatória e campeã |
 
-A captura do chute também possui uma cópia estável para divulgação em `../social/arenaai-v0.2.0-linkedin-cover.png`. O texto sugerido para a publicação fica em [../../social/LINKEDIN_V0.2.0.md](../../social/LINKEDIN_V0.2.0.md).
-
 ## Limite De Uso
 
 Estas imagens são documentação, não assets de runtime. Elas não entram em `assets/asset_manifest.json`, no staging do PyInstaller nem nos ZIPs de macOS e Windows. A fonte de verdade para QA continua sendo a captura completa ignorada pelo Git, acompanhada por `metadata.json`, vídeos e inventário de hashes.

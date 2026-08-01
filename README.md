@@ -66,7 +66,6 @@ Hashes, manifesto e proveniência dos dois builds estão anexados à [GitHub Rel
 | [Qualidade](docs/QUALITY.md) | gates do jogo, cinemáticas, física, áudio, performance e evidência visual |
 | [Assets](docs/ASSETS.md) | inventário, promoção, licenças, áudio, sprites e separação runtime/documentação |
 | [Build e release](docs/BUILD.md) | empacotamento reproduzível, proveniência, macOS, Windows e publicação |
-| [Divulgação v0.2.0](docs/social/LINKEDIN_V0.2.0.md) | capa aprovada e texto sugerido para LinkedIn |
 
 ## Modelo
 
