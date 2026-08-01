@@ -520,8 +520,18 @@ def zip_release_name(name: str) -> str:
     return "/".join(parts)
 
 
+def zip_info_is_directory(info: zipfile.ZipInfo) -> bool:
+    if info.is_dir() or info.filename.replace("\\", "/").endswith("/"):
+        return True
+    unix_mode = info.external_attr >> 16
+    file_type = stat.S_IFMT(unix_mode)
+    if file_type:
+        return stat.S_ISDIR(unix_mode)
+    return bool(info.external_attr & 0x10)
+
+
 def zip_info_is_regular_file(info: zipfile.ZipInfo) -> bool:
-    if info.is_dir():
+    if zip_info_is_directory(info):
         return False
     unix_mode = info.external_attr >> 16
     file_type = stat.S_IFMT(unix_mode)
@@ -576,7 +586,11 @@ def validate_zip_artifact(path: Path) -> list[str]:
             raise AssertionError(
                 f"zip Windows contém entrada corrompida: {corrupt_member!r}"
             )
-        infos = [info for info in archive.infolist() if not info.is_dir()]
+        infos = [
+            info
+            for info in archive.infolist()
+            if not zip_info_is_directory(info)
+        ]
         if not infos:
             raise AssertionError(f"zip Windows vazio: {path}")
         validate_windows_launcher(archive, infos, str(path))

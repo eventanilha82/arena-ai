@@ -2912,6 +2912,8 @@ def validate_release_inventory_contract() -> None:
         validate_release_payload_bytes,
         validate_release_inventory,
         validate_zip_artifact,
+        zip_info_is_directory,
+        zip_info_is_regular_file,
         zip_release_name,
     )
 
@@ -2928,6 +2930,16 @@ def validate_release_inventory_contract() -> None:
         for path in required
     }
     validate_release_inventory(windows_payload, "complete synthetic Windows zip")
+    powershell_directory = zipfile.ZipInfo("_internal\\assets\\")
+    powershell_directory.create_system = 0
+    powershell_directory.external_attr = 0
+    if (
+        not zip_info_is_directory(powershell_directory)
+        or zip_info_is_regular_file(powershell_directory)
+    ):
+        raise AssertionError(
+            "Windows release gate does not recognize Compress-Archive directory entries"
+        )
     sample_path = "assets/generated/balls3d/ball_0.png"
     if (
         zip_release_name(
