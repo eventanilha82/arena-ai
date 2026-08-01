@@ -10,7 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
-from build_assets_qa import validate_mac_app, validate_zip_artifact
+from build_assets_qa import (
+    validate_mac_app,
+    validate_mac_zip_artifact,
+    validate_zip_artifact,
+)
 from release_provenance import (
     source_identity_from_git,
     validate_build_provenance,
@@ -134,15 +138,25 @@ def write_release_metadata(
     app_name: str,
     artifacts: list[dict[str, object]],
     build_provenance: dict[str, object],
+    release_source: dict[str, object],
     mac_zip_method: str,
 ) -> None:
+    integrity = source_integrity()
+    if not integrity["git_worktree_clean"]:
+        raise SystemExit(
+            "release source changed while packaging: "
+            f"{integrity['git_status_porcelain']}"
+        )
+    if integrity["git_head"] != release_source["git_head"]:
+        raise SystemExit("release source HEAD changed while packaging")
     manifest = {
         "app_name": app_name,
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "git_head": run_text(["git", "rev-parse", "--short", "HEAD"]),
         "git_branch": run_text(["git", "branch", "--show-current"]),
         "release_scope": "macos_windows_app",
-        "source_integrity": source_integrity(),
+        "release_source": release_source,
+        "source_integrity": integrity,
         "build_provenance": build_provenance,
         "mac_zip_method": mac_zip_method,
         "artifacts": artifacts,
@@ -228,6 +242,34 @@ def main() -> int:
     shutil.copy2(windows_zip, windows_release_zip)
     shutil.copy2(mac_provenance, mac_release_provenance)
     shutil.copy2(windows_provenance, windows_release_provenance)
+
+    mac_zip_validation = validate_mac_zip_artifact(
+        mac_zip,
+        app_name=args.app_name,
+    )
+    if mac_zip_validation["payload_files"] != mac_payload_files:
+        raise SystemExit("macOS ZIP payload inventory differs from the validated app")
+    if mac_zip_validation["payload_roots"] != mac_payload_roots:
+        raise SystemExit("macOS ZIP payload roots differ from the validated app")
+    recorded_mac_tree = mac_build["artifact"]
+    if any(
+        mac_zip_validation["tree"][key] != recorded_mac_tree[key]
+        for key in ("sha256", "file_count", "size_bytes")
+    ):
+        raise SystemExit("macOS ZIP tree differs from Mac build provenance")
+    if mac_zip_validation["executable"] != mac_build["executable"]:
+        raise SystemExit("macOS ZIP executable differs from Mac build provenance")
+
+    copied_windows_payload = validate_zip_artifact(windows_release_zip)
+    if copied_windows_payload != windows_payload_files:
+        raise SystemExit("copied Windows ZIP inventory differs from build input")
+    validate_build_provenance(
+        windows_release_zip,
+        windows_release_provenance,
+        platform="windows",
+        app_name=args.app_name,
+        expected_source=expected_source,
+    )
     artifacts = [
         file_entry(mac_zip, "mac_app_zip"),
         file_entry(windows_release_zip, "windows_app_zip"),
@@ -239,7 +281,16 @@ def main() -> int:
         app_name=args.app_name,
         artifacts=artifacts,
         build_provenance={"macos": mac_build, "windows": windows_build},
+        release_source=expected_source,
         mac_zip_method=mac_zip_method,
+    )
+    final_source = source_identity_from_git(require_clean=True)
+    if final_source != expected_source:
+        raise SystemExit("release source changed before packaging completed")
+    print(
+        "release source revalidated after packaging: "
+        f"head={final_source['git_head']} "
+        f"fingerprint={final_source['source_fingerprint_sha256']}"
     )
     return 0
 

@@ -303,6 +303,10 @@ def run(*, runs: int, seed: int, top: int, out: Path, csv_out: Path) -> dict[str
         "source_fingerprints": {
             "model_package": file_sha256(MODEL_PATH),
             "sota_pipeline": file_sha256(ROOT / "modeling/worldcup_2026_ml/src/sota_pipeline.py"),
+            "runtime_prediction_cache": file_sha256(
+                ROOT / "modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl"
+            ),
+            "worldcup_model": file_sha256(ROOT / "src/arena_ai/worldcup_model.py"),
             "bolao": file_sha256(ROOT / "src/arena_ai/bolao.py"),
             "observed_group_results": file_sha256(bolao.OBSERVED_GROUP_RESULTS_PATH),
             "observed_knockout_results": file_sha256(bolao.OBSERVED_KNOCKOUT_RESULTS_PATH),

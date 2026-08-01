@@ -329,7 +329,8 @@ release-stage: release-artifacts
 release-github: release-artifacts
 	@test -n "$(TAG)" || (printf "Informe a tag: make release-github TAG=v0.1.0\n"; exit 1)
 	@test -x "$$(command -v gh)" || (printf "GitHub CLI nao encontrado. Instale gh ou publique manualmente os arquivos de $(RELEASE_DIR)/.\n"; exit 1)
-	gh release create "$(TAG)" "$(MAC_RELEASE_ARTIFACT)" "$(WINDOWS_RELEASE_ARTIFACT)" "$(MAC_RELEASE_PROVENANCE)" "$(WINDOWS_RELEASE_PROVENANCE)" "$(RELEASE_DIR)/SHA256SUMS" "$(RELEASE_DIR)/release-manifest.json" --title "$(APP_NAME) $(TAG)" --notes "Builds Mac e Windows do ArenaAI."
+	$(PYTHON) scripts/release_provenance.py check-tag --tag "$(TAG)" --manifest "$(RELEASE_DIR)/release-manifest.json" --remote origin
+	gh release create "$(TAG)" "$(MAC_RELEASE_ARTIFACT)" "$(WINDOWS_RELEASE_ARTIFACT)" "$(MAC_RELEASE_PROVENANCE)" "$(WINDOWS_RELEASE_PROVENANCE)" "$(RELEASE_DIR)/SHA256SUMS" "$(RELEASE_DIR)/release-manifest.json" --verify-tag --title "$(APP_NAME) $(TAG)" --notes "Builds Mac e Windows do ArenaAI."
 
 release-clean:
 	rm -rf "$(RELEASE_DIR)"

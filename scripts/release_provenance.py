@@ -331,6 +331,83 @@ def validate_build_provenance(
     return payload
 
 
+def release_source_from_manifest(path: Path) -> dict[str, object]:
+    payload = read_json(path)
+    if not isinstance(payload, dict):
+        raise ProvenanceError("release manifest must be a JSON object")
+    release_source = validate_source_identity(payload.get("release_source"))
+    build_provenance = payload.get("build_provenance")
+    if not isinstance(build_provenance, dict):
+        raise ProvenanceError("release manifest has no build_provenance object")
+    for platform in ("macos", "windows"):
+        build = build_provenance.get(platform)
+        if not isinstance(build, dict):
+            raise ProvenanceError(
+                f"release manifest has no {platform} build provenance"
+            )
+        build_source = validate_source_identity(build.get("source"))
+        if build_source != release_source:
+            raise ProvenanceError(
+                f"{platform} build source differs from release source"
+            )
+    integrity = payload.get("source_integrity")
+    if not isinstance(integrity, dict):
+        raise ProvenanceError("release manifest has no source_integrity object")
+    if integrity.get("git_worktree_clean") is not True:
+        raise ProvenanceError("release manifest records a dirty worktree")
+    if integrity.get("git_head") != release_source["git_head"]:
+        raise ProvenanceError("release manifest source integrity HEAD mismatch")
+    return release_source
+
+
+def validate_release_tag(
+    tag: str,
+    manifest_path: Path,
+    *,
+    remote: str | None = None,
+) -> dict[str, object]:
+    if not tag or tag != tag.strip() or any(ord(char) < 33 for char in tag):
+        raise ProvenanceError(f"invalid release tag: {tag!r}")
+    release_source = release_source_from_manifest(manifest_path)
+    current_source = source_identity_from_git(require_clean=True)
+    if current_source != release_source:
+        raise ProvenanceError(
+            "current clean checkout differs from the packaged release source"
+        )
+    tag_ref = f"refs/tags/{tag}"
+    run_git("check-ref-format", tag_ref)
+    if run_git("cat-file", "-t", tag_ref) != "tag":
+        raise ProvenanceError(
+            f"release tag must be an annotated tag: {tag_ref}"
+        )
+    tag_commit = run_git("rev-parse", "--verify", f"{tag_ref}^{{commit}}")
+    if tag_commit != release_source["git_head"]:
+        raise ProvenanceError(
+            f"release tag points to {tag_commit}, build source is "
+            f"{release_source['git_head']}"
+        )
+    if remote:
+        remote_refs = run_git(
+            "ls-remote",
+            "--tags",
+            remote,
+            tag_ref,
+            f"{tag_ref}^{{}}",
+        )
+        parsed_refs = {
+            ref: sha
+            for line in remote_refs.splitlines()
+            for sha, ref in [line.split(maxsplit=1)]
+        }
+        remote_commit = parsed_refs.get(f"{tag_ref}^{{}}")
+        if remote_commit != release_source["git_head"]:
+            raise ProvenanceError(
+                f"remote {remote} annotated tag does not resolve to build source: "
+                f"{remote_commit!r} != {release_source['git_head']}"
+            )
+    return release_source
+
+
 def self_test() -> None:
     source = {
         "schema_version": SCHEMA_VERSION,
@@ -394,6 +471,34 @@ def self_test() -> None:
             app_name="ArenaAI",
             expected_source=source,
         )
+        manifest_path = temp / "release-manifest.json"
+        mac_payload = read_json(mac_result)
+        windows_payload = read_json(windows_result)
+        manifest_payload = {
+            "release_source": source,
+            "source_integrity": {
+                "git_head": source["git_head"],
+                "git_worktree_clean": True,
+            },
+            "build_provenance": {
+                "macos": mac_payload,
+                "windows": windows_payload,
+            },
+        }
+        write_json(manifest_path, manifest_payload)
+        if release_source_from_manifest(manifest_path) != source:
+            raise ProvenanceError("self-test changed valid release manifest source")
+        assert isinstance(windows_payload, dict)
+        windows_payload["source"] = {**source, "git_head": "3" * 40}
+        write_json(manifest_path, manifest_payload)
+        try:
+            release_source_from_manifest(manifest_path)
+        except ProvenanceError:
+            pass
+        else:
+            raise ProvenanceError(
+                "self-test accepted mismatched Windows release source"
+            )
         mismatched_source = {
             **source,
             "git_head": "3" * 40,
@@ -461,6 +566,11 @@ def main() -> int:
     check_build_parser.add_argument("--provenance", required=True, type=Path)
     check_build_parser.add_argument("--source-provenance", type=Path)
     check_build_parser.add_argument("--app-name", default="ArenaAI")
+
+    check_tag_parser = subparsers.add_parser("check-tag")
+    check_tag_parser.add_argument("--tag", required=True)
+    check_tag_parser.add_argument("--manifest", required=True, type=Path)
+    check_tag_parser.add_argument("--remote")
 
     subparsers.add_parser("self-test")
     args = parser.parse_args()
@@ -533,6 +643,16 @@ def main() -> int:
                 f"build provenance OK: platform={args.platform} "
                 f"artifact={payload['artifact']['sha256']} "
                 f"source={payload['source']['source_fingerprint_sha256']}"
+            )
+        elif args.command == "check-tag":
+            source = validate_release_tag(
+                args.tag,
+                resolve_path(args.manifest),
+                remote=args.remote,
+            )
+            print(
+                f"release tag OK: tag={args.tag} head={source['git_head']} "
+                f"fingerprint={source['source_fingerprint_sha256']}"
             )
         else:
             self_test()

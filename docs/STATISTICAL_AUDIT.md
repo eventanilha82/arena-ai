@@ -3836,11 +3836,23 @@ Estabilidade Monte Carlo offline:
       "size_bytes": 205834,
       "mtime_ns": 1782788278567602097
     },
+    "runtime_prediction_cache": {
+      "path": "/Users/eventanilha/Projects/arena-ai/modeling/worldcup_2026_ml/models/runtime_prediction_cache.pkl",
+      "sha256": "4bb04e8ee4763cffcba4262364d357b849039691ee915ff795a786d9cb47137b",
+      "size_bytes": 5286536,
+      "mtime_ns": 1785548121544921979
+    },
+    "worldcup_model": {
+      "path": "/Users/eventanilha/Projects/arena-ai/src/arena_ai/worldcup_model.py",
+      "sha256": "3412dc31f2667879ad951a12963089c89572d7ba7689bc3efb3981fb820b81e9",
+      "size_bytes": 32689,
+      "mtime_ns": 1785548079460272163
+    },
     "mc_stability_script": {
       "path": "/Users/eventanilha/Projects/arena-ai/scripts/monte_carlo_stability.py",
-      "sha256": "2d9390053b88a4618b1b9f4a9fc7a2f3ddb0670ee5272aac06d12e8ef4a13607",
-      "size_bytes": 29999,
-      "mtime_ns": 1785548080244153756
+      "sha256": "6a159468a47a072e843dc8b5989f66acf60598bfff63e3f6607ea0f46a122670",
+      "size_bytes": 30195,
+      "mtime_ns": 1785555515089316055
     }
   }
 }

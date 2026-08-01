@@ -96,6 +96,8 @@ MODEL_REPORT = ROOT / "modeling" / "worldcup_2026_ml" / "reports" / "sota_model_
 MODEL_STATS_REPORT = ROOT / "modeling" / "worldcup_2026_ml" / "reports" / "sota_statistical_report.json"
 MODEL_TRAINING_MATCHES = ROOT / "modeling" / "worldcup_2026_ml" / "data" / "processed" / "sota_training_matches.csv"
 MODEL_SOTA_PIPELINE = ROOT / "modeling" / "worldcup_2026_ml" / "src" / "sota_pipeline.py"
+MODEL_RUNTIME_PREDICTION_CACHE = ROOT / "modeling" / "worldcup_2026_ml" / "models" / "runtime_prediction_cache.pkl"
+MODEL_WORLDCUP_MODEL = ROOT / "src" / "arena_ai" / "worldcup_model.py"
 MODEL_STATS_QA_SCRIPT = ROOT / "scripts" / "model_stats_qa.py"
 MODEL_MC_STABILITY_SCRIPT = ROOT / "scripts" / "monte_carlo_stability.py"
 MODEL_RAW_DATA_ROOT = ROOT / "modeling" / "worldcup_2026_ml" / "data" / "raw"
@@ -235,6 +237,8 @@ def assert_fresh_statistical_report(stats_report: dict[str, object]) -> None:
         "model_report": MODEL_REPORT,
         "training_matches": MODEL_TRAINING_MATCHES,
         "sota_pipeline": MODEL_SOTA_PIPELINE,
+        "runtime_prediction_cache": MODEL_RUNTIME_PREDICTION_CACHE,
+        "worldcup_model": MODEL_WORLDCUP_MODEL,
         "mc_stability_script": MODEL_MC_STABILITY_SCRIPT,
     }
     for name, path in mc_expected.items():
@@ -2904,6 +2908,7 @@ def validate_release_inventory_contract() -> None:
         is_forbidden_release_path,
         required_release_paths,
         validate_mac_launcher,
+        validate_mac_zip_artifact,
         validate_release_payload_bytes,
         validate_release_inventory,
         validate_zip_artifact,
@@ -3049,6 +3054,41 @@ def validate_release_inventory_contract() -> None:
                     f"Windows zip accepts invalid launcher case: {label}"
                 )
 
+        mac_root_cases = (
+            (
+                "case-collision",
+                {
+                    "ArenaAI.app/Contents/Info.plist": b"fixture",
+                    "arenaai.app/Contents/MacOS/ArenaAI": b"collision",
+                },
+                "colide por caixa",
+            ),
+            (
+                "extra-root",
+                {
+                    "ArenaAI.app/Contents/Info.plist": b"fixture",
+                    "README.txt": b"extra",
+                },
+                "root extra",
+            ),
+        )
+        for label, entries, expected_error in mac_root_cases:
+            archive_path = Path(tmp) / f"mac-root-{label}.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for name, payload in entries.items():
+                    archive.writestr(name, payload)
+            try:
+                validate_mac_zip_artifact(archive_path)
+            except AssertionError as exc:
+                if expected_error not in str(exc):
+                    raise AssertionError(
+                        f"invalid macOS root was rejected for the wrong reason: {exc}"
+                    ) from exc
+            else:
+                raise AssertionError(
+                    f"macOS ZIP accepts invalid root case: {label}"
+                )
+
         import plistlib
 
         mac_app = Path(tmp) / "ArenaAI.app"
@@ -3061,7 +3101,25 @@ def validate_release_inventory_contract() -> None:
         )
         launcher_path.write_bytes(b"synthetic-launcher")
         launcher_path.chmod(0o755)
-        validate_mac_launcher(mac_app)
+        validate_mac_launcher(
+            mac_app,
+            require_executable=sys.platform != "win32",
+        )
+
+        launcher_path.chmod(0o644)
+        try:
+            validate_mac_launcher(mac_app)
+        except AssertionError as exc:
+            if "executável" not in str(exc):
+                raise AssertionError(
+                    "non-executable macOS launcher was rejected for the "
+                    f"wrong reason: {exc}"
+                ) from exc
+        else:
+            raise AssertionError(
+                "real macOS launcher validation accepts a missing execute bit"
+            )
+        launcher_path.chmod(0o755)
 
         plist_path.write_bytes(b"not-a-plist")
         try:
@@ -4040,10 +4098,93 @@ def validate_full_match_flow() -> None:
         raise AssertionError(f"parallax keeps sliding after full time: {final_scroll:.2f} -> {app.ground_scroll:.2f}")
 
 
+def _qa_cpu_window_means(
+    values: list[float],
+    window_frames: int,
+) -> list[float]:
+    windows = [
+        values[start : start + window_frames]
+        for start in range(0, len(values), window_frames)
+    ]
+    if len(windows) > 1 and len(windows[-1]) < window_frames:
+        windows[-2].extend(windows.pop())
+    return [sum(window) / len(window) for window in windows]
+
+
+def _qa_cpu_clock_profile(
+    values: list[float],
+    coarse_threshold: float,
+) -> tuple[bool, float]:
+    positive = sorted(value for value in values if value > 1e-9)
+    if not positive:
+        return True, float("inf")
+    p10_index = min(len(positive) - 1, math.ceil(len(positive) * 0.10) - 1)
+    observed_quantum = positive[p10_index]
+    return observed_quantum >= coarse_threshold, observed_quantum
+
+
+def validate_cpu_clock_quantization_policy() -> None:
+    coarse_tick = 1.0 / 64.0
+    coarse_samples = [
+        coarse_tick if index % 4 == 0 else 0.0
+        for index in range(2701)
+    ]
+    coarse_samples[7] = 0.001
+    coarse_samples[120] = coarse_tick * 2
+    coarse, quantum = _qa_cpu_clock_profile(coarse_samples, 0.014)
+    if not coarse or not math.isclose(quantum, coarse_tick, abs_tol=1e-9):
+        raise AssertionError(
+            "15.625ms CPU clock with a sub-quantum outlier was not detected"
+        )
+    coarse_windows = _qa_cpu_window_means(coarse_samples, 30)
+    if len(coarse_windows) != 90:
+        raise AssertionError(
+            "partial CPU benchmark window was not merged into a full window"
+        )
+    if max(coarse_windows) >= 0.014:
+        raise AssertionError(
+            "quantized 15.625/31.25ms samples distorted CPU throughput windows"
+        )
+    reconstructed_total = (
+        sum(coarse_windows[:-1]) * 30
+        + coarse_windows[-1] * 31
+    )
+    if not math.isclose(
+        reconstructed_total,
+        sum(coarse_samples),
+        abs_tol=1e-9,
+    ):
+        raise AssertionError("partial CPU benchmark samples were not preserved")
+
+    double_tick = coarse_tick * 2
+    double_tick_samples = [
+        double_tick if index % 4 == 0 else 0.0
+        for index in range(300)
+    ]
+    double_coarse, double_quantum = _qa_cpu_clock_profile(
+        double_tick_samples,
+        0.014,
+    )
+    if not double_coarse or not math.isclose(
+        double_quantum,
+        double_tick,
+        abs_tol=1e-9,
+    ):
+        raise AssertionError("31.25ms base CPU quantum was not detected")
+    if max(_qa_cpu_window_means(double_tick_samples, 30)) >= 0.014:
+        raise AssertionError("31.25ms base quantum distorted CPU throughput windows")
+
+    fine_samples = [0.006 + (index % 3) * 0.0001 for index in range(300)]
+    fine, _quantum = _qa_cpu_clock_profile(fine_samples, 0.014)
+    if fine:
+        raise AssertionError("fine CPU clock was classified as coarse")
+
+
 def validate_sixty_fps_budget() -> None:
     p95_budget = 0.014
     p99_budget = 1.0 / 60.0
     two_frame_budget = 1.0 / 30.0
+    cpu_window_frames = 30
     measurements: list[dict[str, float]] = []
     strict_wall_clock = os.getenv(
         "ARENA_AI_STRICT_WALL_CLOCK_QA",
@@ -4069,7 +4210,24 @@ def validate_sixty_fps_budget() -> None:
             or trial[f"{prefix}_severe_ratio"] > 0.001
         )
 
+    def complete_passed(trial: dict[str, float]) -> bool:
+        cpu_passed = passed(trial, "cpu")
+        wall_passed = passed(trial, "wall")
+        if bool(trial["cpu_clock_coarse"]):
+            # A coarse CPU clock cannot attribute one quantum to one frame.
+            # Keep CPU throughput bounded in windows and make high-resolution
+            # wall time authoritative for individual-frame stalls.
+            return (
+                cpu_passed
+                and wall_passed
+                and trial["wall_max"] <= two_frame_budget
+            )
+        return cpu_passed and (wall_passed or not strict_wall_clock)
+
     maximum_attempts = 5
+    cpu_clock_coarse_mode: bool | None = None
+    consecutive_passes = 0
+    saw_failure = False
     for attempt in range(maximum_attempts):
         app = App(seed=2026)
         app.set_simulate("match")
@@ -4102,7 +4260,22 @@ def validate_sixty_fps_budget() -> None:
             cpu_times.append(time.process_time() - cpu_start)
             wall_times.append(time.perf_counter() - wall_start)
         wall_p95, wall_p99, wall_max, wall_severe_ratio = distribution(wall_times)
-        cpu_p95, cpu_p99, cpu_max, cpu_severe_ratio = distribution(cpu_times)
+        cpu_raw_max = max(cpu_times)
+        detected_coarse_clock, cpu_clock_quantum = _qa_cpu_clock_profile(
+            cpu_times,
+            p95_budget,
+        )
+        if cpu_clock_coarse_mode is None:
+            cpu_clock_coarse_mode = detected_coarse_clock
+        cpu_clock_coarse = cpu_clock_coarse_mode
+        effective_cpu_times = (
+            _qa_cpu_window_means(cpu_times, cpu_window_frames)
+            if cpu_clock_coarse
+            else cpu_times
+        )
+        cpu_p95, cpu_p99, cpu_max, cpu_severe_ratio = distribution(
+            effective_cpu_times
+        )
         measurements.append(
             {
                 "wall_p95": wall_p95,
@@ -4113,6 +4286,9 @@ def validate_sixty_fps_budget() -> None:
                 "cpu_p99": cpu_p99,
                 "cpu_max": cpu_max,
                 "cpu_severe_ratio": cpu_severe_ratio,
+                "cpu_raw_max": cpu_raw_max,
+                "cpu_clock_quantum": cpu_clock_quantum,
+                "cpu_clock_coarse": float(cpu_clock_coarse),
             }
         )
 
@@ -4127,38 +4303,35 @@ def validate_sixty_fps_budget() -> None:
             raise AssertionError(f"text cache is hitting its cap during match loop: {len(app.text_cache.surfaces)}")
         assert_auxiliary_caches_within_limits(app, "match loop")
 
-        current_cpu_passed = passed(measurements[-1], "cpu")
         current_wall_passed = passed(measurements[-1], "wall")
-        current_passed = current_cpu_passed and (
-            current_wall_passed or not strict_wall_clock
-        )
-        recovered = (
-            attempt >= 2
-            and current_passed
-            and passed(measurements[-2], "cpu")
-            and (
-                passed(measurements[-2], "wall")
-                or not strict_wall_clock
+        current_passed = complete_passed(measurements[-1])
+        if current_passed:
+            consecutive_passes += 1
+        else:
+            consecutive_passes = 0
+            saw_failure = True
+        if consecutive_passes >= 2:
+            pass_mode = (
+                f"{cpu_window_frames}-frame CPU windows plus mandatory "
+                "per-frame wall budget"
+                if cpu_clock_coarse
+                else ("CPU+wall" if strict_wall_clock else "CPU")
             )
-        )
-        if attempt == 0 and current_passed:
-            if not current_wall_passed:
+            if cpu_clock_coarse:
+                print(
+                    "[aaa-qa] coarse CPU clock detected and locked for all "
+                    "60fps attempts"
+                )
+            print(
+                "[aaa-qa] 60fps budget "
+                f"{'recovered' if saw_failure else 'passed'} with two "
+                f"consecutive {pass_mode} passes"
+            )
+            if not cpu_clock_coarse and not current_wall_passed:
                 print(
                     "[aaa-qa] 60fps CPU budget passed; wall-clock is "
                     "inconclusive under host contention "
                     "(set ARENA_AI_STRICT_WALL_CLOCK_QA=1 on a controlled host)"
-                )
-            return
-        if recovered:
-            print(
-                "[aaa-qa] 60fps budget recovered with two consecutive "
-                f"{'CPU+wall' if strict_wall_clock else 'CPU'} passes "
-                "after an initial failure"
-            )
-            if not current_wall_passed:
-                print(
-                    "[aaa-qa] wall-clock remains diagnostic-only and "
-                    "inconclusive under host contention"
                 )
             return
         if attempt < maximum_attempts - 1:
@@ -4166,20 +4339,45 @@ def validate_sixty_fps_budget() -> None:
             gc.collect()
             time.sleep(0.5)
             continue
-        details = "; ".join(
-            f"attempt={index + 1}: "
-            f"wall(p95={trial['wall_p95'] * 1000:.2f}ms, p99={trial['wall_p99'] * 1000:.2f}ms, "
-            f"max={trial['wall_max'] * 1000:.2f}ms, over_33ms={trial['wall_severe_ratio']:.3%}); "
-            f"cpu(p95={trial['cpu_p95'] * 1000:.2f}ms, p99={trial['cpu_p99'] * 1000:.2f}ms, "
-            f"max={trial['cpu_max'] * 1000:.2f}ms, over_33ms={trial['cpu_severe_ratio']:.3%})"
-            for index, trial in enumerate(measurements)
+        detail_parts = []
+        for index, trial in enumerate(measurements):
+            cpu_label = (
+                f"cpu[{cpu_window_frames}-frame avg]"
+                if bool(trial["cpu_clock_coarse"])
+                else "cpu"
+            )
+            quantum_detail = (
+                f", raw_quantum={trial['cpu_clock_quantum'] * 1000:.2f}ms, "
+                f"raw_max={trial['cpu_raw_max'] * 1000:.2f}ms"
+                if bool(trial["cpu_clock_coarse"])
+                else ""
+            )
+            detail_parts.append(
+                f"attempt={index + 1}: "
+                f"wall(p95={trial['wall_p95'] * 1000:.2f}ms, "
+                f"p99={trial['wall_p99'] * 1000:.2f}ms, "
+                f"max={trial['wall_max'] * 1000:.2f}ms, "
+                f"over_33ms={trial['wall_severe_ratio']:.3%}); "
+                f"{cpu_label}(p95={trial['cpu_p95'] * 1000:.2f}ms, "
+                f"p99={trial['cpu_p99'] * 1000:.2f}ms, "
+                f"max={trial['cpu_max'] * 1000:.2f}ms, "
+                f"over_33ms={trial['cpu_severe_ratio']:.3%}"
+                f"{quantum_detail})"
+            )
+        details = "; ".join(detail_parts)
+        complete_green = all(
+            complete_passed(trial) for trial in measurements[-2:]
         )
         cpu_green = all(passed(trial, "cpu") for trial in measurements[-2:])
-        classification = (
-            "wall-clock inconclusive under host contention"
-            if strict_wall_clock and cpu_green
-            else "runtime CPU regression"
+        coarse_clock = any(
+            bool(trial["cpu_clock_coarse"]) for trial in measurements[-2:]
         )
+        if coarse_clock:
+            classification = "runtime frame-time regression"
+        elif strict_wall_clock and cpu_green and not complete_green:
+            classification = "wall-clock inconclusive under host contention"
+        else:
+            classification = "runtime CPU regression"
         raise AssertionError(
             f"60fps budget {classification}; two consecutive complete "
             f"passes are required: {details}"
@@ -4570,6 +4768,7 @@ STANDARD_STEPS = (
     validate_asset_manifest,
     validate_release_inventory_contract,
     validate_model_policy_artifacts,
+    validate_cpu_clock_quantization_policy,
     validate_sound_engine_layers,
     validate_match_screen_layout_gate,
     validate_text_safe_area_gate,

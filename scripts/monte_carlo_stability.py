@@ -26,6 +26,7 @@ RUNTIME_PREDICTION_CACHE = MODEL_ROOT / "models" / "runtime_prediction_cache.pkl
 MODEL_REPORT = MODEL_ROOT / "reports" / "sota_model_report.json"
 TRAINING_PATH = MODEL_ROOT / "data" / "processed" / "sota_training_matches.csv"
 SOTA_PIPELINE = SOTA_SRC / "sota_pipeline.py"
+WORLDCUP_MODEL = SRC / "arena_ai" / "worldcup_model.py"
 REPORT_JSON = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.json"
 REPORT_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stability.csv"
 REPORT_STAGE_CSV = MODEL_ROOT / "reports" / "sota_monte_carlo_stage_bracket_stability.csv"
@@ -96,6 +97,8 @@ def source_fingerprints() -> dict[str, Any]:
         "model_report": file_fingerprint(MODEL_REPORT),
         "training_matches": file_fingerprint(TRAINING_PATH),
         "sota_pipeline": file_fingerprint(SOTA_PIPELINE),
+        "runtime_prediction_cache": file_fingerprint(RUNTIME_PREDICTION_CACHE),
+        "worldcup_model": file_fingerprint(WORLDCUP_MODEL),
         "mc_stability_script": file_fingerprint(Path(__file__).resolve()),
     }
 

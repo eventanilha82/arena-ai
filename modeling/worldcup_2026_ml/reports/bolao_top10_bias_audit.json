@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-20T03:00:12.691465+00:00",
+  "generated_at": "2026-08-01T03:44:41.759101+00:00",
   "scope": {
     "ranking": "completed observed bracket lock; no future match prediction",
     "tournament_complete": true,
@@ -326,9 +326,11 @@
   "source_fingerprints": {
     "model_package": "8ddfc8d046fb92ad7166ddc54e4b5e0c2b10899596605c34e393c224ef87b33a",
     "sota_pipeline": "bafab33d1aa4c599e2c3c702d3fc7e134c9995213c079ed3f9c554f2abc50770",
+    "runtime_prediction_cache": "4bb04e8ee4763cffcba4262364d357b849039691ee915ff795a786d9cb47137b",
+    "worldcup_model": "3412dc31f2667879ad951a12963089c89572d7ba7689bc3efb3981fb820b81e9",
     "bolao": "67376f519e2f2dc73dac6119c668684b3df3b782b9f50d4ce62a5dbd6bd94a0f",
     "observed_group_results": "3b801cd72590416d71a1b5ae5b4837f98f9ca15315ff1c022e97719781dc8099",
     "observed_knockout_results": "93aa7ad7b8bfeefe94b1c66a08ae5da3f83d443b659fdb436ea240432a17b810",
-    "top10_bias_audit": "85dc3818721190fb2106139d8dba0dc3468b249349f8676909b77f4bfe78e908"
+    "top10_bias_audit": "0c973b7803973439780991febbeabf9144425254df04c44631dfeb2a79a214df"
   }
 }

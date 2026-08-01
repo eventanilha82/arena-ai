@@ -642,7 +642,11 @@ def validate_bundle_executable_name(value: object, label: str) -> str:
     return value
 
 
-def validate_mac_launcher(path: Path) -> tuple[dict[str, object], Path]:
+def validate_mac_launcher(
+    path: Path,
+    *,
+    require_executable: bool = True,
+) -> tuple[dict[str, object], Path]:
     contents = path / "Contents"
     info_plist = contents / "Info.plist"
     executable_dir = contents / "MacOS"
@@ -678,9 +682,7 @@ def validate_mac_launcher(path: Path) -> tuple[dict[str, object], Path]:
         raise AssertionError(f"launcher macOS precisa ser arquivo regular: {launcher}")
     if launcher_stat.st_size <= 0:
         raise AssertionError(f"launcher macOS não pode estar vazio: {launcher}")
-    # Windows filesystems do not preserve POSIX execute bits. The real macOS
-    # artifact check still enforces this when it runs on macOS.
-    if sys.platform != "win32" and not launcher_stat.st_mode & 0o111:
+    if require_executable and not launcher_stat.st_mode & 0o111:
         raise AssertionError(f"launcher macOS precisa ser executável: {launcher}")
     return plist, launcher
 
@@ -754,6 +756,201 @@ def validate_mac_app(path: Path) -> tuple[list[str], tuple[str, ...]]:
     )
     print(f"[build-assets-qa] {cache_status}")
     return sorted(release_name for release_name, _ in payload_entries), tuple(used_roots)
+
+
+def validate_mac_zip_artifact(
+    path: Path,
+    *,
+    app_name: str = "ArenaAI",
+) -> dict[str, object]:
+    if not path.is_file():
+        raise FileNotFoundError(f"zip macOS não encontrado: {path}")
+    app_root = f"{app_name}.app"
+    with zipfile.ZipFile(path) as archive:
+        corrupt_member = archive.testzip()
+        if corrupt_member is not None:
+            raise AssertionError(
+                f"zip macOS contém entrada corrompida: {corrupt_member!r}"
+            )
+
+        app_entries: dict[str, zipfile.ZipInfo] = {}
+        folded_entries: dict[str, list[str]] = {}
+        for info in archive.infolist():
+            normalized = info.filename.rstrip("/")
+            parts = PurePosixPath(normalized).parts
+            if (
+                not normalized
+                or "\\" in info.filename
+                or info.filename.startswith("/")
+                or any(part in {"", ".", ".."} for part in parts)
+                or (parts and parts[0].endswith(":"))
+            ):
+                raise AssertionError(
+                    f"caminho inseguro no zip macOS: {info.filename!r}"
+                )
+            root = parts[0]
+            if root == "__MACOSX":
+                continue
+            if root.casefold() == app_root.casefold() and root != app_root:
+                raise AssertionError(
+                    "zip macOS contém root que colide por caixa com o bundle: "
+                    f"{root!r} != {app_root!r}"
+                )
+            if root != app_root:
+                raise AssertionError(
+                    f"root extra não autorizado no zip macOS: {root!r}"
+                )
+            relative = "/".join(parts[1:])
+            if not relative:
+                continue
+            folded_entries.setdefault(relative.casefold(), []).append(relative)
+            if not info.is_dir():
+                app_entries[relative] = info
+
+        collisions = {
+            key: names
+            for key, names in folded_entries.items()
+            if len(names) != 1
+        }
+        if collisions:
+            details = "\n".join(
+                f"  - {key}: {names}"
+                for key, names in sorted(collisions.items())
+            )
+            raise AssertionError(
+                "zip macOS contém caminhos duplicados após normalização "
+                "case-insensitive:\n"
+                + details
+            )
+        if not app_entries:
+            raise AssertionError(
+                f"zip macOS não contém bundle raiz exato {app_root!r}"
+            )
+
+        plist_relative = "Contents/Info.plist"
+        plist_info = app_entries.get(plist_relative)
+        if plist_info is None or not zip_info_is_regular_file(plist_info):
+            raise AssertionError(
+                f"zip macOS sem {app_root}/{plist_relative} regular"
+            )
+        try:
+            plist = plistlib.loads(archive.read(plist_info))
+        except Exception as exc:
+            raise AssertionError(f"Info.plist inválido no zip macOS: {exc}") from exc
+        if not isinstance(plist, dict):
+            raise AssertionError("Info.plist do zip macOS precisa conter dicionário")
+        executable_name = validate_bundle_executable_name(
+            plist.get("CFBundleExecutable"),
+            f"{path}:{plist_relative}",
+        )
+        launcher_relative = f"Contents/MacOS/{executable_name}"
+        launcher_info = app_entries.get(launcher_relative)
+        if launcher_info is None or not zip_info_is_regular_file(launcher_info):
+            raise AssertionError(
+                f"zip macOS sem launcher regular exato {launcher_relative}"
+            )
+        launcher_mode = launcher_info.external_attr >> 16
+        if not launcher_mode & 0o111:
+            raise AssertionError(
+                f"launcher macOS no zip precisa preservar execute bit: {launcher_relative}"
+            )
+        launcher_bytes = archive.read(launcher_info)
+        if not launcher_bytes:
+            raise AssertionError("launcher macOS no zip não pode estar vazio")
+
+        digest = hashlib.sha256()
+        file_count = 0
+        total_size = 0
+        for relative, info in sorted(app_entries.items()):
+            mode = info.external_attr >> 16
+            payload = archive.read(info)
+            file_type = stat.S_IFMT(mode)
+            if file_type and stat.S_ISLNK(mode):
+                digest.update(b"L\0" + relative.encode("utf-8") + b"\0")
+                digest.update(
+                    str(len(payload)).encode("ascii") + b"\0" + payload + b"\0"
+                )
+            elif zip_info_is_regular_file(info):
+                digest.update(b"F\0" + relative.encode("utf-8") + b"\0")
+                digest.update(str(len(payload)).encode("ascii") + b"\0")
+                digest.update(sha256_bytes(payload).encode("ascii") + b"\0")
+            else:
+                raise AssertionError(
+                    f"tipo de arquivo especial não suportado no zip macOS: {relative}"
+                )
+            file_count += 1
+            total_size += len(payload)
+
+        payload_entries: list[tuple[str, zipfile.ZipInfo]] = []
+        used_roots: list[str] = []
+        for payload_root in MAC_APP_PAYLOAD_ROOTS:
+            prefix = f"{payload_root}/"
+            root_entries = [
+                (relative[len(prefix) :], info)
+                for relative, info in sorted(app_entries.items())
+                if relative.startswith(prefix) and zip_info_is_regular_file(info)
+            ]
+            if root_entries:
+                used_roots.append(payload_root)
+                payload_entries.extend(root_entries)
+        if not payload_entries:
+            raise AssertionError(f"zip macOS sem payload PyInstaller: {path}")
+
+        embedded_by_key = {
+            logical_release_key(release_name): info
+            for release_name, info in payload_entries
+        }
+        required_to_embedded = validate_release_inventory(
+            [release_name for release_name, _info in payload_entries],
+            str(path),
+        )
+        validate_release_payload_bytes(
+            required_to_embedded,
+            lambda embedded: archive.read(
+                embedded_by_key[logical_release_key(embedded)]
+            ),
+            str(path),
+        )
+        cache_status = validate_runtime_prediction_cache_bytes(
+            archive.read(
+                embedded_by_key[
+                    logical_release_key(
+                        required_to_embedded[RUNTIME_PREDICTION_CACHE_REL]
+                    )
+                ]
+            ),
+            sha256_bytes(
+                archive.read(
+                    embedded_by_key[
+                        logical_release_key(required_to_embedded[MODEL_PACKAGE_REL])
+                    ]
+                )
+            ),
+            sha256_bytes(
+                archive.read(
+                    embedded_by_key[
+                        logical_release_key(required_to_embedded[SOTA_PIPELINE_REL])
+                    ]
+                )
+            ),
+            str(path),
+        )
+
+    print(f"[build-assets-qa] {cache_status}")
+    return {
+        "payload_files": sorted(release_name for release_name, _info in payload_entries),
+        "payload_roots": tuple(used_roots),
+        "tree": {
+            "sha256": digest.hexdigest(),
+            "file_count": file_count,
+            "size_bytes": total_size,
+        },
+        "executable": {
+            "path": launcher_relative,
+            "sha256": sha256_bytes(launcher_bytes),
+            "size_bytes": len(launcher_bytes),
+        },
+    }
 
 
 def main() -> int:

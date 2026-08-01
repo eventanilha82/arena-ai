@@ -359,8 +359,17 @@ Para publicar como GitHub Release, depois de configurar o repositório remoto e
 ter o GitHub CLI autenticado:
 
 ```bash
-make release-github TAG=v0.1.0
+git tag -a v0.2.0 -m "ArenaAI v0.2.0"
+git push origin v0.2.0
+make release-github TAG=v0.2.0
 ```
+
+O empacotamento reabre o ZIP macOS, valida CRC, inventário, bytes, launcher,
+permissão de execução e o fingerprint canônico da árvore contra a proveniência
+do build; o ZIP Windows copiado também é revalidado. Ao final, o snapshot Git
+precisa continuar limpo e idêntico. A publicação exige tag anotada apontando
+exatamente para o SHA comum aos dois builds e usa `gh --verify-tag`, impedindo
+que o GitHub crie silenciosamente uma tag em outro commit.
 
 Se, excepcionalmente, quiser versionar os ZIPs no Git, use o alvo explícito:
 
